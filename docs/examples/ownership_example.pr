@@ -1,0 +1,229 @@
+// Protorun言語サンプル: 所有権と借用の例
+
+// コンソール効果
+effect Console {
+  fn log(message: String): Unit
+}
+
+// コンソールハンドラ
+fn runConsole<T>(action: () -> T with Console): T = {
+  handle action() {
+    Console.log(message) => {
+      println(message)
+      resume()
+    }
+  }
+}
+
+// ベクトル型（可変長配列）
+type Vec<T> = {
+  elements: [T],
+  length: Int
+}
+
+// ベクトルの作成
+fn createVec<T>(): Vec<T> = {
+  {
+    elements: [],
+    length: 0
+  }
+}
+
+// ベクトルに要素を追加（所有権を消費して新しいベクトルを返す）
+fn push<T>(vec: Vec<T>, value: T): Vec<T> = {
+  {
+    elements: vec.elements.concat([value]),
+    length: vec.length + 1
+  }
+}
+
+// ベクトルの要素を取得（借用を使用）
+fn get<T>(vec: &Vec<T>, index: Int): Option<&T> = {
+  if index >= 0 && index < vec.length {
+    Option.Some(&vec.elements[index])
+  } else {
+    Option.None
+  }
+}
+
+// ベクトルの要素を変更（可変借用を使用）
+fn set<T>(vec: &mut Vec<T>, index: Int, value: T): Bool = {
+  if index >= 0 && index < vec.length {
+    vec.elements[index] = value
+    true
+  } else {
+    false
+  }
+}
+
+// 所有権の移動の例
+fn takeOwnership<T>(vec: Vec<T>): Int = {
+  // vecの所有権がここに移動
+  vec.length
+}
+
+// 所有権の移動と返却の例
+fn processAndReturn<T>(vec: Vec<T>): Vec<T> = {
+  // vecの所有権を取得し、処理後に返却
+  let newVec = push(vec, vec.elements[0])
+  newVec  // 新しいベクトルの所有権を返却
+}
+
+// 借用の例
+fn printVec<T: Show<T>>(vec: &Vec<T>): Unit with Console = {
+  Console.log("ベクトルの内容:")
+  
+  for i in 0..vec.length {
+    match get(vec, i) {
+      Option.Some(value) => Console.log(s"[$i]: ${Show.show(*value)}"),
+      Option.None => {}
+    }
+  }
+}
+
+// 可変借用の例
+fn doubleValues(vec: &mut Vec<Int>): Unit = {
+  for i in 0..vec.length {
+    match get(vec, i) {
+      Option.Some(value) => {
+        set(vec, i, *value * 2)
+      },
+      Option.None => {}
+    }
+  }
+}
+
+// リソース型（明示的なクリーンアップが必要）
+type File = {
+  path: String,
+  handle: FileHandle
+}
+
+// ファイルを開く（リソース獲得）
+fn openFile(path: String): Result<File, IOError> = {
+  try {
+    let handle = FileHandle.open(path)
+    Result.Ok({
+      path: path,
+      handle: handle
+    })
+  } catch (e) {
+    Result.Err(IOError.from(e))
+  }
+}
+
+// ファイルを閉じる（リソース解放）
+fn closeFile(file: File): Unit = {
+  file.handle.close()
+}
+
+// RAIIパターンを実現する効果
+effect Resource<R> {
+  fn acquire<A>(acquire: () -> Result<R, A>, release: (R) -> Unit): Result<R, A>
+}
+
+// リソースハンドラ
+fn withResource<R, A, T>(action: () -> T with Resource<R>): T = {
+  handle action() {
+    Resource.acquire(acquire, release) => {
+      match acquire() {
+        Result.Ok(resource) => {
+          try {
+            let result = resume(Result.Ok(resource))
+            release(resource)
+            result
+          } catch (e) {
+            release(resource)
+            throw e
+          }
+        },
+        Result.Err(error) => {
+          resume(Result.Err(error))
+        }
+      }
+    }
+  }
+}
+
+// リソース効果を使ったファイル処理
+fn processFile(path: String): Result<String, IOError> with Resource<File> & Console = {
+  let fileResult = Resource.acquire(
+    () => openFile(path),
+    file => closeFile(file)
+  )
+  
+  match fileResult {
+    Result.Ok(file) => {
+      Console.log(s"ファイルを開きました: ${file.path}")
+      let content = file.handle.readToString()
+      Console.log(s"ファイルの内容: $content")
+      Result.Ok(content)
+    },
+    Result.Err(error) => {
+      Console.log(s"ファイルを開けませんでした: $error")
+      Result.Err(error)
+    }
+  }
+}
+
+// ライフタイムの例
+fn longest<'a>(s1: &'a String, s2: &'a String): &'a String = {
+  if s1.length > s2.length { s1 } else { s2 }
+}
+
+// メイン関数
+fn main(): Unit with Console & Resource<File> = {
+  Console.log("所有権と借用の例")
+  
+  // ベクトルの作成と操作
+  let mut vec = createVec<Int>()
+  vec = push(vec, 1)
+  vec = push(vec, 2)
+  vec = push(vec, 3)
+  
+  // 借用を使った読み取り
+  printVec(&vec)
+  
+  // 可変借用を使った変更
+  doubleValues(&mut vec)
+  
+  // 変更後の内容を表示
+  printVec(&vec)
+  
+  // 所有権の移動
+  let length = takeOwnership(vec)
+  Console.log(s"ベクトルの長さ: $length")
+  
+  // ここでvecは使用不可（所有権が移動済み）
+  // printVec(&vec)  // コンパイルエラー
+  
+  // 新しいベクトルを作成
+  let mut newVec = createVec<String>()
+  newVec = push(newVec, "Hello")
+  newVec = push(newVec, "World")
+  
+  // 所有権の移動と返却
+  newVec = processAndReturn(newVec)
+  printVec(&newVec)
+  
+  // ライフタイムの例
+  let s1 = "短い文字列"
+  let s2 = "これはより長い文字列です"
+  let longerStr = longest(&s1, &s2)
+  Console.log(s"より長い文字列: $longerStr")
+  
+  // リソース管理の例
+  match processFile("example.txt") {
+    Result.Ok(content) => Console.log(s"ファイル処理成功: $content"),
+    Result.Err(error) => Console.log(s"ファイル処理エラー: $error")
+  }
+}
+
+// プログラム実行
+fn run(): Unit = {
+  runConsole(() => {
+    withResource(() => {
+      main()
+    })
+  })
+}

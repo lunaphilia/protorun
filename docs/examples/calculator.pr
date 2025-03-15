@@ -1,0 +1,152 @@
+// Protorun言語サンプル: 簡単な計算機
+
+// 式を表す代数的データ型
+sealed trait Expr
+object Expr {
+  case class Number(value: Int) extends Expr
+  case class Add(left: Expr, right: Expr) extends Expr
+  case class Subtract(left: Expr, right: Expr) extends Expr
+  case class Multiply(left: Expr, right: Expr) extends Expr
+  case class Divide(left: Expr, right: Expr) extends Expr
+}
+
+// 例外効果
+effect Exception<E> {
+  fn raise<T>(error: E): T
+}
+
+// 例外ハンドラ
+fn runException<T, E>(action: () -> T with Exception<E>): Result<T, E> = {
+  handle action() {
+    return x => Result.Ok(x),
+    
+    Exception.raise(error) => Result.Err(error)
+  }
+}
+
+// 式の評価
+fn evaluate(expr: Expr): Int with Exception<String> = {
+  match expr {
+    Expr.Number(value) => value,
+    
+    Expr.Add(left, right) => {
+      let l = evaluate(left)
+      let r = evaluate(right)
+      l + r
+    },
+    
+    Expr.Subtract(left, right) => {
+      let l = evaluate(left)
+      let r = evaluate(right)
+      l - r
+    },
+    
+    Expr.Multiply(left, right) => {
+      let l = evaluate(left)
+      let r = evaluate(right)
+      l * r
+    },
+    
+    Expr.Divide(left, right) => {
+      let l = evaluate(left)
+      let r = evaluate(right)
+      
+      if r == 0 {
+        Exception.raise("ゼロ除算エラー")
+      } else {
+        l / r
+      }
+    }
+  }
+}
+
+// コンソール効果
+effect Console {
+  fn log(message: String): Unit
+  fn readLine(): String
+}
+
+// コンソールハンドラ
+fn runConsole<T>(action: () -> T with Console): T = {
+  handle action() {
+    Console.log(message) => {
+      println(message)
+      resume()
+    },
+    
+    Console.readLine() => {
+      let input = readLine()
+      resume(input)
+    }
+  }
+}
+
+// 文字列をパースして式に変換
+fn parseExpr(input: String): Result<Expr, String> = {
+  // 実際の実装では、より複雑なパーサーを使用
+  // ここでは簡略化のため、単純な例を示す
+  try {
+    let tokens = input.split(" ")
+    
+    if tokens.length == 1 {
+      Result.Ok(Expr.Number(tokens[0].toInt()))
+    } else if tokens.length == 3 {
+      let left = Expr.Number(tokens[0].toInt())
+      let op = tokens[1]
+      let right = Expr.Number(tokens[2].toInt())
+      
+      match op {
+        "+" => Result.Ok(Expr.Add(left, right)),
+        "-" => Result.Ok(Expr.Subtract(left, right)),
+        "*" => Result.Ok(Expr.Multiply(left, right)),
+        "/" => Result.Ok(Expr.Divide(left, right)),
+        _ => Result.Err(s"不明な演算子: $op")
+      }
+    } else {
+      Result.Err("無効な入力形式")
+    }
+  } catch {
+    _ => Result.Err("パースエラー")
+  }
+}
+
+// メイン関数
+fn main(): Unit with Console = {
+  Console.log("簡単な計算機")
+  Console.log("形式: 数値 演算子 数値（例: 5 + 3）")
+  Console.log("終了するには 'exit' と入力してください")
+  
+  var running = true
+  
+  while running {
+    Console.log("> ")
+    let input = Console.readLine()
+    
+    if input == "exit" {
+      running = false
+      Console.log("終了します")
+    } else {
+      match parseExpr(input) {
+        Result.Ok(expr) => {
+          let result = runException(() => evaluate(expr))
+          
+          match result {
+            Result.Ok(value) => Console.log(s"結果: $value"),
+            Result.Err(error) => Console.log(s"エラー: $error")
+          }
+        },
+        
+        Result.Err(error) => {
+          Console.log(s"パースエラー: $error")
+        }
+      }
+    }
+  }
+}
+
+// プログラム実行
+fn run(): Unit = {
+  runConsole(() => {
+    main()
+  })
+}
