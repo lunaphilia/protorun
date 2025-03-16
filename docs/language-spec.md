@@ -30,10 +30,11 @@ Protorunの設計では、以下の機能を優先しています：
 ```
 fn       let      var      if       else     match    case
 return   for      while    in       trait    impl     type
-effect   handle   resume   try      catch    throw    with
-module   import   pub      enum     resource do       as
-release  context  local    acquire  own
+effect   try      catch    throw    with     enum     do
+module   import   pub      as       own      managed  cleanup
 ```
+
+注意: 以前のバージョンから、`handle`, `resume`, `resource`, `release`, `context`, `local`, `acquire`のキーワードは削除され、一部は`managed`や`cleanup`などに統合されました。
 
 ### 2.2 演算子
 
@@ -160,8 +161,8 @@ impl<T: Show> Show for Option<T> {
 ### 3.5 リソース型
 
 ```
-// リソース型の定義
-resource type File {
+// 管理型の定義（旧リソース型）
+managed type File {
   // 内部フィールド
   handle: FileHandle,
   path: String,
@@ -190,13 +191,13 @@ resource type File {
 ### 3.6 リソースパターン型クラス
 
 ```
-// リソースパターンの型クラス
+// 管理リソースパターンの型クラス
 trait Resource<R> {
   // リソース獲得
-  fn acquire<E>(acquireFn: () -> Result<R, E>): Result<R, E>
+  fn open<E>(acquireFn: () -> Result<R, E>): Result<R, E>
   
   // リソース解放
-  fn release(resource: R): Unit
+  fn cleanup(resource: R): Unit
   
   // リソース使用
   fn use<T>(resource: &R, action: (r: &R) -> T): T
@@ -205,16 +206,16 @@ trait Resource<R> {
   fn map<S>(resource: R, f: (R) -> S): S with Resource<S>
 }
 
-// リソース型に対する自動実装
-impl<R: resource type> Resource<R> {
+// 管理型に対する自動実装
+impl<R: managed type> Resource<R> {
   // デフォルト実装
-  fn acquire<E>(acquireFn: () -> Result<R, E>): Result<R, E> = acquireFn()
+  fn open<E>(acquireFn: () -> Result<R, E>): Result<R, E> = acquireFn()
   
-  fn release(resource: R): Unit = resource.close()
+  fn cleanup(resource: R): Unit = resource.close()
   
   fn use<T>(resource: &R, action: (r: &R) -> T): T = action(resource)
   
-  fn map<S: resource type>(resource: R, f: (R) -> S): S = {
+  fn map<S: managed type>(resource: R, f: (R) -> S): S = {
     let result = f(resource)
     // resourceは自動的に解放される
     result
@@ -226,13 +227,13 @@ fn withResource<R, T, E>(
   acquireFn: () -> Result<R, E>,
   action: (r: &R) -> T
 ): Result<T, E> with Resource<R> = {
-  let resource = Resource.acquire(acquireFn)?
+  let resource = Resource.open(acquireFn)?
   try {
     let result = Resource.use(&resource, action)
-    Resource.release(resource)
+    Resource.cleanup(resource)
     Result.Ok(result)
   } catch (e) {
-    Resource.release(resource)
+    Resource.cleanup(resource)
     throw e
   }
 }
@@ -322,14 +323,11 @@ do {
   validEmail
 }
 
-// 効果のローカライゼーション
-local effect Logger {
-  // ローカルスコープ内でのみ有効な効果の実装
-  handle {
-    Logger.log(message) => {
-      println(s"[LOG] $message")
-      resume()
-    }
+// 効果のスコープ化（旧ローカライゼーション）
+with scoped effect Logger {
+  // このスコープ内でのみ有効な効果の実装
+  fn log(message: String): Unit = {
+    println(s"[LOG] $message")
   }
   
   // 効果を使用するコード
@@ -511,16 +509,16 @@ effect FileSystem {
 }
 ```
 
-### 6.2 リソース効果の定義
+### 6.2 ライフサイクル管理を持つ効果
 
 ```
-// リソース効果の定義
-resource effect ResourceManager<R> {
+// ライフサイクル管理を持つ効果（旧リソース効果）
+effect ResourceManager<R> with lifecycle {
   // 獲得操作（自動的にリソースのライフサイクル管理が行われる）
-  fn acquire<E>(acquireFn: () -> Result<R, E>): Result<R, E> with release(R)
+  fn open<E>(acquireFn: () -> Result<R, E>): Result<R, E> with cleanup
   
   // 解放操作の定義
-  release fn release(resource: R): Unit
+  fn cleanup(resource: R): Unit
   
   // 通常の効果操作
   fn use<T>(resource: &R, operation: (r: &R) -> T): T
@@ -528,21 +526,21 @@ resource effect ResourceManager<R> {
 
 // 使用例
 fn processFile(path: String): Result<String, IOError> with ResourceManager<File> = {
-  // acquireはリソースを獲得し、スコープ終了時に自動的に解放される
-  let file = ResourceManager.acquire(() => File.open(path))?
+  // openはリソースを獲得し、スコープ終了時に自動的に解放される
+  let file = ResourceManager.open(() => File.open(path))?
   
   // リソースの使用
   let content = ResourceManager.use(&file, f => f.readToString())?
   
   Result.Ok(content)
-} // fileは自動的に解放される
+} // fileは自動的に解放される（cleanup関数が呼び出される）
 ```
 
-### 6.3 コンテキストリソース
+### 6.3 コンテキスト型
 
 ```
-// コンテキストリソースの宣言
-context resource Database {
+// コンテキスト型の宣言（旧コンテキストリソース）
+context type Database {
   connection: DbConnection,
   
   // 初期化
@@ -573,7 +571,7 @@ fn main(): Result<Unit, Error> = {
   // データベース接続を確立
   let db = Database.connect(config)?
   
-  // コンテキストリソースとして提供
+  // コンテキスト型として提供
   with db {
     // dbが暗黙的に利用可能になる
     let userData = processUserData("user123")?
@@ -690,14 +688,14 @@ fn runFileSystem<T>(action: () -> T with FileSystem): T = {
   }
 }
 
-// リソース効果ハンドラ
+// ライフサイクル管理効果ハンドラ
 fn runResourceManager<R, T>(action: () -> T with ResourceManager<R>): T = {
   // アクティブなリソースを追跡
   var activeResources = Set<R>()
   
   try {
     handle action() {
-      ResourceManager.acquire(acquireFn) => {
+      ResourceManager.open(acquireFn) => {
         match acquireFn() {
           Result.Ok(resource) => {
             activeResources.add(resource)
@@ -709,9 +707,9 @@ fn runResourceManager<R, T>(action: () -> T with ResourceManager<R>): T = {
         }
       },
       
-      ResourceManager.release(resource) => {
+      ResourceManager.cleanup(resource) => {
         // リソースを解放
-        if resource is resource type {
+        if resource is managed type {
           resource.close()
         }
         activeResources.remove(resource)
@@ -726,7 +724,7 @@ fn runResourceManager<R, T>(action: () -> T with ResourceManager<R>): T = {
   } finally {
     // 未解放のリソースを自動的に解放
     for resource in activeResources {
-      if resource is resource type {
+      if resource is managed type {
         resource.close()
       }
     }
@@ -933,28 +931,28 @@ fn main(): Unit with Console = {
 }
 ```
 
-### 9.3 ファイル処理（リソース効果を使用）
+### 9.3 ファイル処理（ライフサイクル管理効果を使用）
 
 ```
-// ファイル処理の実装（リソース効果を使用）
+// ファイル処理の実装（ライフサイクル管理効果を使用）
 fn processFile(path: String): Result<String, IOError> with ResourceManager<File> = {
   // ファイルを開く（スコープ終了時に自動的に閉じられる）
-  let file = ResourceManager.acquire(() => File.open(path))?
+  let file = ResourceManager.open(() => File.open(path))?
   
   // ファイルから読み込む
   let content = ResourceManager.use(&file, f => f.read())?
   
   // 処理された内容を別のファイルに書き込む
   let processed = content.toUpperCase()
-  let outputFile = ResourceManager.acquire(() => File.open(path + ".processed"))?
+  let outputFile = ResourceManager.open(() => File.open(path + ".processed"))?
   ResourceManager.use(&outputFile, f => f.write(processed))?
   
   Result.Ok(processed)
-} // fileとoutputFileは自動的に解放される
+} // fileとoutputFileは自動的に解放される（cleanup関数が呼び出される）
 
 // 使用例
 fn main(): Unit with Console = {
-  // リソース効果ハンドラを適用
+  // ライフサイクル管理効果ハンドラを適用
   runResourceManager(() => {
     match processFile("input.txt") {
       Result.Ok(content) => Console.log(s"処理完了: $content"),
@@ -971,22 +969,20 @@ fn main(): Unit with Console = {
 ```ebnf
 Program ::= (Declaration | Statement)*
 
-Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | ResourceEffectDecl
+Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl
 
 FunctionDecl ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("with" EffectType)? "=" Expression
 
 TypeDecl ::= "type" Identifier GenericParams? "=" (RecordType | Type)
            | "sealed" "trait" Identifier GenericParams? ("{" TraitMember* "}")? ("extends" TypeRef)?
-           | "resource" "type" Identifier GenericParams? "{" ResourceTypeMember* "}"
-           | "context" "resource" Identifier GenericParams? "{" ResourceTypeMember* "}"
+           | "managed" "type" Identifier GenericParams? "{" ManagedTypeMember* "}"
+           | "context" "type" Identifier GenericParams? "{" ManagedTypeMember* "}"
 
 TraitDecl ::= "trait" Identifier GenericParams? ("{" TraitMember* "}")? ("extends" TypeRef)?
 
 ImplDecl ::= "impl" GenericParams? TypeRef "for"? TypeRef "{" ImplMember* "}"
 
-EffectDecl ::= "effect" Identifier GenericParams? "{" EffectOperation* "}"
-
-ResourceEffectDecl ::= "resource" "effect" Identifier GenericParams? "{" ResourceEffectOperation* "}"
+EffectDecl ::= "effect" Identifier GenericParams? ("with" "lifecycle")? "{" EffectOperation* "}"
 
 RecordType ::= "{" (Identifier ":" Type ("," Identifier ":" Type)*)? "}"
 
@@ -994,14 +990,12 @@ TraitMember ::= FunctionDecl
 
 ImplMember ::= FunctionDecl
 
-ResourceTypeMember ::= FieldDecl | FunctionDecl
+ManagedTypeMember ::= FieldDecl | FunctionDecl
 
 FieldDecl ::= Identifier ":" Type
 
-EffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)? ";"
-
-ResourceEffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("with" "release" "(" Type ")")? ";"
-                         | "release" "fn" Identifier ParamList (":" Type)? ";"
+EffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("with" "cleanup")? ";"
+                 | "fn" "cleanup" ParamList (":" Type)? ";"
 
 ParamList ::= "(" (Param ("," Param)*)? ")"
 
@@ -1049,7 +1043,7 @@ Expression ::= LiteralExpr
              | UnaryExpr
              | HandleExpr
              | WithExpr
-             | LocalEffectExpr
+             | ScopedEffectExpr
 
 LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral
 
@@ -1077,7 +1071,7 @@ HandleExpr ::= "handle" Expression "{" (EffectCase)* "}"
 
 WithExpr ::= "with" (Expression | TypeRef) ("handled" "by" Expression)? BlockExpr
 
-LocalEffectExpr ::= "local" "effect" Identifier BlockExpr
+ScopedEffectExpr ::= "with" "scoped" "effect" Identifier BlockExpr
 
 EffectCase ::= QualifiedIdentifier ParamList "=>" BlockExpr
 

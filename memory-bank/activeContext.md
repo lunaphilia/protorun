@@ -12,19 +12,23 @@
 - 代数的効果と所有権システムの統合設計
 - トレイトとデータ型の継承に関する検討と決定
 - nullの排除とOption/Result型の導入
-- リソース型と効果スコープの導入
+- 管理型（旧リソース型）と効果スコープの導入
 - 関数合成のサポート強化（パイプライン演算子、関数合成演算子、do記法）
 - サンプルコードの更新と充実（calculator.pr, state_counter.pr, ownership_example.pr）
 - 制御構造の検討と決定（if式とmatch式の両方を維持）
 - 設計決定の文書化（docs/design-decisions/control-structures.md）
 - 実装計画の詳細化（docs/implementation-plan.md）
 - 言語仕様の改善：
-  - リソース効果の言語レベルサポート（resource effect構文）
-  - リソースパターン型クラス（Resource<R>型クラス）
-  - コンテキストリソース（context resource構文）
-  - 効果ローカライゼーション（local effect構文）
+  - ライフサイクル管理効果の言語レベルサポート（effect with lifecycle構文）
+  - 管理リソースパターンの型クラス（Resource<R>型クラス）
+  - コンテキスト型（context type構文）
+  - 効果のスコープ化（with scoped effect構文）
   - 所有権を考慮した効果（ownキーワード）
   - 文法の拡張（新しい構文要素をEBNF文法に追加）
+- 言語仕様の簡素化：
+  - キーワード数の削減（7個削除、2個追加、純減5個）
+  - 構文の統一と命名の一貫性向上
+  - 複雑な機能の簡素化と直感的な表現
 
 ## 次のステップ
 - 言語仕様の継続的な改善と形式化
