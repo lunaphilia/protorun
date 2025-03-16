@@ -4,6 +4,7 @@
 effect State<S> {
   fn get(): S
   fn set(newState: S): Unit
+  fn modify(f: (S) -> S): Unit
 }
 
 // 状態ハンドラ
@@ -20,6 +21,11 @@ fn runState<S, T>(initialState: S, action: () -> T with State<S>): (T, S) = {
     State.set(newState) => {
       state = newState
       resume()
+    },
+    
+    State.modify(f) => {
+      state = f(state)
+      resume()
     }
   }
   
@@ -30,7 +36,8 @@ fn runState<S, T>(initialState: S, action: () -> T with State<S>): (T, S) = {
 fn makeCounter(initial: Int): () -> Int with State<Int> = {
   () => {
     let current = State.get()
-    State.set(current + 1)
+    // modifyを使用した実装
+    State.modify(count => count + 1)
     current
   }
 }
@@ -56,86 +63,117 @@ fn runConsole<T>(action: () -> T with Console): T = {
 fn useCounter(counter: () -> Int with State<Int>): Unit with Console & State<Int> = {
   Console.log("カウンターのテスト")
   
-  Console.log(s"1回目: ${counter()}")  // 0
-  Console.log(s"2回目: ${counter()}")  // 1
-  Console.log(s"3回目: ${counter()}")  // 2
+  // パイプライン演算子を使用した連続呼び出し
+  counter()
+    |> (value => { Console.log(s"1回目: $value"); value })
+  
+  counter()
+    |> (value => { Console.log(s"2回目: $value"); value })
+  
+  counter()
+    |> (value => { Console.log(s"3回目: $value"); value })
   
   // 状態を直接取得して表示
-  let currentState = State.get()
-  Console.log(s"現在の状態: $currentState")  // 3
+  State.get()
+    |> (state => { Console.log(s"現在の状態: $state"); state })
   
   // 状態をリセット
   State.set(0)
-  Console.log(s"リセット後: ${counter()}")  // 0
+  
+  counter()
+    |> (value => { Console.log(s"リセット後: $value"); value })
 }
 
 // 複数のカウンターを使用する例
 fn multipleCounters(): Unit with Console = {
   Console.log("複数のカウンター")
   
-  // 最初のカウンター（初期値0）
-  let (_, finalState1) = runState(0, () => {
+  // 効果スコープを使用
+  with State<Int> handled by (action => runState(0, action)) {
     let counter1 = makeCounter(0)
     
     Console.log("カウンター1:")
     Console.log(s"1回目: ${counter1()}")  // 0
     Console.log(s"2回目: ${counter1()}")  // 1
-  })
-  
-  Console.log(s"カウンター1の最終状態: $finalState1")  // 2
+    
+    // 状態を取得
+    let finalState1 = State.get()
+    Console.log(s"カウンター1の最終状態: $finalState1")  // 2
+  }
   
   // 2番目のカウンター（初期値10）
-  let (_, finalState2) = runState(10, () => {
+  with State<Int> handled by (action => runState(10, action)) {
     let counter2 = makeCounter(10)
     
     Console.log("カウンター2:")
     Console.log(s"1回目: ${counter2()}")  // 10
     Console.log(s"2回目: ${counter2()}")  // 11
     Console.log(s"3回目: ${counter2()}")  // 12
-  })
-  
-  Console.log(s"カウンター2の最終状態: $finalState2")  // 13
+    
+    // 状態を取得
+    let finalState2 = State.get()
+    Console.log(s"カウンター2の最終状態: $finalState2")  // 13
+  }
 }
 
 // 状態を共有するカウンター
 fn sharedState(): Unit with Console = {
   Console.log("状態を共有するカウンター")
   
-  let (_, finalState) = runState(0, () => {
+  // 効果スコープを使用
+  with State<Int> handled by (action => runState(0, action)) {
     let incrementer = makeCounter(0)  // 1ずつ増加
     
-    // 2ずつ増加するカウンター
+    // 2ずつ増加するカウンター（modifyを使用）
     let doubleIncrementer = () => {
       let current = State.get()
-      State.set(current + 2)
+      State.modify(count => count + 2)
       current
     }
     
-    Console.log("インクリメンター:")
-    Console.log(s"1回目: ${incrementer()}")  // 0
+    // 関数合成を使用した処理
+    let logCounter = (name: String, counter: () -> Int with State<Int>) => {
+      Console.log(s"$name:")
+      Console.log(s"1回目: ${counter()}")
+    }
     
-    Console.log("ダブルインクリメンター:")
-    Console.log(s"1回目: ${doubleIncrementer()}")  // 1
+    // インクリメンターを使用
+    logCounter("インクリメンター", incrementer)
     
-    Console.log("インクリメンター:")
-    Console.log(s"2回目: ${incrementer()}")  // 3
+    // ダブルインクリメンターを使用
+    logCounter("ダブルインクリメンター", doubleIncrementer)
     
-    Console.log("ダブルインクリメンター:")
-    Console.log(s"2回目: ${doubleIncrementer()}")  // 4
-  })
-  
-  Console.log(s"最終状態: $finalState")  // 6
+    // インクリメンターを再度使用
+    logCounter("インクリメンター", () => {
+      let value = incrementer()
+      Console.log(s"2回目: $value")
+      value
+    })
+    
+    // ダブルインクリメンターを再度使用
+    logCounter("ダブルインクリメンター", () => {
+      let value = doubleIncrementer()
+      Console.log(s"2回目: $value")
+      value
+    })
+    
+    // 最終状態を取得
+    let finalState = State.get()
+    Console.log(s"最終状態: $finalState")  // 6
+  }
 }
 
 // メイン関数
 fn main(): Unit with Console = {
   // 基本的なカウンターの使用例
-  let (_, finalState) = runState(0, () => {
+  with State<Int> handled by (action => runState(0, action)) {
     let counter = makeCounter(0)
     useCounter(counter)
-  })
-  
-  Console.log(s"最終状態: $finalState")  // 1
+    
+    // 最終状態を取得
+    let finalState = State.get()
+    Console.log(s"最終状態: $finalState")  // 1
+  }
   
   // 複数のカウンター
   multipleCounters()
@@ -146,7 +184,8 @@ fn main(): Unit with Console = {
 
 // プログラム実行
 fn run(): Unit = {
-  runConsole(() => {
+  // 効果スコープを使用
+  with Console handled by runConsole {
     main()
-  })
+  }
 }

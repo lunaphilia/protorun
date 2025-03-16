@@ -21,6 +21,20 @@ type Vec<T> = {
   length: Int
 }
 
+// Showトレイト（新しい構文）
+trait Show {
+  fn show(self): String
+}
+
+// 基本型のShow実装
+impl Show for Int {
+  fn show(self): String = self.toString()
+}
+
+impl Show for String {
+  fn show(self): String = self
+}
+
 // ベクトルの作成
 fn createVec<T>(): Vec<T> = {
   {
@@ -70,15 +84,19 @@ fn processAndReturn<T>(vec: Vec<T>): Vec<T> = {
 }
 
 // 借用の例
-fn printVec<T: Show<T>>(vec: &Vec<T>): Unit with Console = {
+fn printVec<T: Show>(vec: &Vec<T>): Unit with Console = {
   Console.log("ベクトルの内容:")
   
-  for i in 0..vec.length {
-    match get(vec, i) {
-      Option.Some(value) => Console.log(s"[$i]: ${Show.show(*value)}"),
-      Option.None => {}
-    }
-  }
+  // パイプライン演算子を使用
+  0..vec.length
+    |> (range => {
+      for i in range {
+        match get(vec, i) {
+          Option.Some(value) => Console.log(s"[$i]: ${(*value).show()}"),
+          Option.None => {}
+        }
+      }
+    })
 }
 
 // 可変借用の例
@@ -93,78 +111,62 @@ fn doubleValues(vec: &mut Vec<Int>): Unit = {
   }
 }
 
-// リソース型（明示的なクリーンアップが必要）
-type File = {
+// リソース型（自動クリーンアップ）
+resource type File {
   path: String,
-  handle: FileHandle
-}
-
-// ファイルを開く（リソース獲得）
-fn openFile(path: String): Result<File, IOError> = {
-  try {
-    let handle = FileHandle.open(path)
-    Result.Ok({
-      path: path,
-      handle: handle
-    })
-  } catch (e) {
-    Result.Err(IOError.from(e))
-  }
-}
-
-// ファイルを閉じる（リソース解放）
-fn closeFile(file: File): Unit = {
-  file.handle.close()
-}
-
-// RAIIパターンを実現する効果
-effect Resource<R> {
-  fn acquire<A>(acquire: () -> Result<R, A>, release: (R) -> Unit): Result<R, A>
-}
-
-// リソースハンドラ
-fn withResource<R, A, T>(action: () -> T with Resource<R>): T = {
-  handle action() {
-    Resource.acquire(acquire, release) => {
-      match acquire() {
-        Result.Ok(resource) => {
-          try {
-            let result = resume(Result.Ok(resource))
-            release(resource)
-            result
-          } catch (e) {
-            release(resource)
-            throw e
-          }
-        },
-        Result.Err(error) => {
-          resume(Result.Err(error))
-        }
-      }
-    }
-  }
-}
-
-// リソース効果を使ったファイル処理
-fn processFile(path: String): Result<String, IOError> with Resource<File> & Console = {
-  let fileResult = Resource.acquire(
-    () => openFile(path),
-    file => closeFile(file)
-  )
+  handle: FileHandle,
   
-  match fileResult {
-    Result.Ok(file) => {
-      Console.log(s"ファイルを開きました: ${file.path}")
-      let content = file.handle.readToString()
-      Console.log(s"ファイルの内容: $content")
+  // 獲得関数（コンストラクタ）
+  fn open(path: String): Result<File, IOError> = {
+    try {
+      let handle = FileHandle.open(path)
+      Result.Ok(File {
+        path: path,
+        handle: handle
+      })
+    } catch (e) {
+      Result.Err(IOError.from(e))
+    }
+  }
+  
+  // 解放関数（デストラクタ）
+  fn close(self): Unit = {
+    self.handle.close()
+  }
+  
+  // ファイルから読み込み（不変借用）
+  fn readToString(self: &Self): Result<String, IOError> = {
+    try {
+      let content = self.handle.readToString()
       Result.Ok(content)
-    },
-    Result.Err(error) => {
-      Console.log(s"ファイルを開けませんでした: $error")
-      Result.Err(error)
+    } catch (e) {
+      Result.Err(IOError.from(e))
+    }
+  }
+  
+  // ファイルに書き込み（可変借用）
+  fn write(self: &mut Self, content: String): Result<Unit, IOError> = {
+    try {
+      self.handle.write(content)
+      Result.Ok(())
+    } catch (e) {
+      Result.Err(IOError.from(e))
     }
   }
 }
+
+// リソース型を使ったファイル処理
+fn processFile(path: String): Result<String, IOError> with Console = {
+  // ファイルを開く（スコープ終了時に自動的に閉じられる）
+  let file = File.open(path)?
+  
+  // ファイル操作
+  Console.log(s"ファイルを開きました: ${file.path}")
+  let content = file.readToString()?
+  Console.log(s"ファイルの内容: $content")
+  
+  Result.Ok(content)
+} // ここでfileのclose()が自動的に呼び出される
 
 // ライフタイムの例
 fn longest<'a>(s1: &'a String, s2: &'a String): &'a String = {
@@ -172,14 +174,28 @@ fn longest<'a>(s1: &'a String, s2: &'a String): &'a String = {
 }
 
 // メイン関数
-fn main(): Unit with Console & Resource<File> = {
+fn main(): Unit with Console = {
   Console.log("所有権と借用の例")
+  
+  // ベクトル操作の例
+  demoVectorOperations()
+  
+  // ライフタイムの例
+  demoLifetimes()
+  
+  // リソース管理の例
+  demoResourceManagement()
+}
+
+// ベクトル操作のデモ
+fn demoVectorOperations(): Unit with Console = {
+  Console.log("\n=== ベクトル操作のデモ ===")
   
   // ベクトルの作成と操作
   let mut vec = createVec<Int>()
-  vec = push(vec, 1)
-  vec = push(vec, 2)
-  vec = push(vec, 3)
+    |> (v => push(v, 1))
+    |> (v => push(v, 2))
+    |> (v => push(v, 3))
   
   // 借用を使った読み取り
   printVec(&vec)
@@ -199,20 +215,28 @@ fn main(): Unit with Console & Resource<File> = {
   
   // 新しいベクトルを作成
   let mut newVec = createVec<String>()
-  newVec = push(newVec, "Hello")
-  newVec = push(newVec, "World")
+    |> (v => push(v, "Hello"))
+    |> (v => push(v, "World"))
   
   // 所有権の移動と返却
   newVec = processAndReturn(newVec)
   printVec(&newVec)
+}
+
+// ライフタイムのデモ
+fn demoLifetimes(): Unit with Console = {
+  Console.log("\n=== ライフタイムのデモ ===")
   
-  // ライフタイムの例
   let s1 = "短い文字列"
   let s2 = "これはより長い文字列です"
   let longerStr = longest(&s1, &s2)
   Console.log(s"より長い文字列: $longerStr")
+}
+
+// リソース管理のデモ
+fn demoResourceManagement(): Unit with Console = {
+  Console.log("\n=== リソース管理のデモ ===")
   
-  // リソース管理の例
   match processFile("example.txt") {
     Result.Ok(content) => Console.log(s"ファイル処理成功: $content"),
     Result.Err(error) => Console.log(s"ファイル処理エラー: $error")
@@ -221,9 +245,8 @@ fn main(): Unit with Console & Resource<File> = {
 
 // プログラム実行
 fn run(): Unit = {
-  runConsole(() => {
-    withResource(() => {
-      main()
-    })
-  })
+  // 効果スコープを使用
+  with Console handled by runConsole {
+    main()
+  }
 }

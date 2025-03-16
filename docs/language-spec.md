@@ -14,6 +14,15 @@ Protorunは以下の設計理念に基づいています：
 - **シンプルさ**: 学習しやすく、読みやすい構文と強力な型推論
 - **効率性**: 高性能な実行と予測可能なリソース使用
 
+### 1.2 コア機能の優先順位
+
+Protorunの設計では、以下の機能を優先しています：
+
+1. **代数的効果システム**: 副作用を型レベルで追跡し制御するメカニズム
+2. **所有権モデル**: メモリ安全性を静的に保証するメカニズム
+3. **強力な型システム**: 静的型付けと型推論による安全性
+4. **代数的データ型**: データのモデリングのための表現力豊かな型
+
 ## 2. 字句構造
 
 ### 2.1 キーワード
@@ -22,14 +31,15 @@ Protorunは以下の設計理念に基づいています：
 fn       let      var      if       else     match    case
 return   for      while    in       trait    impl     type
 effect   handle   resume   try      catch    throw    with
-module   import   pub      sealed   object   extends  as
+module   import   pub      enum     resource do       as
 ```
 
 ### 2.2 演算子
 
 ```
 +  -  *  /  %  =  ==  !=  <  >  <=  >=  &&  ||  !  &  |  ^  ~  <<  >>
-->  =>  ::  .  ,  ;  :  ?  ??  ..  ...  +=  -=  *=  /=  %=  &=  |=  ^=
+->  =>  ::  .  ,  ;  :  ..  ...  +=  -=  *=  /=  %=  &=  |=  ^=
+|>  |>* >>>  >>>*
 ```
 
 ### 2.3 リテラル
@@ -42,6 +52,8 @@ module   import   pub      sealed   object   extends  as
 ブール: true, false
 単位: ()
 ```
+
+注意: Protorun言語では`null`リテラルは存在しません。値の存在/不在はOption型で表現します。
 
 ### 2.4 コメント
 
@@ -64,6 +76,8 @@ module   import   pub      sealed   object   extends  as
 Int, Float, Double, Bool, Char, String, Unit
 ```
 
+すべての型はnon-nullableです。nullは言語から排除されています。
+
 ### 3.2 複合型
 
 ```
@@ -77,10 +91,10 @@ Int, Float, Double, Bool, Char, String, Unit
 (T1, T2, ..., Tn) -> R
 (T1, T2, ..., Tn) -> R with E
 
-// オプション型
+// オプション型（値の存在/不在を表現）
 Option<T>
 
-// 結果型
+// 結果型（成功/失敗を表現）
 Result<T, E>
 ```
 
@@ -93,11 +107,15 @@ type Person = {
   age: Int
 }
 
-// 代数的データ型（シールドトレイト + ケースクラス/オブジェクト）
-sealed trait Option<T>
-object Option {
-  case class Some<T>(value: T) extends Option<T>
-  case object None extends Option<Nothing>
+// 代数的データ型（enum構文）
+enum Option<T> {
+  Some(T),
+  None
+}
+
+enum Result<T, E> {
+  Ok(T),
+  Err(E)
 }
 
 // 型エイリアス
@@ -107,24 +125,63 @@ type StringMap<T> = Map<String, T>
 ### 3.4 トレイト（インターフェース）
 
 ```
-trait Show<T> {
-  fn show(value: T): String
+// トレイト定義
+trait Show {
+  fn show(self): String
 }
 
-trait Eq<T> {
-  fn equals(a: T, b: T): Bool
+// トレイト継承（単一継承のみ）
+trait Eq {
+  fn equals(self, other: Self): Bool
+}
+
+trait Ord extends Eq {
+  fn compare(self, other: Self): Int
+  
+  // デフォルト実装
+  fn equals(self, other: Self): Bool = self.compare(other) == 0
 }
 
 // トレイト実装
-impl Show<Int> {
-  fn show(value: Int): String = value.toString()
+impl Show for Int {
+  fn show(self): String = self.toString()
 }
 
 // ジェネリックな実装
-impl<T: Show<T>> Show<Option<T>> {
-  fn show(value: Option<T>): String = match value {
-    Option.Some(v) => s"Some(${Show.show(v)})",
+impl<T: Show> Show for Option<T> {
+  fn show(self): String = match self {
+    Option.Some(v) => s"Some(${v.show()})",
     Option.None => "None"
+  }
+}
+```
+
+### 3.5 リソース型
+
+```
+// リソース型の定義
+resource type File {
+  // 内部フィールド
+  handle: FileHandle,
+  path: String,
+  
+  // 獲得関数（コンストラクタ）
+  fn open(path: String): Result<File, IOError> = {
+    // ファイルを開く実装
+  }
+  
+  // 解放関数（デストラクタ）
+  fn close(self): Unit = {
+    // ファイルを閉じる実装
+  }
+  
+  // 通常のメソッド
+  fn read(self: &Self): Result<String, IOError> = {
+    // ファイルを読み込む実装
+  }
+  
+  fn write(self: &mut Self, content: String): Result<Unit, IOError> = {
+    // ファイルに書き込む実装
   }
 }
 ```
@@ -194,6 +251,24 @@ for {
 while condition {
   // ループ本体
 }
+
+// with式（効果スコープ）
+with Console {
+  Console.log("このスコープ内でConsole効果を使用可能")
+}
+
+// with式（効果ハンドラを指定）
+with Console handled by consoleLogger {
+  Console.log("このスコープ内のConsole効果はconsoleLoggerでハンドル")
+}
+
+// do式（モナド的な連鎖のための構文糖）
+do {
+  user <- findUser(userId)
+  email <- getUserEmail(user)
+  validEmail <- validateEmail(email)
+  validEmail
+}
 ```
 
 ### 4.4 パターンマッチング
@@ -217,6 +292,52 @@ match pair {
   (0, y) => s"最初の要素はゼロ、2番目は$y",
   (x, 0) => s"最初の要素は$x、2番目はゼロ",
   (x, y) => s"($x, $y)"
+}
+```
+
+### 4.5 関数合成
+
+```
+// パイプライン演算子
+infix operator |> : 0
+fn |><A, B>(a: A, f: (A) -> B): B = f(a)
+
+// 効果を持つパイプライン演算子
+infix operator |>* : 0
+fn |>*<A, B, E>(a: A, f: (A) -> B with E): B with E = f(a)
+
+// パイプラインの使用例
+fn processData(data: String): Result<ProcessedData, ProcessError> with Logger = {
+  data
+    |> parse              // 純粋関数
+    |>* validate          // Exception効果
+    |>* enrich            // IO効果
+    |>* log               // Logger効果
+    |> finalize           // 純粋関数
+}
+
+// 関数合成演算子
+infix operator >>> : 1
+fn >>><A, B, C>(f: (A) -> B, g: (B) -> C): (A) -> C = {
+  (a: A) => g(f(a))
+}
+
+// 効果を持つ関数合成演算子
+infix operator >>>* : 1
+fn >>>*<A, B, C, E1, E2>(
+  f: (A) -> B with E1,
+  g: (B) -> C with E2
+): (A) -> C with E1 & E2 = {
+  (a: A) => g(f(a))
+}
+
+// 関数合成の使用例
+fn processUser(userId: String): UserStats with IO & Logger = {
+  // 関数を合成
+  let process = fetchUser >>>* validateUser >>>* enrichUserData >>>* logUserAccess >>> calculateUserStats
+  
+  // 合成関数を適用
+  process(userId)
 }
 ```
 
@@ -267,6 +388,250 @@ fn longest<'a>(x: &'a str, y: &'a str): &'a str = {
 // 構造体でのライフタイム
 type Ref<'a, T> = {
   value: &'a T
+}
+```
+
+### 5.4 リソース管理
+
+```
+// リソース型を使用したリソース管理
+fn processFile(path: String): Result<String, IOError> = {
+  // ファイルを開く（スコープ終了時に自動的に閉じられる）
+  let file = File.open(path)?
+  
+  // ファイルの内容を読み取る
+  let content = file.read()?
+  
+  // 内容を処理
+  let processed = processContent(content)
+  
+  Result.Ok(processed)
+} // ここでfileのreleaseメソッド（close）が自動的に呼び出される
+```
+
+## 6. 代数的効果
+
+### 6.1 効果の定義
+
+```
+// 基本的な効果定義
+effect Console {
+  fn log(message: String): Unit
+  fn readLine(): String
+}
+
+// パラメータ化された効果
+effect State<S> {
+  fn get(): S
+  fn set(newState: S): Unit
+  fn modify(f: (S) -> S): Unit
+}
+
+// 所有権を考慮した効果定義
+effect FileSystem {
+  // ファイルの所有権を返す操作
+  fn openFile(path: String): Result<File, IOError>
+  
+  // ファイルの所有権を消費する操作
+  fn closeFile(file: File): Result<Unit, IOError>
+  
+  // ファイルの借用を使用する操作
+  fn readFile(file: &File): Result<String, IOError>
+  
+  // ファイルの可変借用を使用する操作
+  fn writeFile(file: &mut File, content: String): Result<Unit, IOError>
+}
+```
+
+### 6.2 効果の使用
+
+```
+// 効果を使用する関数
+fn greet(name: String): Unit with Console = {
+  Console.log(s"こんにちは、${name}さん！")
+}
+
+// 複数の効果
+fn counter(): Int with Console & State<Int> = {
+  let current = State.get()
+  Console.log(s"現在の値: $current")
+  State.set(current + 1)
+  State.get()
+}
+
+// 効果スコープを使用
+fn processData(data: String): String = {
+  // 通常のスコープ（効果なし）
+  let length = data.length
+  
+  // Console効果のスコープ
+  with Console {
+    Console.log(s"データ処理: $length文字")
+  }
+  
+  // State効果のスコープ
+  with State<ProcessingState> {
+    let state = State.get()
+    // 状態に基づく処理
+    State.set({ ...state, processed: true })
+  }
+  
+  // 処理結果
+  processResult(data)
+}
+```
+
+### 6.3 効果ハンドラ
+
+```
+// 効果ハンドラ
+fn runConsole<T>(action: () -> T with Console): T = {
+  handle action() {
+    Console.log(message) => {
+      println(message)
+      resume()
+    }
+    
+    Console.readLine() => {
+      let input = readLine()
+      resume(input)
+    }
+  }
+}
+
+// 状態効果のハンドラ
+fn runState<S, T>(initialState: S, action: () -> T with State<S>): (T, S) = {
+  var state = initialState
+  
+  let result = handle action() {
+    State.get() => resume(state),
+    
+    State.set(newState) => {
+      state = newState
+      resume()
+    },
+    
+    State.modify(f) => {
+      state = f(state)
+      resume()
+    }
+  }
+  
+  (result, state)
+}
+
+// 所有権を考慮した効果ハンドラ
+fn runFileSystem<T>(action: () -> T with FileSystem): T = {
+  handle action() {
+    FileSystem.openFile(path) => {
+      let file = RealFileSystem.open(path)
+      // fileの所有権をresumeに渡す
+      resume(file)
+    },
+    
+    FileSystem.closeFile(file) => {
+      // fileの所有権を消費
+      RealFileSystem.close(file)
+      resume()
+    },
+    
+    FileSystem.readFile(file) => {
+      // fileの不変借用を使用
+      let content = RealFileSystem.read(file)
+      resume(content)
+    },
+    
+    FileSystem.writeFile(file, content) => {
+      // fileの可変借用を使用
+      RealFileSystem.write(file, content)
+      resume()
+    }
+  }
+}
+```
+
+### 6.4 効果の合成
+
+```
+// 複数の効果を扱う
+fn program(): Int = {
+  runConsole(() => {
+    runState(0, () => {
+      counter()
+    })._1
+  })
+}
+
+// 効果ハンドラを指定したスコープ
+fn main(): Unit = {
+  // Console効果のハンドラを指定
+  with Console handled by consoleLogger {
+    // このスコープ内のConsole効果はconsoleLoggerでハンドルされる
+    Console.log("アプリケーション開始")
+    
+    // State効果のハンドラを指定
+    with State<AppConfig> handled by (action => runState(defaultConfig, action)) {
+      // このスコープ内のState効果はrunStateでハンドルされる
+      let config = State.get()
+      Console.log(s"設定: $config")
+      
+      // アプリケーションロジック
+      runApplication()
+    }
+    
+    Console.log("アプリケーション終了")
+  }
+}
+```
+
+### 6.5 リソース効果
+
+```
+// リソース効果
+effect Resource<R> {
+  fn acquire<E>(acquire: () -> Result<R, E>, release: (R) -> Unit): Result<R, E>
+}
+
+// リソースハンドラ
+fn withResource<R, E, T>(action: () -> T with Resource<R>): T = {
+  handle action() {
+    Resource.acquire(acquire, release) => {
+      match acquire() {
+        Result.Ok(resource) => {
+          try {
+            // resourceの所有権を継続に渡す
+            let result = resume(Result.Ok(resource))
+            // resourceの所有権が戻ってくる（リソースの解放責任）
+            release(resource)
+            result
+          } catch (e) {
+            // 例外発生時もリソースを解放
+            release(resource)
+            throw e
+          }
+        },
+        Result.Err(error) => resume(Result.Err(error))
+      }
+    }
+  }
+}
+
+// 使用例
+fn processFile(path: String): Result<String, IOError> with Resource<File> = {
+  // リソース獲得（所有権の移動）
+  let fileResult = Resource.acquire(
+    () => File.open(path),
+    file => file.close()  // 所有権を消費する関数を渡す
+  )
+  
+  match fileResult {
+    Result.Ok(file) => {
+      // fileの所有権を使用
+      let content = file.read()?
+      Result.Ok(content)
+    },
+    Result.Err(error) => Result.Err(error)
+  }
 }
 ```
 
