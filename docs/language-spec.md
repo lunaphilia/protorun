@@ -32,6 +32,7 @@ fn       let      var      if       else     match    case
 return   for      while    in       trait    impl     type
 effect   handle   resume   try      catch    throw    with
 module   import   pub      enum     resource do       as
+release  context  local    acquire  own
 ```
 
 ### 2.2 演算子
@@ -186,6 +187,57 @@ resource type File {
 }
 ```
 
+### 3.6 リソースパターン型クラス
+
+```
+// リソースパターンの型クラス
+trait Resource<R> {
+  // リソース獲得
+  fn acquire<E>(acquireFn: () -> Result<R, E>): Result<R, E>
+  
+  // リソース解放
+  fn release(resource: R): Unit
+  
+  // リソース使用
+  fn use<T>(resource: &R, action: (r: &R) -> T): T
+  
+  // リソース変換
+  fn map<S>(resource: R, f: (R) -> S): S with Resource<S>
+}
+
+// リソース型に対する自動実装
+impl<R: resource type> Resource<R> {
+  // デフォルト実装
+  fn acquire<E>(acquireFn: () -> Result<R, E>): Result<R, E> = acquireFn()
+  
+  fn release(resource: R): Unit = resource.close()
+  
+  fn use<T>(resource: &R, action: (r: &R) -> T): T = action(resource)
+  
+  fn map<S: resource type>(resource: R, f: (R) -> S): S = {
+    let result = f(resource)
+    // resourceは自動的に解放される
+    result
+  }
+}
+
+// 使用例
+fn withResource<R, T, E>(
+  acquireFn: () -> Result<R, E>,
+  action: (r: &R) -> T
+): Result<T, E> with Resource<R> = {
+  let resource = Resource.acquire(acquireFn)?
+  try {
+    let result = Resource.use(&resource, action)
+    Resource.release(resource)
+    Result.Ok(result)
+  } catch (e) {
+    Resource.release(resource)
+    throw e
+  }
+}
+```
+
 ## 4. 式と文
 
 ### 4.1 変数宣言
@@ -268,6 +320,22 @@ do {
   email <- getUserEmail(user)
   validEmail <- validateEmail(email)
   validEmail
+}
+
+// 効果のローカライゼーション
+local effect Logger {
+  // ローカルスコープ内でのみ有効な効果の実装
+  handle {
+    Logger.log(message) => {
+      println(s"[LOG] $message")
+      resume()
+    }
+  }
+  
+  // 効果を使用するコード
+  Logger.log("Starting process...")
+  // 処理...
+  Logger.log("Process complete")
 }
 ```
 
@@ -430,10 +498,10 @@ effect State<S> {
 // 所有権を考慮した効果定義
 effect FileSystem {
   // ファイルの所有権を返す操作
-  fn openFile(path: String): Result<File, IOError>
+  fn openFile(path: String): Result<own File, IOError>
   
   // ファイルの所有権を消費する操作
-  fn closeFile(file: File): Result<Unit, IOError>
+  fn closeFile(file: own File): Result<Unit, IOError>
   
   // ファイルの借用を使用する操作
   fn readFile(file: &File): Result<String, IOError>
@@ -443,7 +511,80 @@ effect FileSystem {
 }
 ```
 
-### 6.2 効果の使用
+### 6.2 リソース効果の定義
+
+```
+// リソース効果の定義
+resource effect ResourceManager<R> {
+  // 獲得操作（自動的にリソースのライフサイクル管理が行われる）
+  fn acquire<E>(acquireFn: () -> Result<R, E>): Result<R, E> with release(R)
+  
+  // 解放操作の定義
+  release fn release(resource: R): Unit
+  
+  // 通常の効果操作
+  fn use<T>(resource: &R, operation: (r: &R) -> T): T
+}
+
+// 使用例
+fn processFile(path: String): Result<String, IOError> with ResourceManager<File> = {
+  // acquireはリソースを獲得し、スコープ終了時に自動的に解放される
+  let file = ResourceManager.acquire(() => File.open(path))?
+  
+  // リソースの使用
+  let content = ResourceManager.use(&file, f => f.readToString())?
+  
+  Result.Ok(content)
+} // fileは自動的に解放される
+```
+
+### 6.3 コンテキストリソース
+
+```
+// コンテキストリソースの宣言
+context resource Database {
+  connection: DbConnection,
+  
+  // 初期化
+  fn connect(config: DbConfig): Result<Database, DbError> = {
+    let conn = DbConnection.open(config)?
+    Result.Ok(Database { connection: conn })
+  }
+  
+  // 解放（自動的に呼び出される）
+  fn close(self): Unit = {
+    self.connection.close()
+  }
+  
+  // クエリメソッド
+  fn query(self: &Self, sql: String): Result<QueryResult, DbError> = {
+    self.connection.query(sql)
+  }
+}
+
+// 使用例
+fn processUserData(userId: String): Result<UserData, Error> with Database = {
+  // 暗黙的にコンテキストからDatabaseを使用
+  let userData = Database.query(s"SELECT * FROM users WHERE id = $userId")?
+  Result.Ok(parseUserData(userData))
+}
+
+fn main(): Result<Unit, Error> = {
+  // データベース接続を確立
+  let db = Database.connect(config)?
+  
+  // コンテキストリソースとして提供
+  with db {
+    // dbが暗黙的に利用可能になる
+    let userData = processUserData("user123")?
+    displayUserData(userData)
+    
+    Result.Ok(())
+  } // dbは自動的に閉じられる
+}
+```
+
+### 6.4 効果の使用
 
 ```
 // 効果を使用する関数
@@ -481,7 +622,7 @@ fn processData(data: String): String = {
 }
 ```
 
-### 6.3 効果ハンドラ
+### 6.5 効果ハンドラ
 
 ```
 // 効果ハンドラ
@@ -548,9 +689,52 @@ fn runFileSystem<T>(action: () -> T with FileSystem): T = {
     }
   }
 }
+
+// リソース効果ハンドラ
+fn runResourceManager<R, T>(action: () -> T with ResourceManager<R>): T = {
+  // アクティブなリソースを追跡
+  var activeResources = Set<R>()
+  
+  try {
+    handle action() {
+      ResourceManager.acquire(acquireFn) => {
+        match acquireFn() {
+          Result.Ok(resource) => {
+            activeResources.add(resource)
+            resume(Result.Ok(resource))
+          },
+          Result.Err(error) => {
+            resume(Result.Err(error))
+          }
+        }
+      },
+      
+      ResourceManager.release(resource) => {
+        // リソースを解放
+        if resource is resource type {
+          resource.close()
+        }
+        activeResources.remove(resource)
+        resume()
+      },
+      
+      ResourceManager.use(resource, operation) => {
+        let result = operation(resource)
+        resume(result)
+      }
+    }
+  } finally {
+    // 未解放のリソースを自動的に解放
+    for resource in activeResources {
+      if resource is resource type {
+        resource.close()
+      }
+    }
+  }
+}
 ```
 
-### 6.4 効果の合成
+### 6.6 効果の合成
 
 ```
 // 複数の効果を扱う
@@ -581,140 +765,6 @@ fn main(): Unit = {
     
     Console.log("アプリケーション終了")
   }
-}
-```
-
-### 6.5 リソース効果
-
-```
-// リソース効果
-effect Resource<R> {
-  fn acquire<E>(acquire: () -> Result<R, E>, release: (R) -> Unit): Result<R, E>
-}
-
-// リソースハンドラ
-fn withResource<R, E, T>(action: () -> T with Resource<R>): T = {
-  handle action() {
-    Resource.acquire(acquire, release) => {
-      match acquire() {
-        Result.Ok(resource) => {
-          try {
-            // resourceの所有権を継続に渡す
-            let result = resume(Result.Ok(resource))
-            // resourceの所有権が戻ってくる（リソースの解放責任）
-            release(resource)
-            result
-          } catch (e) {
-            // 例外発生時もリソースを解放
-            release(resource)
-            throw e
-          }
-        },
-        Result.Err(error) => resume(Result.Err(error))
-      }
-    }
-  }
-}
-
-// 使用例
-fn processFile(path: String): Result<String, IOError> with Resource<File> = {
-  // リソース獲得（所有権の移動）
-  let fileResult = Resource.acquire(
-    () => File.open(path),
-    file => file.close()  // 所有権を消費する関数を渡す
-  )
-  
-  match fileResult {
-    Result.Ok(file) => {
-      // fileの所有権を使用
-      let content = file.read()?
-      Result.Ok(content)
-    },
-    Result.Err(error) => Result.Err(error)
-  }
-}
-```
-
-## 6. 代数的効果
-
-### 6.1 効果の定義
-
-```
-// 基本的な効果定義
-effect Console {
-  fn log(message: String): Unit
-  fn readLine(): String
-}
-
-// パラメータ化された効果
-effect State<S> {
-  fn get(): S
-  fn set(newState: S): Unit
-}
-```
-
-### 6.2 効果の使用
-
-```
-// 効果を使用する関数
-fn greet(name: String): Unit with Console = {
-  Console.log(s"こんにちは、${name}さん！")
-}
-
-// 複数の効果
-fn counter(): Int with Console & State<Int> = {
-  let current = State.get()
-  Console.log(s"現在の値: $current")
-  State.set(current + 1)
-  State.get()
-}
-```
-
-### 6.3 効果ハンドラ
-
-```
-// 効果ハンドラ
-fn runConsole<T>(action: () -> T with Console): T = {
-  handle action() {
-    Console.log(message) => {
-      println(message)
-      resume()
-    }
-    
-    Console.readLine() => {
-      let input = readLine()
-      resume(input)
-    }
-  }
-}
-
-// 状態効果のハンドラ
-fn runState<S, T>(initialState: S, action: () -> T with State<S>): (T, S) = {
-  var state = initialState
-  
-  let result = handle action() {
-    State.get() => resume(state)
-    
-    State.set(newState) => {
-      state = newState
-      resume()
-    }
-  }
-  
-  (result, state)
-}
-```
-
-### 6.4 効果の合成
-
-```
-// 複数の効果を扱う
-fn program(): Int = {
-  runConsole(() => {
-    runState(0, () => {
-      counter()
-    })._1
-  })
 }
 ```
 
@@ -796,13 +846,12 @@ effect Async {
 
 ```
 // 計算機の実装
-sealed trait Expr
-object Expr {
-  case class Number(value: Int) extends Expr
-  case class Add(left: Expr, right: Expr) extends Expr
-  case class Subtract(left: Expr, right: Expr) extends Expr
-  case class Multiply(left: Expr, right: Expr) extends Expr
-  case class Divide(left: Expr, right: Expr) extends Expr
+enum Expr {
+  Number(Int),
+  Add(Expr, Expr),
+  Subtract(Expr, Expr),
+  Multiply(Expr, Expr),
+  Divide(Expr, Expr)
 }
 
 // 式の評価
@@ -867,7 +916,7 @@ fn main(): Unit with Console = {
 fn makeCounter(initial: Int): () -> Int with State<Int> = {
   () => {
     let current = State.get()
-    State.set(current + 1)
+    State.modify(count => count + 1)
     current
   }
 }
@@ -884,23 +933,34 @@ fn main(): Unit with Console = {
 }
 ```
 
-### 9.3 ファイル処理
+### 9.3 ファイル処理（リソース効果を使用）
 
 ```
-// ファイル処理の実装
-fn processFile(path: String): Result<String, IOError> with IO = {
-  let content = IO.readFile(path)?
+// ファイル処理の実装（リソース効果を使用）
+fn processFile(path: String): Result<String, IOError> with ResourceManager<File> = {
+  // ファイルを開く（スコープ終了時に自動的に閉じられる）
+  let file = ResourceManager.acquire(() => File.open(path))?
+  
+  // ファイルから読み込む
+  let content = ResourceManager.use(&file, f => f.read())?
+  
+  // 処理された内容を別のファイルに書き込む
   let processed = content.toUpperCase()
-  IO.writeFile(path + ".processed", processed)?
+  let outputFile = ResourceManager.acquire(() => File.open(path + ".processed"))?
+  ResourceManager.use(&outputFile, f => f.write(processed))?
+  
   Result.Ok(processed)
-}
+} // fileとoutputFileは自動的に解放される
 
 // 使用例
-fn main(): Unit with Console & IO = {
-  match processFile("input.txt") {
-    Result.Ok(content) => Console.log(s"処理完了: $content"),
-    Result.Err(error) => Console.log(s"エラー: $error")
-  }
+fn main(): Unit with Console = {
+  // リソース効果ハンドラを適用
+  runResourceManager(() => {
+    match processFile("input.txt") {
+      Result.Ok(content) => Console.log(s"処理完了: $content"),
+      Result.Err(error) => Console.log(s"エラー: $error")
+    }
+  })
 }
 ```
 
@@ -911,18 +971,22 @@ fn main(): Unit with Console & IO = {
 ```ebnf
 Program ::= (Declaration | Statement)*
 
-Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl
+Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | ResourceEffectDecl
 
 FunctionDecl ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("with" EffectType)? "=" Expression
 
 TypeDecl ::= "type" Identifier GenericParams? "=" (RecordType | Type)
            | "sealed" "trait" Identifier GenericParams? ("{" TraitMember* "}")? ("extends" TypeRef)?
+           | "resource" "type" Identifier GenericParams? "{" ResourceTypeMember* "}"
+           | "context" "resource" Identifier GenericParams? "{" ResourceTypeMember* "}"
 
-TraitDecl ::= "trait" Identifier GenericParams? ("{" TraitMember* "}")?
+TraitDecl ::= "trait" Identifier GenericParams? ("{" TraitMember* "}")? ("extends" TypeRef)?
 
 ImplDecl ::= "impl" GenericParams? TypeRef "for"? TypeRef "{" ImplMember* "}"
 
 EffectDecl ::= "effect" Identifier GenericParams? "{" EffectOperation* "}"
+
+ResourceEffectDecl ::= "resource" "effect" Identifier GenericParams? "{" ResourceEffectOperation* "}"
 
 RecordType ::= "{" (Identifier ":" Type ("," Identifier ":" Type)*)? "}"
 
@@ -930,7 +994,14 @@ TraitMember ::= FunctionDecl
 
 ImplMember ::= FunctionDecl
 
+ResourceTypeMember ::= FieldDecl | FunctionDecl
+
+FieldDecl ::= Identifier ":" Type
+
 EffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)? ";"
+
+ResourceEffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("with" "release" "(" Type ")")? ";"
+                         | "release" "fn" Identifier ParamList (":" Type)? ";"
 
 ParamList ::= "(" (Param ("," Param)*)? ")"
 
@@ -948,6 +1019,7 @@ Type ::= TypeRef
        | ArrayType
 
 TypeRef ::= Identifier GenericArgs?
+          | "own" TypeRef
 
 GenericArgs ::= "<" (Type ("," Type)*)? ">"
 
@@ -976,6 +1048,8 @@ Expression ::= LiteralExpr
              | BinaryExpr
              | UnaryExpr
              | HandleExpr
+             | WithExpr
+             | LocalEffectExpr
 
 LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral
 
@@ -1000,6 +1074,10 @@ BinaryExpr ::= Expression Operator Expression
 UnaryExpr ::= Operator Expression
 
 HandleExpr ::= "handle" Expression "{" (EffectCase)* "}"
+
+WithExpr ::= "with" (Expression | TypeRef) ("handled" "by" Expression)? BlockExpr
+
+LocalEffectExpr ::= "local" "effect" Identifier BlockExpr
 
 EffectCase ::= QualifiedIdentifier ParamList "=>" BlockExpr
 
