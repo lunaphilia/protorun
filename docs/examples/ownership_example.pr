@@ -6,7 +6,7 @@ effect Console {
 }
 
 // コンソールハンドラ
-fn runConsole<T>(action: () -> T with Console): T = {
+fn runConsole<T>(action: () -> T & Console): T = {
   handle action() {
     Console.log(message) => {
       println(message)
@@ -27,11 +27,11 @@ trait Show {
 }
 
 // 基本型のShow実装
-impl Show for Int {
+impl Int: Show {
   fn show(self): String = self.toString()
 }
 
-impl Show for String {
+impl String: Show {
   fn show(self): String = self
 }
 
@@ -84,7 +84,7 @@ fn processAndReturn<T>(vec: Vec<T>): Vec<T> = {
 }
 
 // 借用の例
-fn printVec<T: Show>(vec: &Vec<T>): Unit with Console = {
+fn printVec<T: Show>(vec: &Vec<T>): Unit & Console = {
   Console.log("ベクトルの内容:")
   
   // パイプライン演算子を使用
@@ -111,8 +111,8 @@ fn doubleValues(vec: &mut Vec<Int>): Unit = {
   }
 }
 
-// リソース型（自動クリーンアップ）
-resource type File {
+// 管理型（自動クリーンアップ）
+managed File {
   path: String,
   handle: FileHandle,
   
@@ -156,7 +156,7 @@ resource type File {
 }
 
 // リソース型を使ったファイル処理
-fn processFile(path: String): Result<String, IOError> with Console = {
+fn processFile(path: String): Result<String, IOError> & Console = {
   // ファイルを開く（スコープ終了時に自動的に閉じられる）
   let file = File.open(path)?
   
@@ -174,7 +174,7 @@ fn longest<'a>(s1: &'a String, s2: &'a String): &'a String = {
 }
 
 // メイン関数
-fn main(): Unit with Console = {
+fn main(): Unit & Console = {
   Console.log("所有権と借用の例")
   
   // ベクトル操作の例
@@ -188,7 +188,7 @@ fn main(): Unit with Console = {
 }
 
 // ベクトル操作のデモ
-fn demoVectorOperations(): Unit with Console = {
+fn demoVectorOperations(): Unit & Console = {
   Console.log("\n=== ベクトル操作のデモ ===")
   
   // ベクトルの作成と操作
@@ -224,7 +224,7 @@ fn demoVectorOperations(): Unit with Console = {
 }
 
 // ライフタイムのデモ
-fn demoLifetimes(): Unit with Console = {
+fn demoLifetimes(): Unit & Console = {
   Console.log("\n=== ライフタイムのデモ ===")
   
   let s1 = "短い文字列"
@@ -234,7 +234,7 @@ fn demoLifetimes(): Unit with Console = {
 }
 
 // リソース管理のデモ
-fn demoResourceManagement(): Unit with Console = {
+fn demoResourceManagement(): Unit & Console = {
   Console.log("\n=== リソース管理のデモ ===")
   
   match processFile("example.txt") {
@@ -246,7 +246,7 @@ fn demoResourceManagement(): Unit with Console = {
 // プログラム実行
 fn run(): Unit = {
   // 効果スコープを使用
-  with Console handled by runConsole {
+  with runConsole: Console {
     main()
   }
 }

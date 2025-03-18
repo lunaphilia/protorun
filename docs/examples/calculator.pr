@@ -15,7 +15,7 @@ effect Exception<E> {
 }
 
 // 例外ハンドラ
-fn runException<T, E>(action: () -> T with Exception<E>): Result<T, E> = {
+fn runException<T, E>(action: () -> T & Exception<E>): Result<T, E> = {
   handle action() {
     return x => Result.Ok(x),
     
@@ -24,7 +24,7 @@ fn runException<T, E>(action: () -> T with Exception<E>): Result<T, E> = {
 }
 
 // 式の評価
-fn evaluate(expr: Expr): Int with Exception<String> = {
+fn evaluate(expr: Expr): Int & Exception<String> = {
   match expr {
     Expr.Number(value) => value,
     
@@ -66,7 +66,7 @@ effect Console {
 }
 
 // コンソールハンドラ
-fn runConsole<T>(action: () -> T with Console): T = {
+fn runConsole<T>(action: () -> T & Console): T = {
   handle action() {
     Console.log(message) => {
       println(message)
@@ -123,7 +123,7 @@ fn parseExpr(input: String): Result<Expr, String> = {
 }
 
 // メイン関数
-fn main(): Unit with Console = {
+fn main(): Unit & Console = {
   Console.log("簡単な計算機")
   Console.log("形式: 数値 演算子 数値（例: 5 + 3）")
   Console.log("終了するには 'exit' と入力してください")
@@ -147,7 +147,7 @@ fn main(): Unit with Console = {
 }
 
 // 式の結果を処理する関数
-fn processExprResult(result: Result<Expr, String>): Unit with Console = {
+fn processExprResult(result: Result<Expr, String>): Unit & Console = {
   match result {
     Result.Ok(expr) => {
       // 効果スコープを使用
@@ -170,7 +170,7 @@ fn processExprResult(result: Result<Expr, String>): Unit with Console = {
 // プログラム実行
 fn run(): Unit = {
   // 効果スコープを使用
-  with Console handled by runConsole {
+  with runConsole: Console {
     main()
   }
 }

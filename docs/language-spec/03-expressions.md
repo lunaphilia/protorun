@@ -46,7 +46,7 @@ fn add(a: Int, b: Int): Int = {
 fn square(x: Int): Int = x * x
 
 // 効果付き関数
-fn log(message: String): Unit with Console = {
+fn log(message: String): Unit & Console = {
   Console.log(message)
 }
 
@@ -67,7 +67,7 @@ Protorun言語の関数定義は、以下の原則に基づいて設計されて
 
 特に重要な特徴：
 
-- **効果注釈**: 関数が持つ副作用を`with`キーワードで明示することで、関数の振る舞いが明確になり、予期しない副作用を防止します。これは、純粋関数型プログラミングの原則と実用性のバランスを取るための設計決定です。
+- **効果注釈**: 関数が持つ副作用を`&`演算子で明示することで、関数の振る舞いが明確になり、予期しない副作用を防止します。これは、純粋関数型プログラミングの原則と実用性のバランスを取るための設計決定です。
 
 - **ジェネリック関数**: 型パラメータを使用することで、様々な型に対して動作する汎用的な関数を定義できます。これにより、コードの再利用性が向上し、型安全性を維持しながら抽象化が可能になります。
 
@@ -114,12 +114,12 @@ with Console {
 }
 
 // with式（効果ハンドラを指定）
-with Console handled by ConsoleHandler {
+with ConsoleHandler: Console {
   Console.log("このスコープ内のConsole効果はConsoleHandlerでハンドル")
 }
 
 // 効果のスコープ化
-with scoped effect Logger {
+with scoped Logger {
   // このスコープ内でのみ有効な効果の実装
   fn log(message: String): Unit = {
     println(s"[LOG] $message")
@@ -361,7 +361,7 @@ let combinedResult = {
 let result = with ResourceManager<Connection> {
   let conn = ResourceManager.open(() => Database.connect(url))?
   
-  with Transaction(conn) {
+  with Transaction(conn): Transaction {
     // トランザクション内の処理
     let data = executeQuery(conn, query)?
     processData(data)
@@ -423,10 +423,10 @@ fn |><A, B>(a: A, f: (A) -> B): B = f(a)
 
 // 効果を持つパイプライン演算子
 infix operator |>* : 0
-fn |>*<A, B, E>(a: A, f: (A) -> B with E): B with E = f(a)
+fn |>*<A, B, E>(a: A, f: (A) -> B & E): B & E = f(a)
 
 // パイプラインの使用例
-fn processData(data: String): Result<ProcessedData, ProcessError> with Logger = {
+fn processData(data: String): Result<ProcessedData, ProcessError> & Logger = {
   data
     |> parse              // 純粋関数
     |>* validate          // Exception効果
@@ -444,14 +444,14 @@ fn >>><A, B, C>(f: (A) -> B, g: (B) -> C): (A) -> C = {
 // 効果を持つ関数合成演算子
 infix operator >>>* : 1
 fn >>>*<A, B, C, E1, E2>(
-  f: (A) -> B with E1,
-  g: (B) -> C with E2
-): (A) -> C with E1 & E2 = {
+  f: (A) -> B & E1,
+  g: (B) -> C & E2
+): (A) -> C & E1 & E2 = {
   (a: A) => g(f(a))
 }
 
 // 関数合成の使用例
-fn processUser(userId: String): UserStats with IO & Logger = {
+fn processUser(userId: String): UserStats & IO & Logger = {
   // 関数を合成
   let process = fetchUser >>>* validateUser >>>* enrichUserData >>>* logUserAccess >>> calculateUserStats
   

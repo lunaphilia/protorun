@@ -8,7 +8,7 @@ effect State<S> {
 }
 
 // 状態ハンドラ
-fn runState<S, T>(initialState: S, action: () -> T with State<S>): (T, S) = {
+fn runState<S, T>(initialState: S, action: () -> T & State<S>): (T, S) = {
   var state = initialState
   
   let result = handle action() {
@@ -33,7 +33,7 @@ fn runState<S, T>(initialState: S, action: () -> T with State<S>): (T, S) = {
 }
 
 // カウンター関数を作成する高階関数
-fn makeCounter(initial: Int): () -> Int with State<Int> = {
+fn makeCounter(initial: Int): () -> Int & State<Int> = {
   () => {
     let current = State.get()
     // modifyを使用した実装
@@ -48,7 +48,7 @@ effect Console {
 }
 
 // コンソールハンドラ
-fn runConsole<T>(action: () -> T with Console): T = {
+fn runConsole<T>(action: () -> T & Console): T = {
   handle action() {
     return x => x,
     
@@ -60,7 +60,7 @@ fn runConsole<T>(action: () -> T with Console): T = {
 }
 
 // カウンターを使用する関数
-fn useCounter(counter: () -> Int with State<Int>): Unit with Console & State<Int> = {
+fn useCounter(counter: () -> Int & State<Int>): Unit & Console & State<Int> = {
   Console.log("カウンターのテスト")
   
   // パイプライン演算子を使用した連続呼び出し
@@ -85,11 +85,11 @@ fn useCounter(counter: () -> Int with State<Int>): Unit with Console & State<Int
 }
 
 // 複数のカウンターを使用する例
-fn multipleCounters(): Unit with Console = {
+fn multipleCounters(): Unit & Console = {
   Console.log("複数のカウンター")
   
   // 効果スコープを使用
-  with State<Int> handled by (action => runState(0, action)) {
+  with (action => runState(0, action)): State<Int> {
     let counter1 = makeCounter(0)
     
     Console.log("カウンター1:")
@@ -102,7 +102,7 @@ fn multipleCounters(): Unit with Console = {
   }
   
   // 2番目のカウンター（初期値10）
-  with State<Int> handled by (action => runState(10, action)) {
+  with (action => runState(10, action)): State<Int> {
     let counter2 = makeCounter(10)
     
     Console.log("カウンター2:")
@@ -117,11 +117,11 @@ fn multipleCounters(): Unit with Console = {
 }
 
 // 状態を共有するカウンター
-fn sharedState(): Unit with Console = {
+fn sharedState(): Unit & Console = {
   Console.log("状態を共有するカウンター")
   
   // 効果スコープを使用
-  with State<Int> handled by (action => runState(0, action)) {
+  with (action => runState(0, action)): State<Int> {
     let incrementer = makeCounter(0)  // 1ずつ増加
     
     // 2ずつ増加するカウンター（modifyを使用）
@@ -132,7 +132,7 @@ fn sharedState(): Unit with Console = {
     }
     
     // 関数合成を使用した処理
-    let logCounter = (name: String, counter: () -> Int with State<Int>) => {
+    let logCounter = (name: String, counter: () -> Int & State<Int>) => {
       Console.log(s"$name:")
       Console.log(s"1回目: ${counter()}")
     }
@@ -164,9 +164,9 @@ fn sharedState(): Unit with Console = {
 }
 
 // メイン関数
-fn main(): Unit with Console = {
+fn main(): Unit & Console = {
   // 基本的なカウンターの使用例
-  with State<Int> handled by (action => runState(0, action)) {
+  with (action => runState(0, action)): State<Int> {
     let counter = makeCounter(0)
     useCounter(counter)
     
@@ -185,7 +185,7 @@ fn main(): Unit with Console = {
 // プログラム実行
 fn run(): Unit = {
   // 効果スコープを使用
-  with Console handled by runConsole {
+  with runConsole: Console {
     main()
   }
 }

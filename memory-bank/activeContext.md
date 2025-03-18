@@ -51,6 +51,13 @@
   - モナド連鎖のためのbind式の導入（`bind { x <- expr1; y <- expr2; ... }`）
   - 用途に応じた構文の明確な区別（コレクション操作とモナド連鎖）
   - 言語仕様書の更新（03-expressions.md）
+- 言語構文の一貫性向上：
+  - 効果ハンドラの定義構文を`handler HandlerName for Effect`から`handler HandlerName: Effect`に変更
+  - 効果ハンドラの使用構文を`with Effect handled by Handler`から`with Handler: Effect`に変更
+  - 関数の効果注釈を`fn name(): ReturnType with Effect`から`fn name(): ReturnType & Effect`に変更
+  - スコープ付き効果構文を`with scoped effect Name`から`with scoped Name`に変更
+  - ライフサイクル管理効果構文を`effect Name with lifecycle`から`effect Name: lifecycle`に変更
+  - 型注釈パターン「エンティティ: 型」の一貫した使用による言語全体の統一性向上
 
 ## 次のステップ
 - 言語仕様の継続的な改善と形式化
@@ -63,6 +70,8 @@
 - 効果ハンドラの実装方法の詳細設計
 - 言語仕様書の継続的な改善（例の追加、説明の充実）
 - サンプルコードの更新（新しいコレクションリテラル内包表記とbind式を使用）
+- 新しい構文に合わせたサンプルコードの更新
+- 文法定義（EBNF）の更新
 
 ## アクティブな決定事項
 - 言語名：Protorun
@@ -83,3 +92,5 @@
 - コンテキスト型：暗黙的なコンテキスト渡しの仕組み
 - 効果ハンドラの実装：トレイト実装に似た`handler`構文を使用
 - 継続の扱い：暗黙的な継続をデフォルトとし、必要に応じて明示的な制御も可能なハイブリッドアプローチ
+- 型注釈パターン：「エンティティ: 型」パターンを言語全体で一貫して使用
+- 効果注釈：関数の効果を`&`演算子で型と合成（`ReturnType & Effect`）

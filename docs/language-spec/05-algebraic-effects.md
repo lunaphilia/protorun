@@ -54,7 +54,7 @@ effect FileSystem {
 
 ```
 // 暗黙的な継続を使用した効果ハンドラ
-handler ConsoleHandler for Console {
+handler ConsoleHandler: Console {
   fn log(message: String): Unit = {
     println(message)
     // 暗黙的にresumeが呼び出される
@@ -73,7 +73,7 @@ handler ConsoleHandler for Console {
 
 ```
 // 明示的な継続を使用した効果ハンドラ
-handler ExplicitConsoleHandler for Console {
+handler ExplicitConsoleHandler: Console {
   fn log(message: String, resume: () -> Unit): Unit = {
     println(message)
     resume()  // 明示的に継続を呼び出す
@@ -92,7 +92,7 @@ handler ExplicitConsoleHandler for Console {
 
 ```
 // 継続を呼び出さない効果ハンドラ
-handler ExceptionHandler<E> for Exception<E> {
+handler ExceptionHandler<E>: Exception<E> {
   fn raise<T>(error: E): noresume T = {
     // noresume型は継続を呼び出さないことを示す
     Result.Err(error)
@@ -100,7 +100,7 @@ handler ExceptionHandler<E> for Exception<E> {
 }
 
 // 継続を複数回呼び出す効果ハンドラ
-handler ChoiceHandler for Choice {
+handler ChoiceHandler: Choice {
   fn choose<T>(options: [T]): multiresume T = {
     // multiresume型は複数回の継続呼び出しを示す
     for option in options {
@@ -121,7 +121,7 @@ handler ChoiceHandler for Choice {
 
 ```
 // ライフサイクル管理を持つ効果（旧リソース効果）
-effect ResourceManager<R> with lifecycle {
+effect ResourceManager<R>: lifecycle {
   // 獲得操作（自動的にリソースのライフサイクル管理が行われる）
   fn open<E>(acquireFn: () -> Result<R, E>): Result<R, E> with cleanup
   
@@ -133,7 +133,7 @@ effect ResourceManager<R> with lifecycle {
 }
 
 // ライフサイクル管理効果のハンドラ
-handler ResourceManagerHandler<R> for ResourceManager<R> {
+handler ResourceManagerHandler<R>: ResourceManager<R> {
   // アクティブなリソースを追跡
   var activeResources = Set<R>()
   
@@ -170,7 +170,7 @@ handler ResourceManagerHandler<R> for ResourceManager<R> {
 }
 
 // 使用例
-fn processFile(path: String): Result<String, IOError> with ResourceManager<File> = {
+fn processFile(path: String): Result<String, IOError> & ResourceManager<File> = {
   // openはリソースを獲得し、スコープ終了時に自動的に解放される
   let file = ResourceManager.open(() => File.open(path))?
   
@@ -181,18 +181,18 @@ fn processFile(path: String): Result<String, IOError> with ResourceManager<File>
 } // fileは自動的に解放される（cleanup関数が呼び出される）
 ```
 
-ライフサイクル管理を持つ効果は、リソースの獲得と解放を自動的に管理するための特別な種類の効果です。`with lifecycle`キーワードを使用して定義され、リソースのライフサイクルを追跡し、スコープ終了時に自動的に解放することを保証します。これにより、リソースリークを防ぎ、安全なリソース管理を実現します。
+ライフサイクル管理を持つ効果は、リソースの獲得と解放を自動的に管理するための特別な種類の効果です。`lifecycle`キーワードを使用して定義され、リソースのライフサイクルを追跡し、スコープ終了時に自動的に解放することを保証します。これにより、リソースリークを防ぎ、安全なリソース管理を実現します。
 
 ## 5.5 効果の使用
 
 ```
 // 効果を使用する関数
-fn greet(name: String): Unit with Console = {
+fn greet(name: String): Unit & Console = {
   Console.log(s"こんにちは、${name}さん！")
 }
 
 // 複数の効果
-fn counter(): Int with Console & State<Int> = {
+fn counter(): Int & Console & State<Int> = {
   let current = State.get()
   Console.log(s"現在の値: $current")
   State.set(current + 1)
@@ -221,24 +221,24 @@ fn processData(data: String): String = {
 }
 ```
 
-効果を使用する関数は、関数シグネチャに`with`キーワードを使用してその効果を宣言します。これにより、関数が持つ可能性のある副作用が型レベルで追跡されます。複数の効果を持つ関数は、`&`演算子を使用して効果を組み合わせることができます。また、`with`式を使用して効果のスコープを明示的に制限することもできます。
+効果を使用する関数は、関数シグネチャに`&`演算子を使用してその効果を宣言します。これにより、関数が持つ可能性のある副作用が型レベルで追跡されます。複数の効果を持つ関数は、`&`演算子を使用して効果を組み合わせることができます。また、`with`式を使用して効果のスコープを明示的に制限することもできます。
 
 ## 5.6 効果ハンドラの使用
 
 ```
 // 効果ハンドラを使用した関数
-fn runWithConsole<T>(action: () -> T with Console): T = {
-  with Console handled by ConsoleHandler {
+fn runWithConsole<T>(action: () -> T & Console): T = {
+  with ConsoleHandler: Console {
     action()
   }
 }
 
 // 状態効果のハンドラを使用
-fn runWithState<S, T>(initialState: S, action: () -> T with State<S>): (T, S) = {
+fn runWithState<S, T>(initialState: S, action: () -> T & State<S>): (T, S) = {
   var state = initialState
   
   // 状態ハンドラを定義
-  handler StateHandler for State<S> {
+  handler StateHandler: State<S> {
     fn get(): S = state
     
     fn set(newState: S): Unit = {
@@ -251,7 +251,7 @@ fn runWithState<S, T>(initialState: S, action: () -> T with State<S>): (T, S) = 
   }
   
   // ハンドラを適用
-  let result = with State<S> handled by StateHandler {
+  let result = with StateHandler: State<S> {
     action()
   }
   
@@ -259,9 +259,9 @@ fn runWithState<S, T>(initialState: S, action: () -> T with State<S>): (T, S) = 
 }
 
 // 明示的な継続を使用するハンドラ
-fn runWithExplicitConsole<T>(action: () -> T with Console): T = {
+fn runWithExplicitConsole<T>(action: () -> T & Console): T = {
   // 明示的な継続を使用するハンドラを定義
-  handler ExplicitConsoleHandler for Console {
+  handler ExplicitConsoleHandler: Console {
     fn log(message: String, resume: () -> Unit): Unit = {
       println(message)
       resume()
@@ -273,22 +273,22 @@ fn runWithExplicitConsole<T>(action: () -> T with Console): T = {
     }
   }
   
-  with Console handled by ExplicitConsoleHandler {
+  with ExplicitConsoleHandler: Console {
     action()
   }
 }
 
 // 継続を呼び出さないハンドラ（例外処理）
-fn runWithException<T, E>(action: () -> T with Exception<E>): Result<T, E> = {
+fn runWithException<T, E>(action: () -> T & Exception<E>): Result<T, E> = {
   // 継続を呼び出さないハンドラを定義
-  handler ExceptionHandler for Exception<E> {
+  handler ExceptionHandler: Exception<E> {
     fn raise<R>(error: E): noresume R = {
       return Result.Err(error)
     }
   }
   
   try {
-    let result = with Exception<E> handled by ExceptionHandler {
+    let result = with ExceptionHandler: Exception<E> {
       action()
     }
     Result.Ok(result)
@@ -298,7 +298,7 @@ fn runWithException<T, E>(action: () -> T with Exception<E>): Result<T, E> = {
 }
 ```
 
-効果ハンドラは、`with ... handled by ...`構文を使用して適用されます。これにより、特定のスコープ内での効果の実装を提供します。効果ハンドラはインラインで定義することもできますし、事前に定義したハンドラを使用することもできます。効果ハンドラは、効果の使用と実装を分離し、同じ効果に対して異なる実装を提供することを可能にします。
+効果ハンドラは、`with ハンドラ: 効果`構文を使用して適用されます。これにより、特定のスコープ内での効果の実装を提供します。効果ハンドラはインラインで定義することもできますし、事前に定義したハンドラを使用することもできます。効果ハンドラは、効果の使用と実装を分離し、同じ効果に対して異なる実装を提供することを可能にします。
 
 ## 5.7 効果の合成
 
@@ -306,8 +306,8 @@ fn runWithException<T, E>(action: () -> T with Exception<E>): Result<T, E> = {
 // 複数の効果を扱う
 fn program(): Int = {
   // 複数のハンドラを合成
-  with Console handled by ConsoleHandler {
-    with State<Int> handled by (initialState = 0) {
+  with ConsoleHandler: Console {
+    with StateHandler(initialState = 0): State<Int> {
       counter()
     }
   }
@@ -316,12 +316,12 @@ fn program(): Int = {
 // 効果ハンドラを指定したスコープ
 fn main(): Unit = {
   // Console効果のハンドラを指定
-  with Console handled by ConsoleHandler {
+  with ConsoleHandler: Console {
     // このスコープ内のConsole効果はConsoleHandlerでハンドルされる
     Console.log("アプリケーション開始")
     
     // State効果のハンドラを指定
-    with State<AppConfig> handled by StateHandler(initialState = defaultConfig) {
+    with StateHandler(initialState = defaultConfig): State<AppConfig> {
       // このスコープ内のState効果はStateHandlerでハンドルされる
       let config = State.get()
       Console.log(s"設定: $config")

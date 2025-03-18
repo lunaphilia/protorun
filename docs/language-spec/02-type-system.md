@@ -37,7 +37,7 @@ Protorun言語の基本型は、以下の原則に基づいて設計されてい
 
 // 関数型
 (T1, T2, ..., Tn) -> R
-(T1, T2, ..., Tn) -> R with E
+(T1, T2, ..., Tn) -> R & E
 
 // オプション型（値の存在/不在を表現）
 Option<T>
@@ -54,7 +54,7 @@ Protorun言語の複合型は、以下の原則に基づいて設計されてい
 
 特に注目すべき点：
 
-- **関数型の効果注釈**: 関数型には効果注釈（`with E`）を含めることができます。これにより、関数が持つ可能性のある副作用を型レベルで追跡し、型安全な効果制御を実現します。
+- **関数型の効果注釈**: 関数型には効果注釈（`& E`）を含めることができます。これにより、関数が持つ可能性のある副作用を型レベルで追跡し、型安全な効果制御を実現します。
 
 - **Option型とResult型**: nullの代わりにOption型を使用し、例外の代わりにResult型を使用することで、エラー処理を型安全かつ明示的に行うことができます。これにより、エラーハンドリングの漏れを防ぎ、コードの堅牢性が向上します。
 
@@ -109,7 +109,7 @@ trait Eq {
   fn equals(self, other: Self): Bool
 }
 
-trait Ord extends Eq {
+trait Ord: Eq {
   fn compare(self, other: Self): Int
   
   // デフォルト実装
@@ -117,12 +117,12 @@ trait Ord extends Eq {
 }
 
 // トレイト実装
-impl Show for Int {
+impl Int: Show {
   fn show(self): String = self.toString()
 }
 
 // ジェネリックな実装
-impl<T: Show> Show for Option<T> {
+impl<T: Show> Option<T>: Show {
   fn show(self): String = match self {
     Option.Some(v) => s"Some(${v.show()})",
     Option.None => "None"
@@ -149,7 +149,7 @@ Protorun言語のトレイトシステムは、以下の原則に基づいて設
 
 ```
 // 管理型の定義（旧リソース型）
-managed type File {
+managed File {
   // 内部フィールド
   handle: FileHandle,
   path: String,
@@ -207,11 +207,11 @@ trait Resource<R> {
   fn use<T>(resource: &R, action: (r: &R) -> T): T
   
   // リソース変換
-  fn map<S>(resource: R, f: (R) -> S): S with Resource<S>
+  fn map<S>(resource: R, f: (R) -> S): S & Resource<S>
 }
 
 // 管理型に対する自動実装
-impl<R: managed type> Resource<R> {
+impl<R: managed> R: Resource<R> {
   // デフォルト実装
   fn open<E>(acquireFn: () -> Result<R, E>): Result<R, E> = acquireFn()
   
@@ -219,7 +219,7 @@ impl<R: managed type> Resource<R> {
   
   fn use<T>(resource: &R, action: (r: &R) -> T): T = action(resource)
   
-  fn map<S: managed type>(resource: R, f: (R) -> S): S = {
+  fn map<S: managed>(resource: R, f: (R) -> S): S = {
     let result = f(resource)
     // resourceは自動的に解放される
     result
@@ -230,7 +230,7 @@ impl<R: managed type> Resource<R> {
 fn withResource<R, T, E>(
   acquireFn: () -> Result<R, E>,
   action: (r: &R) -> T
-): Result<T, E> with Resource<R> = {
+): Result<T, E> & Resource<R> = {
   let resource = Resource.open(acquireFn)?
   try {
     let result = Resource.use(&resource, action)
