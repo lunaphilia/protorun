@@ -90,12 +90,18 @@ match value {
   _ => defaultExpression
 }
 
-// for式
-for {
-  x <- xs
-  y <- ys
-  if condition
-} yield x + y
+// コレクションリテラル内包表記
+[x * 2 for x <- numbers if x % 2 == 0]
+{k.toUpperCase() -> v * 2 for (k, v) <- map if v > 0}
+#{x * x for x <- range(1, 10)}
+
+// bind式（モナド連鎖）
+bind {
+  user <- findUser(userId)
+  email <- getUserEmail(user)
+  validEmail <- validateEmail(email)
+  validEmail
+}
 
 // while文
 while condition {
@@ -112,15 +118,7 @@ with Console handled by ConsoleHandler {
   Console.log("このスコープ内のConsole効果はConsoleHandlerでハンドル")
 }
 
-// do式（モナド的な連鎖のための構文糖）
-do {
-  user <- findUser(userId)
-  email <- getUserEmail(user)
-  validEmail <- validateEmail(email)
-  validEmail
-}
-
-// 効果のスコープ化（旧ローカライゼーション）
+// 効果のスコープ化
 with scoped effect Logger {
   // このスコープ内でのみ有効な効果の実装
   fn log(message: String): Unit = {
@@ -145,15 +143,142 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 
 - **if式とmatch式の二重性**: 両方の構造を維持することで、単純な条件分岐（if）と複雑なパターンマッチング（match）の両方に最適化された構文を提供します。これは、使いやすさと表現力のバランスを取るための設計決定です。
 
-- **for式**: モナド的な計算を自然に表現するための構文です。コレクションの操作や非同期計算などを簡潔に記述できます。これは、Scalaのfor内包表記からインスピレーションを得ています。
+- **コレクションリテラル内包表記**: コレクション操作を簡潔に表現するための構文です。Pythonの内包表記からインスピレーションを得ており、コレクションの種類（リスト、マップ、セット）に応じた構文を提供します。
+
+- **bind式**: モナド的な連鎖を表現するための構文です。Option、Result、Futureなどのモナド的な型の連鎖に最適化されています。Haskellのdoノーテーションからインスピレーションを得ていますが、より明示的な名前を使用しています。
 
 - **with式**: 効果のスコープとハンドラを制御するための構文です。これにより、効果の影響範囲を明示的に制限し、効果の実装を提供することができます。これは、代数的効果システムの中核となる機能です。with式はブロック内の最後の式の評価結果を返します。
 
-- **do式**: モナド的な連鎖を簡潔に表現するための構文糖です。これにより、`flatMap`や`bind`操作の連鎖を読みやすく書くことができます。これは、Haskellのdoノーテーションからインスピレーションを得ています。
-
 - **効果のスコープ化**: 効果の実装を局所的に提供するための構文です。これにより、効果の実装を必要な場所に限定し、グローバルな状態の変更を避けることができます。これは、効果システムの柔軟性と安全性を向上させるための設計決定です。
 
-### 4.4.1 with式の返り値と用途
+### 4.4.1 コレクションリテラル内包表記
+
+コレクションリテラル内包表記は、コレクションの変換、フィルタリング、結合などの操作を簡潔に表現するための構文です。この構文は、Pythonの内包表記からインスピレーションを得ています。
+
+```
+// リスト内包表記
+[expression for pattern <- iterable if condition]
+
+// 例：偶数の2倍
+[x * 2 for x <- numbers if x % 2 == 0]
+
+// 複数のイテレータ
+[(x, y) for x <- xs for y <- ys if x + y > 5]
+
+// パターンマッチング
+[(name, age) for Person(name, age) <- people if age >= 18]
+
+// マップ内包表記
+{keyExpr -> valueExpr for pattern <- iterable if condition}
+
+// 例：キーと値の変換
+{k.toUpperCase() -> v * 2 for (k, v) <- originalMap if v > 0}
+
+// キーと値の入れ替え
+{v -> k for (k, v) <- originalMap}
+
+// セット内包表記
+#{expression for pattern <- iterable if condition}
+
+// 例：平方数のセット
+#{x * x for x <- range(1, 10)}
+
+// 文字列の最初の文字のセット
+#{word[0] for word <- words}
+```
+
+内包表記は、以下のような高階関数の組み合わせに変換されます：
+
+```
+// リスト内包表記
+[x * 2 for x <- numbers if x % 2 == 0]
+
+// 変換後
+numbers.filter(x => x % 2 == 0).map(x => x * 2)
+
+// 複数のイテレータを持つ内包表記
+[(x, y) for x <- xs for y <- ys if x + y > 5]
+
+// 変換後
+xs.flatMap(x => 
+  ys.filter(y => x + y > 5)
+    .map(y => (x, y))
+)
+```
+
+内包表記の利点は、コレクション操作を宣言的かつ読みやすく表現できることです。特に複数のコレクションを組み合わせる場合や、フィルタリングと変換を組み合わせる場合に有用です。
+
+### 4.4.2 bind式
+
+bind式は、モナド的な計算の連鎖を簡潔に表現するための構文です。Option、Result、Future、Eitherなどのモナド的な型の連鎖に最適化されています。
+
+```
+// 基本形式
+bind {
+  pattern1 <- expression1
+  pattern2 <- expression2
+  if condition
+  finalExpression
+}
+
+// 例：ユーザー情報の取得と検証
+bind {
+  user <- findUser(userId)
+  email <- getUserEmail(user)
+  validEmail <- validateEmail(email)
+  validEmail
+}
+
+// 例：エラーハンドリング
+bind {
+  data <- fetchData()
+  parsed <- parseData(data)
+  if parsed.isValid
+  processData(parsed)
+}
+```
+
+bind式は、以下のような`flatMap`と`map`の連鎖に変換されます：
+
+```
+// bind式
+bind {
+  user <- findUser(userId)
+  email <- getUserEmail(user)
+  validEmail <- validateEmail(email)
+  validEmail
+}
+
+// 変換後
+findUser(userId).flatMap(user => 
+  getUserEmail(user).flatMap(email => 
+    validateEmail(email).map(validEmail => 
+      validEmail
+    )
+  )
+)
+```
+
+bind式の利点は、ネストしたflatMap/map呼び出しを平坦で読みやすい形式で表現できることです。特に、早期リターンパターン（エラーが発生した場合に処理を中断する）を自然に表現できます。
+
+bind式は、以下のような型を持つ値に対して使用できます：
+
+1. **Option<T>**: 値が存在するかどうかを表す型
+2. **Result<T, E>**: 成功または失敗を表す型
+3. **Future<T>**: 非同期計算の結果を表す型
+4. **Either<L, R>**: 2つの可能な型のうちの1つを表す型
+5. **カスタムモナド型**: `flatMap`と`map`メソッドを持つ任意の型
+
+bind式を使用するには、対象の型が以下のメソッドを提供している必要があります：
+
+```
+trait Monad<T> {
+  fn flatMap<U>(f: (T) -> Monad<U>): Monad<U>
+  fn map<U>(f: (T) -> U): Monad<U>
+}
+```
+
+### 4.4.3 with式の返り値と用途
 
 with式は式として設計されており、ブロック内の最後の式の評価結果を返します。この返り値は他の式と同様に使用できます：
 
