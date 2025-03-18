@@ -192,6 +192,74 @@ managed File {
 
 管理型の名称は、以前は「リソース型」でしたが、その目的をより明確に表現するために「管理型」に変更されました。これは、この型がリソースそのものではなく、リソースの管理に焦点を当てていることを強調するためです。
 
+### 3.6.1 管理型の暗黙的な使用
+
+管理型は、明示的なパラメータとして使用するだけでなく、暗黙的なコンテキストとしても使用できます。これにより、依存性注入パターンを型安全かつ簡潔に実装できます。
+
+```
+// 管理型を暗黙的に使用する関数
+fn processUserData(userId: String): Result<UserData, Error> with db: Database = {
+  // dbが暗黙的に利用可能
+  let userData = db.query(s"SELECT * FROM users WHERE id = $userId")?
+  Result.Ok(parseUserData(userData))
+}
+
+// 使用例
+fn main(): Result<Unit, Error> = {
+  let db = Database.connect(config)?
+  
+  // with式で暗黙的なコンテキストを提供
+  with db {
+    // dbが暗黙的に利用可能になる
+    let userData = processUserData("user123")?
+    displayUserData(userData)
+    
+    Result.Ok(())
+  } // dbは自動的に閉じられる
+}
+```
+
+管理型の暗黙的な使用には以下の特徴があります：
+
+1. **暗黙的な依存関係**: 関数は`with`キーワードを使用して必要な管理型を宣言します。
+2. **スコープベースの提供**: `with`式を使用して管理型をスコープ内で暗黙的に提供します。
+3. **自動リソース管理**: スコープ終了時に管理型の解放メソッドが自動的に呼び出されます。
+4. **型安全性**: コンパイラは必要な管理型が提供されていることを静的に検証します。
+
+複数の管理型を同時に使用することもできます：
+
+```
+// 複数の管理型を暗黙的に使用する関数
+fn processUserOrder(userId: String, orderId: String): Result<OrderDetails, Error> with db: Database, logger: Logger, client: HttpClient = {
+  logger.info(s"処理開始: ユーザー $userId, 注文 $orderId")
+  
+  let userData = db.query(s"SELECT * FROM users WHERE id = $userId")?
+  let orderData = db.query(s"SELECT * FROM orders WHERE id = $orderId")?
+  
+  let additionalInfo = client.get(s"https://api.example.com/orders/$orderId/details")?
+  
+  logger.info("処理完了")
+  Result.Ok(combineOrderDetails(userData, orderData, additionalInfo))
+}
+
+// 使用例
+fn main(): Result<Unit, Error> = {
+  let db = Database.connect(dbConfig)?
+  let logger = Logger.init(logConfig)
+  let client = HttpClient.create(httpConfig)
+  
+  // 複数の管理型を提供
+  with db, logger, client {
+    let orderDetails = processUserOrder("user123", "order456")?
+    displayOrderDetails(orderDetails)
+    
+    Result.Ok(())
+  } // すべてのリソースは自動的に解放される
+}
+```
+
+この機能は、Scalaのimplicit parameterからインスピレーションを得ていますが、リソース管理の自動化と組み合わせることで、より安全で使いやすい依存性注入メカニズムを提供します。
+
 ## 3.7 リソースパターン型クラス
 
 ```

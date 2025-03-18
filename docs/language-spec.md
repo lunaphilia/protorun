@@ -17,7 +17,8 @@ Protorun言語の仕様は以下のセクションに分かれています。各
    - 複合型
    - 型定義
    - トレイト（インターフェース）
-   - リソース型
+   - 管理型（旧リソース型）
+   - 管理型の暗黙的な使用
    - リソースパターン型クラス
 
 3. [式と文](language-spec/03-expressions.md)
@@ -37,30 +38,38 @@ Protorun言語の仕様は以下のセクションに分かれています。各
    - 効果の定義
    - 効果ハンドラの定義
    - ライフサイクル管理を持つ効果
-   - コンテキスト型
    - 効果の使用
    - 効果ハンドラの使用
    - 効果の合成
+   - 管理型の暗黙的な使用と代数的効果の関係
 
-6. [モジュールシステムと標準ライブラリ](language-spec/06-modules.md)
+6. [モジュールシステム](language-spec/06-modules.md)
    - モジュール定義
    - インポート
+
+7. [標準ライブラリ](language-spec/07-standard-library.md)
    - コアデータ構造
    - I/O操作
    - 並行処理
 
-7. [サンプルプログラム](language-spec/07-examples.md)
+8. [サンプルプログラム](language-spec/08-examples.md)
    - 簡単な計算機
    - 状態を持つカウンター
    - ファイル処理（ライフサイクル管理効果を使用）
 
-8. [文法（EBNF）](language-spec/08-grammar.md)
+9. [文法（EBNF）](language-spec/09-grammar.md)
 
-9. [今後の展望と参考文献](language-spec/09-future.md)
-   - 今後の展望
-   - 参考文献
+10. [今後の展望](language-spec/10-future.md)
+
+11. [参考文献](language-spec/11-references.md)
 
 ## 更新履歴
+
+- 2025-03-19: コンテキスト型と管理型の統合
+  - コンテキスト型を削除し、管理型に暗黙的なパラメータとしての機能を追加
+  - 関数シグネチャで`with db: Database`のように暗黙的なパラメータを宣言可能に
+  - `with`式を使用して暗黙的なコンテキストを提供する構文を追加
+  - 言語仕様の構成を整理し、ファイルの通し番号を修正
 
 - 2025-03-18: 言語構文の一貫性向上
   - 効果ハンドラの定義構文を`handler HandlerName for Effect`から`handler HandlerName: Effect`に変更

@@ -118,6 +118,18 @@ with ConsoleHandler: Console {
   Console.log("このスコープ内のConsole効果はConsoleHandlerでハンドル")
 }
 
+// with式（管理型の暗黙的な提供）
+with db {
+  // dbが暗黙的に利用可能になる
+  processUserData("user123")
+}
+
+// with式（複数の管理型の暗黙的な提供）
+with db, logger, client {
+  // db, logger, clientが暗黙的に利用可能になる
+  processUserOrder("user123", "order456")
+}
+
 // 効果のスコープ化
 with scoped Logger {
   // このスコープ内でのみ有効な効果の実装

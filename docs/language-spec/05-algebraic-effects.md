@@ -337,7 +337,53 @@ fn main(): Unit = {
 
 代数的効果の主要な利点の一つは、異なる効果を持つ計算を簡単に合成できることです。効果ハンドラを組み合わせることで、複雑な副作用を持つプログラムを構築できます。効果ハンドラはネストすることができ、内側のハンドラから外側のハンドラへと効果が伝播します。これにより、モジュラーで再利用可能な方法で副作用を管理できます。
 
-## 5.8 代数的効果の設計上の考慮事項
+## 5.8 管理型の暗黙的な使用と代数的効果の関係
+
+管理型の暗黙的な使用と代数的効果は、異なる問題を解決するために設計された補完的な概念です：
+
+1. **管理型の暗黙的な使用**: 暗黙的なコンテキスト渡しとリソースライフサイクル管理に焦点を当てています。
+2. **代数的効果**: 副作用の型安全な表現と制御に焦点を当てています。
+
+これらは以下のように連携することができます：
+
+```
+// 代数的効果を使用して管理型にアクセス
+effect DbAccess {
+  fn query(sql: String): Result<QueryResult, DbError>
+}
+
+// 管理型を使用して効果を実装
+fn runWithDatabase<T>(db: Database, action: () -> T & DbAccess): T = {
+  handler DbHandler: DbAccess {
+    fn query(sql: String): Result<QueryResult, DbError> = {
+      db.query(sql)
+    }
+  }
+  
+  with DbHandler: DbAccess {
+    action()
+  }
+}
+
+// 使用例
+fn main(): Result<Unit, Error> = {
+  let db = Database.connect(config)?
+  
+  with db {
+    let result = runWithDatabase(db, () => {
+      // DbAccess効果を使用
+      let data = DbAccess.query("SELECT * FROM users")?
+      processData(data)
+    })
+    
+    Result.Ok(())
+  }
+}
+```
+
+この組み合わせにより、管理型の暗黙的な使用によるリソース管理と代数的効果の副作用制御の両方の利点を活用できます。
+
+## 5.9 代数的効果の設計上の考慮事項
 
 代数的効果を設計する際には、以下の点を考慮することが重要です：
 
