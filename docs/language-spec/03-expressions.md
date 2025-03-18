@@ -147,11 +147,104 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 
 - **for式**: モナド的な計算を自然に表現するための構文です。コレクションの操作や非同期計算などを簡潔に記述できます。これは、Scalaのfor内包表記からインスピレーションを得ています。
 
-- **with式**: 効果のスコープとハンドラを制御するための構文です。これにより、効果の影響範囲を明示的に制限し、効果の実装を提供することができます。これは、代数的効果システムの中核となる機能です。
+- **with式**: 効果のスコープとハンドラを制御するための構文です。これにより、効果の影響範囲を明示的に制限し、効果の実装を提供することができます。これは、代数的効果システムの中核となる機能です。with式はブロック内の最後の式の評価結果を返します。
 
 - **do式**: モナド的な連鎖を簡潔に表現するための構文糖です。これにより、`flatMap`や`bind`操作の連鎖を読みやすく書くことができます。これは、Haskellのdoノーテーションからインスピレーションを得ています。
 
 - **効果のスコープ化**: 効果の実装を局所的に提供するための構文です。これにより、効果の実装を必要な場所に限定し、グローバルな状態の変更を避けることができます。これは、効果システムの柔軟性と安全性を向上させるための設計決定です。
+
+### 4.4.1 with式の返り値と用途
+
+with式は式として設計されており、ブロック内の最後の式の評価結果を返します。この返り値は他の式と同様に使用できます：
+
+```
+// with式の返り値を変数に代入
+let result = with Console {
+  Console.log("計算を開始します")
+  let x = complexCalculation()
+  Console.log("計算結果: " + x.toString())
+  x  // この値がwith式の返り値となる
+}
+
+// with式の返り値を関数の引数として使用
+processResult(with State<Counter> {
+  let current = State.get()
+  State.modify(c => c.increment())
+  current.value * 2  // この値がwith式の返り値となる
+})
+```
+
+with式の返り値を使用することには、以下のような実用的な価値があります：
+
+1. **効果の局所化と結果の取得**: 効果の使用を特定のスコープに限定しながら、その結果を外部で利用できます。
+
+```
+// リソース管理と結果の取得
+let fileContents = with ResourceManager<File> {
+  // ファイルを開く（スコープ終了時に自動的に閉じられる）
+  let file = ResourceManager.open(() => File.open("data.txt"))?
+  
+  // ファイルの内容を読み込み、処理した結果を返す
+  ResourceManager.use(&file, f => f.readToString())?
+    |> processData
+}
+// fileContentsには処理済みのファイル内容が格納され、
+// ファイルは自動的に閉じられている
+```
+
+2. **合成性の向上**: with式を他の式と自然に組み合わせることができます。
+
+```
+// 条件分岐での使用
+let result = if condition {
+  with Console {
+    Console.log("条件が真の場合の処理")
+    computeForTrue()
+  }
+} else {
+  with Logger {
+    Logger.log("条件が偽の場合の処理")
+    computeForFalse()
+  }
+}
+```
+
+3. **効果の組み合わせと結果の合成**: 異なる効果を持つ複数のwith式から返された値を合成できます。
+
+```
+// 複数の効果と結果の合成
+let combinedResult = {
+  let result1 = with Console {
+    Console.log("最初の処理")
+    computeFirst()
+  }
+  
+  let result2 = with State<AppState> {
+    let state = State.get()
+    computeSecond(state)
+  }
+  
+  // 2つの結果を合成
+  combineResults(result1, result2)
+}
+```
+
+4. **リソース管理の安全性**: リソースの安全な管理と結果の取得を一つの式で表現できます。
+
+```
+// 複数のリソースを使用した計算
+let result = with ResourceManager<Connection> {
+  let conn = ResourceManager.open(() => Database.connect(url))?
+  
+  with Transaction(conn) {
+    // トランザクション内の処理
+    let data = executeQuery(conn, query)?
+    processData(data)
+  }  // トランザクションは自動的にコミットまたはロールバック
+}  // 接続は自動的に閉じられる
+```
+
+with式が値を返す式として設計されていることは、Protorunの式ベースの設計原則に沿っており、言語全体の一貫性と表現力を向上させます。これにより、効果の制御と計算の結果を自然に組み合わせることができ、より簡潔で読みやすいコードを書くことが可能になります。
 
 ## 4.5 パターンマッチング
 
