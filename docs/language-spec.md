@@ -62,6 +62,17 @@ Protorun言語の仕様は以下のセクションに分かれています。各
 
 ## 更新履歴
 
+- 2025-03-18: 言語構文の一貫性向上
+  - 効果ハンドラの定義構文を`handler HandlerName for Effect`から`handler HandlerName: Effect`に変更
+  - 効果ハンドラの使用構文を`with Effect handled by Handler`から`with Handler: Effect`に変更
+  - 関数の効果注釈を`fn name(): ReturnType with Effect`から`fn name(): ReturnType & Effect`に変更
+  - スコープ付き効果構文を`with scoped effect Name`から`with scoped Name`に変更
+  - ライフサイクル管理効果構文を`effect Name with lifecycle`から`effect Name: lifecycle`に変更
+  - トレイト継承構文を`trait Child extends Parent`から`trait Child: Parent`に変更
+  - トレイト実装構文を`impl Trait for Type`から`impl Type: Trait`に変更
+  - 管理型定義構文を`managed type Name`から`managed Name`に変更
+  - 型注釈パターン「エンティティ: 型」の一貫した使用による言語全体の統一性向上
+
 - 2025-03-17: 代数的効果の実装方法を更新
   - 効果ハンドラの定義にimpl構文に似た`handler`構文を導入
   - 暗黙的な継続と明示的な継続のハイブリッドアプローチを採用
