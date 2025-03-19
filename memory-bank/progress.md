@@ -1,6 +1,16 @@
 # 進捗状況
 
 ## 完了した項目
+- エラー処理の一本化：
+  - 例外処理（try/catch/throw）とResult型によるエラー伝搬の二重化を解消
+  - Result型ベースのエラー処理に統一
+  - Exception効果の定義を修正し、Result型を返すように変更
+  - runWithExceptionの実装を簡素化
+  - Result型に便利なユーティリティメソッドを追加（mapErr, flatMapErr, unwrap, unwrapOr, unwrapOrElse, isOk, isErr, unwrapErr）
+  - Result型のユーティリティ関数を追加（all, any）
+  - サンプルコード（calculator.pr, ownership_example.pr）を修正してResult型ベースのエラー処理を使用
+  - ?演算子によるエラー伝搬の推奨
+
 - ライフサイクル管理効果のモデル簡素化：
   - 効果ハンドラから冗長な`onClose`メソッドを削除
   - リソース管理をシンプル化：`acquire`で獲得したリソースはスコープ終了時に自動的に`release`で解放
@@ -133,6 +143,13 @@
 - 簡素化された文法の実装とツールのサポート
 
 ## 解決した問題
+- エラー処理の二重化：
+  - 例外処理（try/catch/throw）とResult型によるエラー伝搬の二重化を解消
+  - Result型ベースのエラー処理に統一することで一貫性を向上
+  - Exception効果の定義を修正し、Result型を返すように変更することで型安全性を強化
+  - Result型に便利なユーティリティメソッドを追加することで使いやすさを向上
+  - ?演算子によるエラー伝搬を推奨することで簡潔なコードを実現
+
 - ライフサイクル管理効果の冗長性：
   - 効果ハンドラから冗長な`onClose`メソッドを削除
   - リソース管理をシンプル化：`acquire`で獲得したリソースはスコープ終了時に自動的に`release`で解放

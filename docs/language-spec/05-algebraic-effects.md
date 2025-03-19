@@ -110,7 +110,8 @@ handler ChoiceHandler: Choice {
         Result.Err(_) => continue          // 失敗したら次の選択肢を試す
       }
     }
-    throw new NoValidChoiceError()
+    // 例外ではなくResult.Errを返す
+    Result.Err(ChoiceError.NoValidChoice)
   }
 }
 ```
@@ -248,21 +249,33 @@ handler DatabaseHandler: Database {
   
   fn transaction<T, E>(action: () -> Result<T, E> & Database): Result<T, E | DbError> = {
     let conn = acquire()
-    conn.beginTransaction()
+    let txResult = conn.beginTransaction()
     
-    try {
-      let result = action()
-      
-      match result {
-        Result.Ok(_) => conn.commit(),
-        Result.Err(_) => conn.rollback()
-      }
-      
-      result
-    } catch (e) {
-      conn.rollback()
-      throw e
+    // トランザクション開始に失敗した場合はエラーを返す
+    if txResult.isErr() {
+      return Result.Err(txResult.unwrapErr())
     }
+    
+    // アクションを実行
+    let result = action()
+    
+    // 結果に基づいてコミットまたはロールバック
+    match result {
+      Result.Ok(_) => {
+        let commitResult = conn.commit()
+        if commitResult.isErr() {
+          // コミットに失敗した場合はエラーを返す
+          return Result.Err(commitResult.unwrapErr())
+        }
+      },
+      Result.Err(_) => {
+        // エラーの場合はロールバック
+        let _ = conn.rollback() // ロールバックの失敗は無視
+      }
+    }
+    
+    // アクションの結果を返す
+    result
   }
 }
 ```
@@ -436,22 +449,18 @@ fn runWithExplicitConsole<T>(action: () -> T & Console): T = {
   }
 }
 
-// 継続を呼び出さないハンドラ（例外処理）
+// 継続を呼び出さないハンドラ（Result型ベースのエラー処理）
 fn runWithException<T, E>(action: () -> T & Exception<E>): Result<T, E> = {
   // 継続を呼び出さないハンドラを定義
   handler ExceptionHandler: Exception<E> {
-    fn raise<R>(error: E): noresume R = {
+    fn raise<R>(error: E): noresume Result<R, E> = {
       return Result.Err(error)
     }
   }
   
-  try {
-    let result = with ExceptionHandler: Exception<E> {
-      action()
-    }
-    Result.Ok(result)
-  } catch (e) {
-    Result.Err(e)
+  // ExceptionHandlerを適用し、結果をResult型で返す
+  with ExceptionHandler: Exception<E> {
+    Result.Ok(action())
   }
 }
 ```

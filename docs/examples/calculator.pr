@@ -9,51 +9,45 @@ enum Expr {
   Divide(Expr, Expr)
 }
 
-// 例外効果
-effect Exception<E> {
-  fn raise<T>(error: E): T
-}
-
-// 例外ハンドラ
-fn runException<T, E>(action: () -> T & Exception<E>): Result<T, E> = {
-  handle action() {
-    return x => Result.Ok(x),
-    
-    Exception.raise(error) => Result.Err(error)
-  }
+// エラー型の定義
+enum CalcError {
+  DivisionByZero,
+  ParseError(String),
+  InvalidFormat(String),
+  UnknownOperator(String)
 }
 
 // 式の評価
-fn evaluate(expr: Expr): Int & Exception<String> = {
+fn evaluate(expr: Expr): Result<Int, CalcError> = {
   match expr {
-    Expr.Number(value) => value,
+    Expr.Number(value) => Result.Ok(value),
     
     Expr.Add(left, right) => {
-      let l = evaluate(left)
-      let r = evaluate(right)
-      l + r
+      let l = evaluate(left)?
+      let r = evaluate(right)?
+      Result.Ok(l + r)
     },
     
     Expr.Subtract(left, right) => {
-      let l = evaluate(left)
-      let r = evaluate(right)
-      l - r
+      let l = evaluate(left)?
+      let r = evaluate(right)?
+      Result.Ok(l - r)
     },
     
     Expr.Multiply(left, right) => {
-      let l = evaluate(left)
-      let r = evaluate(right)
-      l * r
+      let l = evaluate(left)?
+      let r = evaluate(right)?
+      Result.Ok(l * r)
     },
     
     Expr.Divide(left, right) => {
-      let l = evaluate(left)
-      let r = evaluate(right)
+      let l = evaluate(left)?
+      let r = evaluate(right)?
       
       if r == 0 {
-        Exception.raise("ゼロ除算エラー")
+        Result.Err(CalcError.DivisionByZero)
       } else {
-        l / r
+        Result.Ok(l / r)
       }
     }
   }
@@ -81,44 +75,40 @@ fn runConsole<T>(action: () -> T & Console): T = {
 }
 
 // 文字列をパースして式に変換
-fn parseExpr(input: String): Result<Expr, String> = {
+fn parseExpr(input: String): Result<Expr, CalcError> = {
   // 実際の実装では、より複雑なパーサーを使用
   // ここでは簡略化のため、単純な例を示す
-  try {
-    let tokens = input.split(" ")
-    
-    if tokens.length == 1 {
-      // toInt()はOption<Int>を返すように変更
-      match tokens[0].toInt() {
-        Option.Some(value) => Result.Ok(Expr.Number(value)),
-        Option.None => Result.Err("数値への変換エラー")
-      }
-    } else if tokens.length == 3 {
-      // 両方の数値を変換
-      let leftNum = tokens[0].toInt()
-      let rightNum = tokens[2].toInt()
-      
-      match (leftNum, rightNum) {
-        (Option.Some(l), Option.Some(r)) => {
-          let left = Expr.Number(l)
-          let right = Expr.Number(r)
-          let op = tokens[1]
-          
-          match op {
-            "+" => Result.Ok(Expr.Add(left, right)),
-            "-" => Result.Ok(Expr.Subtract(left, right)),
-            "*" => Result.Ok(Expr.Multiply(left, right)),
-            "/" => Result.Ok(Expr.Divide(left, right)),
-            _ => Result.Err(s"不明な演算子: $op")
-          }
-        },
-        _ => Result.Err("数値への変換エラー")
-      }
-    } else {
-      Result.Err("無効な入力形式")
+  let tokens = input.split(" ")
+  
+  if tokens.length == 1 {
+    // toInt()はOption<Int>を返すように変更
+    match tokens[0].toInt() {
+      Option.Some(value) => Result.Ok(Expr.Number(value)),
+      Option.None => Result.Err(CalcError.ParseError("数値への変換エラー"))
     }
-  } catch {
-    _ => Result.Err("パースエラー")
+  } else if tokens.length == 3 {
+    // 両方の数値を変換
+    let leftNum = tokens[0].toInt()
+    let rightNum = tokens[2].toInt()
+    
+    match (leftNum, rightNum) {
+      (Option.Some(l), Option.Some(r)) => {
+        let left = Expr.Number(l)
+        let right = Expr.Number(r)
+        let op = tokens[1]
+        
+        match op {
+          "+" => Result.Ok(Expr.Add(left, right)),
+          "-" => Result.Ok(Expr.Subtract(left, right)),
+          "*" => Result.Ok(Expr.Multiply(left, right)),
+          "/" => Result.Ok(Expr.Divide(left, right)),
+          _ => Result.Err(CalcError.UnknownOperator(op))
+        }
+      },
+      _ => Result.Err(CalcError.ParseError("数値への変換エラー"))
+    }
+  } else {
+    Result.Err(CalcError.InvalidFormat("無効な入力形式"))
   }
 }
 
@@ -147,22 +137,28 @@ fn main(): Unit & Console = {
 }
 
 // 式の結果を処理する関数
-fn processExprResult(result: Result<Expr, String>): Unit & Console = {
+fn processExprResult(result: Result<Expr, CalcError>): Unit & Console = {
   match result {
     Result.Ok(expr) => {
-      // 効果スコープを使用
-      with Exception<String> {
-        try {
-          let value = evaluate(expr)
-          Console.log(s"結果: $value")
-        } catch (error) {
-          Console.log(s"評価エラー: $error")
+      // 式を評価し、結果を表示
+      match evaluate(expr) {
+        Result.Ok(value) => Console.log(s"結果: $value"),
+        Result.Err(error) => {
+          match error {
+            CalcError.DivisionByZero => Console.log("エラー: ゼロ除算"),
+            _ => Console.log(s"評価エラー: $error")
+          }
         }
       }
     },
     
     Result.Err(error) => {
-      Console.log(s"パースエラー: $error")
+      match error {
+        CalcError.ParseError(msg) => Console.log(s"パースエラー: $msg"),
+        CalcError.InvalidFormat(msg) => Console.log(s"フォーマットエラー: $msg"),
+        CalcError.UnknownOperator(op) => Console.log(s"不明な演算子: $op"),
+        _ => Console.log(s"エラー: $error")
+      }
     }
   }
 }

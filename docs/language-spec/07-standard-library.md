@@ -77,6 +77,92 @@ enum Result<T, E> {
   Ok(T),
   Err(E)
 }
+
+// Result型の拡張メソッド
+impl<T, E> Result<T, E> {
+  // 既存のメソッド
+  fn map<U>(self, f: (T) -> U): Result<U, E> = match self {
+    Result.Ok(value) => Result.Ok(f(value)),
+    Result.Err(error) => Result.Err(error)
+  }
+  
+  fn flatMap<U>(self, f: (T) -> Result<U, E>): Result<U, E> = match self {
+    Result.Ok(value) => f(value),
+    Result.Err(error) => Result.Err(error)
+  }
+  
+  // 新しいユーティリティメソッド
+  fn mapErr<F>(self, f: (E) -> F): Result<T, F> = match self {
+    Result.Ok(value) => Result.Ok(value),
+    Result.Err(error) => Result.Err(f(error))
+  }
+  
+  fn flatMapErr<F>(self, f: (E) -> Result<T, F>): Result<T, F> = match self {
+    Result.Ok(value) => Result.Ok(value),
+    Result.Err(error) => f(error)
+  }
+  
+  fn unwrap(self): T = match self {
+    Result.Ok(value) => value,
+    Result.Err(_) => panic("Result.unwrap called on an Err value")
+  }
+  
+  fn unwrapOr(self, default: T): T = match self {
+    Result.Ok(value) => value,
+    Result.Err(_) => default
+  }
+  
+  fn unwrapOrElse(self, f: (E) -> T): T = match self {
+    Result.Ok(value) => value,
+    Result.Err(error) => f(error)
+  }
+  
+  fn isOk(self): Bool = match self {
+    Result.Ok(_) => true,
+    Result.Err(_) => false
+  }
+  
+  fn isErr(self): Bool = match self {
+    Result.Ok(_) => false,
+    Result.Err(_) => true
+  }
+  
+  fn unwrapErr(self): E = match self {
+    Result.Ok(_) => panic("Result.unwrapErr called on an Ok value"),
+    Result.Err(error) => error
+  }
+}
+
+// Result型のユーティリティ関数
+module Result {
+  // 複数のResultを結合する
+  fn all<T, E>(results: List<Result<T, E>>): Result<List<T>, E> = {
+    let values = List.empty<T>()
+    
+    for result in results {
+      match result {
+        Result.Ok(value) => values = List.append(values, List.of(value)),
+        Result.Err(error) => return Result.Err(error)
+      }
+    }
+    
+    Result.Ok(values)
+  }
+  
+  // 最初に成功したResultを返す
+  fn any<T, E>(results: List<Result<T, E>>): Result<T, List<E>> = {
+    let errors = List.empty<E>()
+    
+    for result in results {
+      match result {
+        Result.Ok(value) => return Result.Ok(value),
+        Result.Err(error) => errors = List.append(errors, List.of(error))
+      }
+    }
+    
+    Result.Err(errors)
+  }
+}
 ```
 
 これらのコアデータ構造は、型安全で効率的なプログラミングを可能にします。各データ構造は、関連する操作と共に提供され、関数型プログラミングのパターンをサポートします。

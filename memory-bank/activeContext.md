@@ -8,6 +8,16 @@
 - 言語仕様書の構造と内容の改善
 
 ## 最近の変更
+- エラー処理の一本化：
+  - 例外処理（try/catch/throw）とResult型によるエラー伝搬の二重化を解消
+  - Result型ベースのエラー処理に統一
+  - Exception効果の定義を修正し、Result型を返すように変更
+  - runWithExceptionの実装を簡素化
+  - Result型に便利なユーティリティメソッドを追加（mapErr, flatMapErr, unwrap, unwrapOr, unwrapOrElse, isOk, isErr, unwrapErr）
+  - Result型のユーティリティ関数を追加（all, any）
+  - サンプルコード（calculator.pr, ownership_example.pr）を修正してResult型ベースのエラー処理を使用
+  - ?演算子によるエラー伝搬の推奨
+
 - ライフサイクル管理効果のモデル簡素化：
   - 効果ハンドラから冗長な`onClose`メソッドを削除
   - リソース管理をシンプル化：`acquire`で獲得したリソースはスコープ終了時に自動的に`release`で解放
@@ -120,6 +130,7 @@
 - 所有権モデル：Rustに似た所有権と借用の概念
 - 継承システム：トレイトの単一継承のみをサポート、データ型の継承を制限
 - nullの排除：値の存在/不在はOption型で表現
+- エラー処理：Result型ベースのエラー処理を採用、?演算子によるエラー伝搬をサポート
 - 暗黙的パラメータ：関数シグネチャで`(with param: Type)`構文を使用した暗黙的なパラメータ渡し
 - 効果スコープ：効果の局所的な使用のためのwith式
 - 関数合成：パイプライン演算子と関数合成演算子の導入

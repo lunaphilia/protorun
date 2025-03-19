@@ -118,14 +118,15 @@ managed File {
   
   // 獲得関数（コンストラクタ）
   fn open(path: String): Result<File, IOError> = {
-    try {
-      let handle = FileHandle.open(path)
-      Result.Ok(File {
+    // FileHandle.openの結果を直接返す
+    let handleResult = FileHandle.open(path)
+    
+    match handleResult {
+      Result.Ok(handle) => Result.Ok(File {
         path: path,
         handle: handle
-      })
-    } catch (e) {
-      Result.Err(IOError.from(e))
+      }),
+      Result.Err(error) => Result.Err(IOError.from(error))
     }
   }
   
@@ -136,21 +137,23 @@ managed File {
   
   // ファイルから読み込み（不変借用）
   fn readToString(self: &Self): Result<String, IOError> = {
-    try {
-      let content = self.handle.readToString()
-      Result.Ok(content)
-    } catch (e) {
-      Result.Err(IOError.from(e))
+    // handle.readToStringの結果を直接返す
+    let readResult = self.handle.readToString()
+    
+    match readResult {
+      Result.Ok(content) => Result.Ok(content),
+      Result.Err(error) => Result.Err(IOError.from(error))
     }
   }
   
   // ファイルに書き込み（可変借用）
   fn write(self: &mut Self, content: String): Result<Unit, IOError> = {
-    try {
-      self.handle.write(content)
-      Result.Ok(())
-    } catch (e) {
-      Result.Err(IOError.from(e))
+    // handle.writeの結果を直接返す
+    let writeResult = self.handle.write(content)
+    
+    match writeResult {
+      Result.Ok(_) => Result.Ok(()),
+      Result.Err(error) => Result.Err(IOError.from(error))
     }
   }
 }
