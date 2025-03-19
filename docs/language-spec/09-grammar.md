@@ -72,6 +72,8 @@ Type ::= TypeRef
 
 TypeRef ::= Identifier GenericArgs?
           | "own" TypeRef
+          | "&" TypeRef
+          | "&mut" TypeRef
 
 GenericArgs ::= "<" (Type ("," Type)*)? ">"
 
