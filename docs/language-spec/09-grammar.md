@@ -19,20 +19,19 @@ Program ::= (Declaration | Statement)*
 
 Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl
 
-FunctionDecl ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("with" EffectType)? "=" Expression
+FunctionDecl ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("&" EffectType)? "=" Expression
 
 TypeDecl ::= "type" Identifier GenericParams? "=" (RecordType | Type)
-           | "sealed" "trait" Identifier GenericParams? ("{" TraitMember* "}")? ("extends" TypeRef)?
-           | "managed" "type" Identifier GenericParams? "{" ManagedTypeMember* "}"
-           | "context" "type" Identifier GenericParams? "{" ManagedTypeMember* "}"
+           | "sealed" "trait" Identifier GenericParams? ("{" TraitMember* "}")? (":" TypeRef)?
+           | "managed" Identifier GenericParams? "{" ManagedTypeMember* "}"
 
-TraitDecl ::= "trait" Identifier GenericParams? ("{" TraitMember* "}")? ("extends" TypeRef)?
+TraitDecl ::= "trait" Identifier GenericParams? ("{" TraitMember* "}")? (":" TypeRef)?
 
-ImplDecl ::= "impl" GenericParams? TypeRef "for"? TypeRef "{" ImplMember* "}"
+ImplDecl ::= "impl" GenericParams? TypeRef ":" TypeRef "{" ImplMember* "}"
 
-EffectDecl ::= "effect" Identifier GenericParams? ("with" "lifecycle")? "{" EffectOperation* "}"
+EffectDecl ::= "effect" Identifier GenericParams? (":" "lifecycle")? "{" EffectOperation* "}"
 
-HandlerDecl ::= "handler" Identifier GenericParams? "for" TypeRef "{" HandlerMember* "}"
+HandlerDecl ::= "handler" Identifier GenericParams? ":" TypeRef "{" HandlerMember* "}"
 
 RecordType ::= "{" (Identifier ":" Type ("," Identifier ":" Type)*)? "}"
 
@@ -76,7 +75,7 @@ TypeRef ::= Identifier GenericArgs?
 
 GenericArgs ::= "<" (Type ("," Type)*)? ">"
 
-FunctionType ::= "(" (Type ("," Type)*)? ")" "->" Type ("with" EffectType)?
+FunctionType ::= "(" (Type ("," Type)*)? ")" "->" Type ("&" EffectType)?
 
 TupleType ::= "(" Type ("," Type)+ ")"
 
@@ -98,7 +97,8 @@ Expression ::= LiteralExpr
              | BlockExpr
              | IfExpr
              | MatchExpr
-             | ForExpr
+             | CollectionComprehensionExpr
+             | BindExpr
              | LambdaExpr
              | CallExpr
              | MemberAccessExpr
@@ -118,7 +118,9 @@ IfExpr ::= "if" Expression BlockExpr ("else" (IfExpr | BlockExpr))?
 
 MatchExpr ::= "match" Expression "{" (Pattern ("if" Expression)? "=>" Expression ",")* "}"
 
-ForExpr ::= "for" "{" (Pattern "<-" Expression ("if" Expression)?)* "}" "yield" Expression
+CollectionComprehensionExpr ::= "[" Expression "for" Pattern "<-" Expression ("if" Expression)? "]"
+
+BindExpr ::= "bind" "{" (Pattern "<-" Expression ";")* Expression "}"
 
 LambdaExpr ::= ParamList "=>" Expression
 
@@ -132,9 +134,9 @@ UnaryExpr ::= Operator Expression
 
 HandleExpr ::= "handle" Expression "{" (EffectCase)* "}"
 
-WithExpr ::= "with" (Expression | TypeRef) ("handled" "by" Expression)? BlockExpr
+WithExpr ::= "with" (Expression | TypeRef) (":" TypeRef)? BlockExpr
 
-ScopedEffectExpr ::= "with" "scoped" "effect" Identifier BlockExpr
+ScopedEffectExpr ::= "with" "scoped" Identifier BlockExpr
 
 EffectCase ::= QualifiedIdentifier ParamList "=>" BlockExpr
 
@@ -166,7 +168,7 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 ### 10.3.2 宣言
 
 - **関数宣言（FunctionDecl）**: `fn`キーワードで始まり、関数名、ジェネリックパラメータ（オプション）、パラメータリスト、戻り値の型（オプション）、効果型（オプション）、関数本体（式）で構成されます。
-- **型宣言（TypeDecl）**: レコード型、シールドトレイト、管理型、コンテキスト型の定義を含みます。
+- **型宣言（TypeDecl）**: レコード型、シールドトレイト、管理型の定義を含みます。
 - **トレイト宣言（TraitDecl）**: インターフェースを定義します。
 - **実装宣言（ImplDecl）**: トレイトの実装を定義します。
 - **効果宣言（EffectDecl）**: 代数的効果を定義します。
@@ -187,7 +189,8 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 - **ブロック式（BlockExpr）**: 文の集合と最終的な式で構成されます。
 - **条件式（IfExpr）**: 条件に基づいて異なる式を評価します。
 - **パターンマッチング式（MatchExpr）**: 値をパターンと照合して異なる式を評価します。
-- **for式（ForExpr）**: コレクションを反復処理して新しいコレクションを生成します。
+- **コレクション内包表記式（CollectionComprehensionExpr）**: コレクションを反復処理して新しいコレクションを生成します。
+- **バインド式（BindExpr）**: モナド連鎖のための式です。
 - **ラムダ式（LambdaExpr）**: 無名関数です。
 - **関数呼び出し式（CallExpr）**: 関数を呼び出します。
 - **メンバーアクセス式（MemberAccessExpr）**: オブジェクトのメンバーにアクセスします。
@@ -218,22 +221,24 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 
 ### 10.4.2 ライフサイクル管理効果
 
-ライフサイクル管理効果は、`effect ... with lifecycle`構文を使用して定義されます。これには以下の特殊な操作が含まれます：
+ライフサイクル管理効果は、`effect ... : lifecycle`構文を使用して定義されます。これには以下の特殊な操作が含まれます：
 
 1. **獲得操作**: `with cleanup`修飾子を持ち、リソースの獲得と自動解放を管理します。
 2. **解放操作**: `cleanup`関数として定義され、リソースの解放を実装します。
 
-### 10.4.3 コンテキスト型
+### 10.4.3 管理型の暗黙的な使用
 
-コンテキスト型は、`context type`キーワードを使用して定義されます。これは管理型と同様の構文を持ちますが、暗黙的なコンテキスト渡しの機能が追加されています。
+管理型は、`managed`キーワードを使用して定義され、暗黙的なコンテキスト渡しの機能を持っています。これにより、関数シグネチャで`with db: Database`のように暗黙的なパラメータを宣言し、`with`式を使用して暗黙的なコンテキストを提供することができます。
 
 ## 10.5 文法の進化
 
 Protorun言語の文法は、言語の進化に伴って拡張されています。最近の追加には以下が含まれます：
 
 1. **効果ハンドラの構文**: `handler`キーワードと特殊な継続制御（`noresume`、`multiresume`）
-2. **ライフサイクル管理効果**: `with lifecycle`と`with cleanup`修飾子
-3. **コンテキスト型**: `context type`キーワード
+2. **ライフサイクル管理効果**: `: lifecycle`と`with cleanup`修飾子
+3. **管理型の暗黙的な使用**: 管理型に暗黙的なパラメータとしての機能を追加
 4. **所有権修飾子**: `own`キーワード
+5. **コレクション内包表記とバインド式**: `for`式と`do`式の代わりに導入
+6. **型注釈パターン**: 「エンティティ: 型」パターンの一貫した使用
 
 これらの追加は、言語の表現力と安全性を向上させるために設計されています。
