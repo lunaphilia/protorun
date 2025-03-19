@@ -20,16 +20,16 @@ Program ::= (Declaration | Statement)*
 Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl
 
 FunctionDecl ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("&" EffectType)? "=" Expression
+               | "fn" Identifier GenericParams? ParamList ("(" "with" Param ("," Param)* ")")? (":" Type)? ("&" EffectType)? "=" Expression
 
 TypeDecl ::= "type" Identifier GenericParams? "=" (RecordType | Type)
            | "sealed" "trait" Identifier GenericParams? ("{" TraitMember* "}")? (":" TypeRef)?
-           | "managed" Identifier GenericParams? "{" ManagedTypeMember* "}"
 
 TraitDecl ::= "trait" Identifier GenericParams? ("{" TraitMember* "}")? (":" TypeRef)?
 
 ImplDecl ::= "impl" GenericParams? TypeRef ":" TypeRef "{" ImplMember* "}"
 
-EffectDecl ::= "effect" Identifier GenericParams? (":" "lifecycle")? "{" EffectOperation* "}"
+EffectDecl ::= "effect" Identifier GenericParams? (":" TypeRef)? "{" EffectOperation* "}"
 
 HandlerDecl ::= "handler" Identifier GenericParams? ":" TypeRef "{" HandlerMember* "}"
 
@@ -39,21 +39,16 @@ TraitMember ::= FunctionDecl
 
 ImplMember ::= FunctionDecl
 
-HandlerMember ::= HandlerFunction | FieldDecl | FinalizeFunction
+HandlerMember ::= HandlerFunction | FieldDecl
 
 HandlerFunction ::= Identifier GenericParams? ParamList (":" ReturnType)? "=" Expression
                   | Identifier GenericParams? ParamList "," "resume" ":" ResumeType ":" ReturnType "=" Expression
                   | Identifier GenericParams? ParamList ":" "noresume" ReturnType "=" Expression
                   | Identifier GenericParams? ParamList ":" "multiresume" ReturnType "=" Expression
 
-FinalizeFunction ::= "fn" "finalize" "(" ")" ":" "Unit" "=" Expression
-
-ManagedTypeMember ::= FieldDecl | FunctionDecl
-
 FieldDecl ::= Identifier ":" Type
 
-EffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("with" "cleanup")? ";"
-                 | "fn" "cleanup" ParamList (":" Type)? ";"
+EffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)? ";"
 
 ParamList ::= "(" (Param ("," Param)*)? ")"
 
@@ -169,11 +164,11 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 
 ### 10.3.2 宣言
 
-- **関数宣言（FunctionDecl）**: `fn`キーワードで始まり、関数名、ジェネリックパラメータ（オプション）、パラメータリスト、戻り値の型（オプション）、効果型（オプション）、関数本体（式）で構成されます。
-- **型宣言（TypeDecl）**: レコード型、シールドトレイト、管理型の定義を含みます。
+- **関数宣言（FunctionDecl）**: `fn`キーワードで始まり、関数名、ジェネリックパラメータ（オプション）、パラメータリスト、暗黙的パラメータリスト（オプション）、戻り値の型（オプション）、効果型（オプション）、関数本体（式）で構成されます。
+- **型宣言（TypeDecl）**: レコード型、シールドトレイトの定義を含みます。
 - **トレイト宣言（TraitDecl）**: インターフェースを定義します。
 - **実装宣言（ImplDecl）**: トレイトの実装を定義します。
-- **効果宣言（EffectDecl）**: 代数的効果を定義します。
+- **効果宣言（EffectDecl）**: 代数的効果を定義します。効果は他の効果（例：`LifecycleEffect<R>`）を継承することができます。
 - **ハンドラ宣言（HandlerDecl）**: 効果ハンドラを定義します。
 
 ### 10.3.3 型システム
@@ -223,22 +218,40 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 
 ### 10.4.2 ライフサイクル管理効果
 
-ライフサイクル管理効果は、`effect ... : lifecycle`構文を使用して定義されます。これには以下の特殊な操作が含まれます：
+ライフサイクル管理効果は、`LifecycleEffect<R>`型を継承する効果として定義されます。これには以下の特殊な操作が含まれます：
 
-1. **獲得操作**: `with cleanup`修飾子を持ち、リソースの獲得と自動解放を管理します。
-2. **解放操作**: `cleanup`関数として定義され、リソースの解放を実装します。
+1. **獲得操作**: `acquire`関数として定義され、リソースの獲得を実装します。
+2. **解放操作**: `release`関数として定義され、リソースの解放を実装します。
 
-### 10.4.3 管理型の暗黙的な使用
+ライフサイクル管理効果を使用すると、リソースの獲得と解放が自動的に管理されます。`acquire`関数で獲得されたリソースは、スコープ終了時に自動的に`release`関数によって解放されます。このシンプルなモデルは、C++のRAIIパターンやRustの所有権システムに近く、リソース管理を直感的かつ安全に行うことができます。
 
-管理型は、`managed`キーワードを使用して定義され、暗黙的なコンテキスト渡しの機能を持っています。これにより、関数シグネチャで`with db: Database`のように暗黙的なパラメータを宣言し、`with`式を使用して暗黙的なコンテキストを提供することができます。
+### 10.4.3 暗黙的パラメータ
+
+暗黙的パラメータは、関数シグネチャの後に`(with param: Type)`構文で宣言されます。これにより、スコープ内で利用可能な値を明示的に渡すことなく、関数に提供することができます。
+
+```
+// 暗黙的パラメータを宣言
+fn processData(data: String)(with logger: Logger): Result<ProcessedData, Error> = {
+  logger.log("データ処理開始")
+  // 処理...
+  logger.log("データ処理完了")
+  Result.Ok(processedData)
+}
+
+// 暗黙的パラメータの提供
+with LoggerHandler: Logger {
+  // この呼び出しでは、スコープ内のLoggerが暗黙的に渡される
+  processData("raw data")
+}
+```
 
 ## 10.5 文法の進化
 
 Protorun言語の文法は、言語の進化に伴って拡張されています。最近の追加には以下が含まれます：
 
 1. **効果ハンドラの構文**: `handler`キーワードと特殊な継続制御（`noresume`、`multiresume`）
-2. **ライフサイクル管理効果**: `: lifecycle`と`with cleanup`修飾子
-3. **管理型の暗黙的な使用**: 管理型に暗黙的なパラメータとしての機能を追加
+2. **ライフサイクル管理効果**: `LifecycleEffect<R>`型の導入
+3. **暗黙的パラメータ**: `(with param: Type)`構文の導入
 4. **所有権修飾子**: `own`キーワード
 5. **コレクション内包表記とバインド式**: `for`式と`do`式の代わりに導入
 6. **型注釈パターン**: 「エンティティ: 型」パターンの一貫した使用
