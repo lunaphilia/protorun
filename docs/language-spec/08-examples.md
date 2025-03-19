@@ -1,6 +1,6 @@
-# 9. 例：サンプルプログラム
+# 8. 例：サンプルプログラム
 
-## 9.1 サンプルプログラムの目的と概要
+## 8.1 サンプルプログラムの目的と概要
 
 サンプルプログラムは、Protorun言語の機能と使用パターンを実際のコード例を通じて示すことを目的としています。これらの例は以下の役割を果たします：
 
@@ -12,7 +12,7 @@
 
 以下のサンプルプログラムは、Protorun言語の様々な側面を示すために選ばれています。
 
-## 9.2 簡単な計算機
+## 8.2 簡単な計算機
 
 この例は、代数的データ型、パターンマッチング、代数的効果（例外処理）を使用した簡単な計算機の実装を示しています。
 
@@ -101,7 +101,7 @@ fn main(): Unit with Console = {
 4. **特殊な継続制御**: `noresume`キーワードを使用した継続を呼び出さない効果ハンドラ
 5. **エラー処理**: `Result`型と`?`演算子を使用したエラー伝播
 
-## 9.3 状態を持つカウンター
+## 8.3 状態を持つカウンター
 
 この例は、状態効果を使用したカウンターの実装を示しています。
 
@@ -151,71 +151,25 @@ fn main(): Unit with Console = {
 4. **ジェネリクス**: 型パラメータを使用した汎用的な状態ハンドラ
 5. **効果スコープ**: `with`式を使用した効果の局所的な適用
 
-## 9.4 ファイル処理（ライフサイクル管理効果を使用）
+## 8.4 ファイル処理（ライフサイクル管理効果を使用）
 
-この例は、ライフサイクル管理効果を使用したファイル処理の実装を示しています。
+この例は、ライフサイクル管理効果を使用したファイル処理の実装を示しています。ライフサイクル管理効果の詳細については、[5.4 ライフサイクル管理効果](05-algebraic-effects.md#54-ライフサイクル管理効果)を参照してください。
 
 ```
 // ファイル処理の実装（ライフサイクル管理効果を使用）
-fn processFile(path: String): Result<String, IOError> with ResourceManager<File> = {
+fn processFile(path: String): Result<String, IOError> & FileSystem = {
   // ファイルを開く（スコープ終了時に自動的に閉じられる）
-  let file = ResourceManager.open(() => File.open(path))?
+  let file = FileSystem.acquire()
   
   // ファイルから読み込む
-  let content = ResourceManager.use(&file, f => f.read())?
+  let content = FileSystem.read()
   
   // 処理された内容を別のファイルに書き込む
   let processed = content.toUpperCase()
-  let outputFile = ResourceManager.open(() => File.open(path + ".processed"))?
-  ResourceManager.use(&outputFile, f => f.write(processed))?
+  FileSystem.write(processed)
   
   Result.Ok(processed)
-} // fileとoutputFileは自動的に解放される（cleanup関数が呼び出される）
-
-// 使用例
-fn main(): Unit with Console = {
-  // ライフサイクル管理効果ハンドラを定義
-  handler ResourceManagerHandler<R> for ResourceManager<R> {
-    var activeResources = Set<R>()
-    
-    fn open<E>(acquireFn: () -> Result<R, E>): Result<R, E> = {
-      match acquireFn() {
-        Result.Ok(resource) => {
-          activeResources.add(resource)
-          Result.Ok(resource)
-        },
-        Result.Err(error) => Result.Err(error)
-      }
-    }
-    
-    fn cleanup(resource: R): Unit = {
-      if resource is managed type {
-        resource.close()
-      }
-      activeResources.remove(resource)
-    }
-    
-    fn use<T>(resource: &R, operation: (r: &R) -> T): T = {
-      operation(resource)
-    }
-    
-    fn finalize(): Unit = {
-      for resource in activeResources {
-        if resource is managed type {
-          resource.close()
-        }
-      }
-    }
-  }
-  
-  // ハンドラを適用して処理を実行
-  with ResourceManager<File> handled by ResourceManagerHandler {
-    match processFile("input.txt") {
-      Result.Ok(content) => Console.log(s"処理完了: $content"),
-      Result.Err(error) => Console.log(s"エラー: $error")
-    }
-  }
-}
+} // fileは自動的に解放される（FileSystem.release(file)が呼び出される）
 ```
 
 この例では、以下の言語機能を示しています：
@@ -226,51 +180,11 @@ fn main(): Unit with Console = {
 4. **エラー処理**: `Result`型と`?`演算子を使用したエラー伝播
 5. **型チェック**: `is`演算子を使用した型チェック
 
-## 9.5 コンテキスト型を使用したデータベース操作
+## 8.5 暗黙的パラメータを使用したデータベース操作
 
-この例は、コンテキスト型を使用したデータベース操作の実装を示しています。
+この例は、暗黙的パラメータと効果システムを使用したデータベース操作の実装を示しています。暗黙的パラメータの詳細については、[5.8 暗黙的パラメータと効果システム](05-algebraic-effects.md#58-暗黙的パラメータと効果システム)を参照してください。
 
 ```
-// データベースコンテキスト型
-context type Database {
-  connection: DbConnection,
-  
-  // 初期化
-  fn connect(config: DbConfig): Result<Database, DbError> = {
-    let conn = DbConnection.open(config)?
-    Result.Ok(Database { connection: conn })
-  }
-  
-  // 解放（自動的に呼び出される）
-  fn close(self): Unit = {
-    self.connection.close()
-  }
-  
-  // クエリメソッド
-  fn query(self: &Self, sql: String): Result<QueryResult, DbError> = {
-    self.connection.query(sql)
-  }
-  
-  // トランザクションメソッド
-  fn transaction<T, E>(self: &Self, action: () -> Result<T, E> with Database): Result<T, E | DbError> = {
-    self.connection.beginTransaction()
-    
-    try {
-      let result = action()
-      
-      match result {
-        Result.Ok(_) => self.connection.commit(),
-        Result.Err(_) => self.connection.rollback()
-      }
-      
-      result
-    } catch (e) {
-      self.connection.rollback()
-      throw e
-    }
-  }
-}
-
 // ユーザーデータ型
 type User = {
   id: String,
@@ -279,8 +193,8 @@ type User = {
 }
 
 // ユーザーリポジトリ
-fn getUserById(userId: String): Result<User, DbError> with Database = {
-  let result = Database.query(s"SELECT * FROM users WHERE id = $userId")?
+fn getUserById(userId: String)(with db: Database): Result<User, DbError> = {
+  let result = db.query(s"SELECT * FROM users WHERE id = $userId")?
   
   if result.isEmpty() {
     Result.Err(DbError.NotFound(s"ユーザーが見つかりません: $userId"))
@@ -294,37 +208,9 @@ fn getUserById(userId: String): Result<User, DbError> with Database = {
   }
 }
 
-fn updateUser(user: User): Result<Unit, DbError> with Database = {
-  Database.query(s"UPDATE users SET name = '${user.name}', email = '${user.email}' WHERE id = '${user.id}'")?
+fn updateUser(user: User)(with db: Database): Result<Unit, DbError> = {
+  db.execute(s"UPDATE users SET name = '${user.name}', email = '${user.email}' WHERE id = '${user.id}'")?
   Result.Ok(())
-}
-
-// 使用例
-fn main(): Result<Unit, Error> with Console = {
-  // データベース接続を確立
-  let db = Database.connect(DbConfig {
-    host: "localhost",
-    port: 5432,
-    username: "admin",
-    password: "password",
-    database: "myapp"
-  })?
-  
-  // コンテキスト型として提供
-  with db {
-    // トランザクション内でユーザーを更新
-    Database.transaction(() => {
-      let user = getUserById("user123")?
-      let updatedUser = { ...user, name: "新しい名前" }
-      updateUser(updatedUser)?
-      Result.Ok(())
-    }) match {
-      Result.Ok(_) => Console.log("ユーザーを更新しました"),
-      Result.Err(error) => Console.log(s"エラー: $error")
-    }
-    
-    Result.Ok(())
-  } // dbは自動的に閉じられる
 }
 ```
 
@@ -336,9 +222,9 @@ fn main(): Result<Unit, Error> with Console = {
 4. **レコード更新**: スプレッド構文を使用したレコードの更新
 5. **文字列補間**: SQL文の構築
 
-## 9.6 代数的効果とコンテキスト型の連携
+## 8.6 代数的効果と暗黙的パラメータの連携
 
-この例は、代数的効果とコンテキスト型がどのように連携できるかを示しています。
+この例は、代数的効果と暗黙的パラメータがどのように連携できるかを示しています。
 
 ```
 // データベースアクセス効果
@@ -353,7 +239,7 @@ effect Logging {
 }
 
 // ビジネスロジック
-fn processUserData(userId: String): Result<UserData, Error> with DbAccess & Logging = {
+fn processUserData(userId: String): Result<UserData, Error> & DbAccess & Logging = {
   Logging.log(LogLevel.Info, s"ユーザーデータの処理開始: $userId")
   
   // データベースからユーザー情報を取得
@@ -373,16 +259,10 @@ fn processUserData(userId: String): Result<UserData, Error> with DbAccess & Logg
   Result.Ok(userData)
 }
 
-// コンテキスト型を使用して効果を実装
-fn runWithDatabase<T>(action: () -> T with DbAccess & Logging): Result<T, Error> = {
-  // データベースコンテキスト
-  let db = Database.connect(config)?
-  
-  // ロガーコンテキスト
-  let logger = Logger.init(logConfig)
-  
+// 暗黙的パラメータを使用して効果を実装
+fn runWithDatabase<T>(action: () -> T & DbAccess & Logging)(with db: Database, logger: Logger): Result<T, Error> = {
   // 効果ハンドラを定義
-  handler DbHandler for DbAccess {
+  handler DbHandler: DbAccess {
     fn query(sql: String): Result<QueryResult, DbError> = {
       db.query(sql)
     }
@@ -392,38 +272,50 @@ fn runWithDatabase<T>(action: () -> T with DbAccess & Logging): Result<T, Error>
     }
   }
   
-  handler LogHandler for Logging {
+  handler LogHandler: Logging {
     fn log(level: LogLevel, message: String): Unit = {
       logger.log(level, message)
     }
   }
   
-  // コンテキスト型と効果ハンドラを組み合わせて使用
-  with db, logger {
-    with DbAccess handled by DbHandler {
-      with Logging handled by LogHandler {
-        try {
-          Result.Ok(action())
-        } catch (e) {
-          Result.Err(e)
-        }
+  // 効果ハンドラを適用
+  with DbHandler: DbAccess {
+    with LogHandler: Logging {
+      try {
+        Result.Ok(action())
+      } catch (e) {
+        Result.Err(e)
       }
     }
   }
 }
 
 // 使用例
-fn main(): Result<Unit, Error> with Console = {
-  runWithDatabase(() => {
-    let userData = processUserData("user123")?
-    Console.log(s"ユーザーデータ: $userData")
-    Result.Ok(())
-  }) match {
-    Result.Ok(_) => Console.log("処理が完了しました"),
-    Result.Err(error) => Console.log(s"エラー: $error")
+fn main(): Result<Unit, Error> & Console = {
+  // データベースハンドラとロガーハンドラを定義
+  handler DatabaseHandler: Database {
+    // 実装...
   }
   
-  Result.Ok(())
+  handler LoggerHandler: Logger {
+    // 実装...
+  }
+  
+  // ハンドラを適用
+  with DatabaseHandler: Database {
+    with LoggerHandler: Logger {
+      runWithDatabase(() => {
+        let userData = processUserData("user123")?
+        Console.log(s"ユーザーデータ: $userData")
+        Result.Ok(())
+      }) match {
+        Result.Ok(_) => Console.log("処理が完了しました"),
+        Result.Err(error) => Console.log(s"エラー: $error")
+      }
+      
+      Result.Ok(())
+    }
+  }
 }
 ```
 

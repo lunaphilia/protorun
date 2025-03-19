@@ -150,20 +150,36 @@ type Ref<'a, T> = {
 
 ## 4.5 リソース管理
 
+Protorun言語では、リソース管理を効果システムと統合することで、安全で柔軟なリソース管理を実現しています。
+
 ```
-// リソース型を使用したリソース管理
-fn processFile(path: String): Result<String, IOError> = {
-  // ファイルを開く（スコープ終了時に自動的に閉じられる）
-  let file = File.open(path)?
+// ライフサイクル管理効果を使用したリソース管理
+effect FileSystem: LifecycleEffect<File> {
+  fn acquire(): File = {
+    File.open("example.txt")
+  }
   
-  // ファイルの内容を読み取る
-  let content = file.read()?
+  fn release(file: File): Unit = {
+    file.close()
+  }
+  
+  fn read(): String
+  fn write(content: String): Unit
+}
+
+// 使用例
+fn processFile(): Result<String, IOError> & FileSystem = {
+  // ファイルを開く（スコープ終了時に自動的に閉じられる）
+  let file = FileSystem.acquire()
+  
+  // ファイルから読み込み
+  let content = FileSystem.read()
   
   // 内容を処理
   let processed = processContent(content)
   
   Result.Ok(processed)
-} // ここでfileのreleaseメソッド（close）が自動的に呼び出される
+} // fileは自動的に閉じられる（FileSystem.release(file)が呼び出される）
 ```
 
 リソース管理システムは、以下の原則に基づいて設計されています：
@@ -179,6 +195,36 @@ fn processFile(path: String): Result<String, IOError> = {
 - **予測可能な解放**: リソースが解放されるタイミングが明確で予測可能です
 - **コードの簡潔さ**: 明示的な解放コードを書く必要がなく、コードの簡潔さが向上します
 
-リソース管理は、所有権システムと管理型（旧リソース型）を組み合わせて実現されます。管理型は、獲得関数（コンストラクタ）と解放関数（デストラクタ）を持ち、所有者のスコープ終了時に自動的に解放関数が呼び出されます。これにより、try-finally構文などの明示的なリソース管理コードを書く必要がなくなり、コードの簡潔さと安全性が向上します。
+### 4.5.1 ライフサイクル管理効果によるリソース管理
 
-また、リソース管理システムは、代数的効果システムと統合されており、ライフサイクル管理効果（`effect : lifecycle`）を使用して、より柔軟なリソース管理パターンを実現することもできます。これにより、リソースの獲得と解放を効果として抽象化し、効果ハンドラを通じて制御することができます。
+リソース管理は、所有権システムとライフサイクル管理効果（`LifecycleEffect<R>`）を組み合わせて実現されます。ライフサイクル管理効果は、リソースの獲得（`acquire`）と解放（`release`）を明示的に定義し、効果ハンドラを通じて制御します。
+
+ライフサイクル管理効果の詳細については、[5.4 ライフサイクル管理効果](05-algebraic-effects.md#54-ライフサイクル管理効果)を参照してください。
+
+### 4.5.2 複数のリソースの管理
+
+複数のリソースを管理する場合、それぞれのリソースは独立して獲得・解放されます：
+
+```
+// 複数のリソースを使用する例
+fn processData(): Result<String, Error> & Database & FileSystem = {
+  // データベース接続を獲得
+  let conn = Database.acquire()
+  
+  // ファイルを開く
+  let file = FileSystem.acquire()
+  
+  // データベースからデータを取得
+  let data = Database.query("SELECT * FROM data")?
+  
+  // ファイルに書き込み
+  FileSystem.write(data.toString())
+  
+  // ファイルから読み込み
+  let content = FileSystem.read()
+  
+  Result.Ok(content)
+} // conn と file は自動的に解放される（逆順）
+```
+
+複数のリソースが獲得された場合、それらは獲得された順序の逆順で解放されます。これにより、リソース間の依存関係がある場合でも、安全に解放されることが保証されます。

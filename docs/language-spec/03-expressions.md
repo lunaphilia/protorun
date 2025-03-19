@@ -118,15 +118,15 @@ with ConsoleHandler: Console {
   Console.log("このスコープ内のConsole効果はConsoleHandlerでハンドル")
 }
 
-// with式（管理型の暗黙的な提供）
-with db {
-  // dbが暗黙的に利用可能になる
+// with式（効果の暗黙的な提供）
+with DatabaseHandler: Database {
+  // Database効果が暗黙的に利用可能になる
   processUserData("user123")
 }
 
-// with式（複数の管理型の暗黙的な提供）
-with db, logger, client {
-  // db, logger, clientが暗黙的に利用可能になる
+// with式（複数の効果の暗黙的な提供）
+with DatabaseHandler: Database, LoggerHandler: Logger {
+  // Database効果とLogger効果が暗黙的に利用可能になる
   processUserOrder("user123", "order456")
 }
 
@@ -293,6 +293,12 @@ trait Monad<T> {
 ### 4.4.3 with式の返り値と用途
 
 with式は式として設計されており、ブロック内の最後の式の評価結果を返します。この返り値は他の式と同様に使用できます：
+
+### 4.4.4 暗黙的パラメータ
+
+Protorun言語は、暗黙的パラメータをサポートしています。これにより、スコープ内で利用可能な値を明示的に渡すことなく、関数に提供することができます。
+
+暗黙的パラメータと効果システムの詳細については、[5.8 暗黙的パラメータと効果システム](05-algebraic-effects.md#58-暗黙的パラメータと効果システム)を参照してください。
 
 ```
 // with式の返り値を変数に代入
