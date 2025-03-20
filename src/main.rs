@@ -39,8 +39,8 @@ fn run_file(path: &Path) -> Result<()> {
         ))?;
 
     let filename = path.to_string_lossy().to_string();
-    let mut parser = Parser::from_str(&content, Some(filename))?;
-    let program = parser.parse_program()?;
+    let mut parser = Parser::new(Some(filename));
+    let program = parser.parse_program(&content)?;
 
     println!("解析成功！");
     print_program(&program);
@@ -69,20 +69,14 @@ fn run_repl() -> Result<()> {
             break;
         }
 
-        match Parser::from_str(input, None) {
-            Ok(mut parser) => {
-                match parser.parse_program() {
-                    Ok(program) => {
-                        println!("解析成功！");
-                        print_program(&program);
-                    }
-                    Err(e) => {
-                        println!("解析エラー: {}", e);
-                    }
-                }
+        let mut parser = Parser::new(None);
+        match parser.parse_program(input) {
+            Ok(program) => {
+                println!("解析成功！");
+                print_program(&program);
             }
             Err(e) => {
-                println!("字句解析エラー: {}", e);
+                println!("解析エラー: {}", e);
             }
         }
     }

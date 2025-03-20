@@ -5,8 +5,8 @@ fn main() {
     use protorun::parser::Parser;
     
     let input = "let x =";
-    let mut parser = Parser::from_str(input, None).unwrap();
-    let result = parser.parse_program();
+    let mut parser = Parser::new(None);
+    let result = parser.parse_program(input);
     
     match result {
         Ok(_) => println!("成功（予期しない）"),

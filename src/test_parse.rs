@@ -1,11 +1,9 @@
 // 構文解析のテスト用スクリプト
 
 use std::fs;
-use std::path::Path;
 
 // protorunモジュールをインポート
 mod protorun;
-use protorun::lexer::Lexer;
 use protorun::parser::Parser;
 use protorun::ast::{Decl, Type};
 
@@ -31,26 +29,9 @@ fn main() {
     println!("{}", content);
     println!();
     
-    // 字句解析を行う
-    let mut lexer = Lexer::new(&content, Some(sample_path.to_string()));
-    let tokens = match lexer.tokenize() {
-        Ok(tokens) => tokens,
-        Err(e) => {
-            eprintln!("字句解析エラー: {}", e);
-            return;
-        }
-    };
-    
-    println!("トークン数: {}", tokens.len());
-    println!("最初の10個のトークン:");
-    for (i, token) in tokens.iter().take(10).enumerate() {
-        println!("{}: {:?} @ {:?}", i, token.kind, token.span);
-    }
-    println!();
-    
     // 構文解析を行う
-    let mut parser = Parser::new(tokens, Some(sample_path.to_string()));
-    let program = match parser.parse_program() {
+    let mut parser = Parser::new(Some(sample_path.to_string()));
+    let program = match parser.parse_program(&content) {
         Ok(program) => program,
         Err(e) => {
             eprintln!("構文解析エラー: {}", e);
