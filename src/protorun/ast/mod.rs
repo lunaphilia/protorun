@@ -9,6 +9,52 @@ pub struct Span {
     pub column: usize, // 列番号（1始まり）
 }
 
+/// リテラルパターンの値
+#[derive(Debug, Clone, PartialEq)]
+pub enum LiteralValue {
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    String(String),
+    Unit,
+}
+
+/// パターンマッチングのAST
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    /// リテラルパターン
+    Literal(LiteralValue, Span),
+    /// 識別子パターン
+    Identifier(String, Span),
+    /// タプルパターン
+    Tuple(Vec<Pattern>, Span),
+    /// コンストラクタパターン
+    Constructor {
+        name: String,
+        arguments: Vec<Pattern>,
+        span: Span,
+    },
+    /// ワイルドカードパターン
+    Wildcard(Span),
+}
+
+/// コレクション内包表記の種類
+#[derive(Debug, Clone, PartialEq)]
+pub enum ComprehensionKind {
+    List,
+    Map,
+    Set,
+}
+
+/// ハンドラ指定
+#[derive(Debug, Clone, PartialEq)]
+pub enum HandlerSpec {
+    /// 式としてのハンドラ
+    Expr(Box<Expr>),
+    /// 型としてのハンドラ
+    Type(Type),
+}
+
 /// 式のAST
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -45,6 +91,41 @@ pub enum Expr {
     },
     /// カッコで囲まれた式
     ParenExpr(Box<Expr>, Span),
+    /// if式
+    IfExpr {
+        condition: Box<Expr>,
+        then_branch: Box<Expr>,
+        else_branch: Option<Box<Expr>>,
+        span: Span,
+    },
+    /// match式
+    MatchExpr {
+        scrutinee: Box<Expr>,
+        cases: Vec<(Pattern, Option<Expr>, Expr)>,
+        span: Span,
+    },
+    /// コレクション内包表記
+    CollectionComprehension {
+        kind: ComprehensionKind,
+        output_expr: Box<Expr>,
+        input_expr: Box<Expr>,
+        pattern: Pattern,
+        condition: Option<Box<Expr>>,
+        span: Span,
+    },
+    /// bind式
+    BindExpr {
+        bindings: Vec<(Pattern, Expr)>,
+        final_expr: Box<Expr>,
+        span: Span,
+    },
+    /// with式
+    WithExpr {
+        handler: HandlerSpec,
+        effect_type: Option<Type>,
+        body: Box<Expr>,
+        span: Span,
+    },
 }
 
 /// 文のAST

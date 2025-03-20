@@ -140,6 +140,39 @@ fn stmt_to_string(stmt: &Stmt) -> String {
     }
 }
 
+// パターンを文字列に変換
+fn pattern_to_string(pattern: &protorun::ast::Pattern) -> String {
+    match pattern {
+        protorun::ast::Pattern::Literal(value, _) => {
+            match value {
+                protorun::ast::LiteralValue::Int(i) => i.to_string(),
+                protorun::ast::LiteralValue::Float(f) => f.to_string(),
+                protorun::ast::LiteralValue::Bool(b) => b.to_string(),
+                protorun::ast::LiteralValue::String(s) => format!("\"{}\"", s),
+                protorun::ast::LiteralValue::Unit => "()".to_string(),
+            }
+        },
+        protorun::ast::Pattern::Identifier(name, _) => name.clone(),
+        protorun::ast::Pattern::Tuple(patterns, _) => {
+            let patterns_str: Vec<String> = patterns.iter()
+                .map(pattern_to_string)
+                .collect();
+            format!("({})", patterns_str.join(", "))
+        },
+        protorun::ast::Pattern::Constructor { name, arguments, .. } => {
+            if arguments.is_empty() {
+                name.clone()
+            } else {
+                let args_str: Vec<String> = arguments.iter()
+                    .map(pattern_to_string)
+                    .collect();
+                format!("{}({})", name, args_str.join(", "))
+            }
+        },
+        protorun::ast::Pattern::Wildcard(_) => "_".to_string(),
+    }
+}
+
 // 式を文字列に変換
 fn expr_to_string(expr: &Expr) -> String {
     match expr {
@@ -171,7 +204,97 @@ fn expr_to_string(expr: &Expr) -> String {
         }
         Expr::ParenExpr(expr, _) => {
             format!("({})", expr_to_string(expr))
-        }
+        },
+        Expr::IfExpr { condition, then_branch, else_branch, .. } => {
+            let else_str = if let Some(else_expr) = else_branch {
+                format!(" else {}", expr_to_string(else_expr))
+            } else {
+                String::new()
+            };
+            
+            format!("if {} {}{}",
+                expr_to_string(condition),
+                expr_to_string(then_branch),
+                else_str
+            )
+        },
+        Expr::MatchExpr { scrutinee, cases, .. } => {
+            let cases_str: Vec<String> = cases.iter()
+                .map(|(pattern, guard, expr)| {
+                    let guard_str = if let Some(g) = guard {
+                        format!(" if {}", expr_to_string(g))
+                    } else {
+                        String::new()
+                    };
+                    
+                    format!("{}{} => {}",
+                        pattern_to_string(pattern),
+                        guard_str,
+                        expr_to_string(expr)
+                    )
+                })
+                .collect();
+            
+            format!("match {} {{ {} }}",
+                expr_to_string(scrutinee),
+                cases_str.join(", ")
+            )
+        },
+        Expr::CollectionComprehension { kind, output_expr, input_expr, pattern, condition, .. } => {
+            let condition_str = if let Some(cond) = condition {
+                format!(" if {}", expr_to_string(cond))
+            } else {
+                String::new()
+            };
+            
+            let (prefix, suffix) = match kind {
+                protorun::ast::ComprehensionKind::List => ("[", "]"),
+                protorun::ast::ComprehensionKind::Map => ("{", "}"),
+                protorun::ast::ComprehensionKind::Set => ("#{", "}"),
+            };
+            
+            format!("{}{} for {} <- {}{}{}",
+                prefix,
+                expr_to_string(output_expr),
+                pattern_to_string(pattern),
+                expr_to_string(input_expr),
+                condition_str,
+                suffix
+            )
+        },
+        Expr::BindExpr { bindings, final_expr, .. } => {
+            let bindings_str: Vec<String> = bindings.iter()
+                .map(|(pattern, expr)| {
+                    format!("{} <- {}",
+                        pattern_to_string(pattern),
+                        expr_to_string(expr)
+                    )
+                })
+                .collect();
+            
+            format!("bind {{ {}; {} }}",
+                bindings_str.join("; "),
+                expr_to_string(final_expr)
+            )
+        },
+        Expr::WithExpr { handler, effect_type, body, .. } => {
+            let handler_str = match handler {
+                protorun::ast::HandlerSpec::Expr(expr) => expr_to_string(expr),
+                protorun::ast::HandlerSpec::Type(typ) => type_to_string(typ),
+            };
+            
+            let effect_str = if let Some(effect) = effect_type {
+                format!(": {}", type_to_string(effect))
+            } else {
+                String::new()
+            };
+            
+            format!("with {}{}{}",
+                handler_str,
+                effect_str,
+                expr_to_string(body)
+            )
+        },
     }
 }
 
