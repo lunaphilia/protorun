@@ -515,12 +515,81 @@ pub fn with_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a,
     }))
 }
 
+/// リストリテラルをパース
+pub fn list_literal<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+    let (input, _) = ws_comments(char('['))(input)?;
+    let (input, elements) = separated_list0(
+        ws_comments(char(',')),
+        |i| expression(i, ctx)
+    )(input)?;
+    let (input, _) = opt(ws_comments(char(',')))(input)?;  // 末尾のカンマはオプション
+    let (input, _) = ws_comments(char(']'))(input)?;
+    
+    let span = ctx.calculate_span(input);
+    
+    Ok((input, Expr::ListLiteral {
+        elements,
+        span,
+    }))
+}
+
+/// マップリテラルをパース
+pub fn map_literal<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+    let (input, _) = ws_comments(char('{'))(input)?;
+    let (input, entries) = separated_list0(
+        ws_comments(char(',')),
+        |i| {
+            let (i, key) = expression(i, ctx)?;
+            let (i, _) = ws_comments(tag("->"))(i)?;
+            let (i, value) = expression(i, ctx)?;
+            Ok((i, (key, value)))
+        }
+    )(input)?;
+    let (input, _) = opt(ws_comments(char(',')))(input)?;  // 末尾のカンマはオプション
+    let (input, _) = ws_comments(char('}'))(input)?;
+    
+    let span = ctx.calculate_span(input);
+    
+    Ok((input, Expr::MapLiteral {
+        entries,
+        span,
+    }))
+}
+
+/// セットリテラルをパース
+pub fn set_literal<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+    let (input, _) = ws_comments(tag("#{"))(input)?;
+    let (input, elements) = separated_list0(
+        ws_comments(char(',')),
+        |i| expression(i, ctx)
+    )(input)?;
+    let (input, _) = opt(ws_comments(char(',')))(input)?;  // 末尾のカンマはオプション
+    let (input, _) = ws_comments(char('}'))(input)?;
+    
+    let span = ctx.calculate_span(input);
+    
+    Ok((input, Expr::SetLiteral {
+        elements,
+        span,
+    }))
+}
+
+/// コレクションリテラルをパース（統合版）
+pub fn collection_literal<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+    alt((
+        |i| list_literal(i, ctx),
+        |i| map_literal(i, ctx),
+        |i| set_literal(i, ctx)
+    ))(input)
+}
+
 /// 式をパース
 pub fn expression<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
     alt((
         |i| if_expr(i, ctx),
         |i| match_expr(i, ctx),
         |i| collection_comprehension(i, ctx),
+        |i| collection_literal(i, ctx),  // 追加
         |i| bind_expr(i, ctx),
         |i| with_expr(i, ctx),
         |i| logical_or(i, ctx)

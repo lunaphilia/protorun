@@ -181,6 +181,24 @@ fn expr_to_string(expr: &Expr) -> String {
         Expr::BoolLiteral(value, _) => value.to_string(),
         Expr::StringLiteral(value, _) => format!("\"{}\"", value),
         Expr::UnitLiteral(_) => "()".to_string(),
+        Expr::ListLiteral { elements, .. } => {
+            let elements_str: Vec<String> = elements.iter()
+                .map(expr_to_string)
+                .collect();
+            format!("[{}]", elements_str.join(", "))
+        },
+        Expr::MapLiteral { entries, .. } => {
+            let entries_str: Vec<String> = entries.iter()
+                .map(|(key, value)| format!("{} -> {}", expr_to_string(key), expr_to_string(value)))
+                .collect();
+            format!("{{{}}}", entries_str.join(", "))
+        },
+        Expr::SetLiteral { elements, .. } => {
+            let elements_str: Vec<String> = elements.iter()
+                .map(expr_to_string)
+                .collect();
+            format!("#{{{}}}", elements_str.join(", "))
+        },
         Expr::Identifier(name, _) => name.clone(),
         Expr::BinaryOp { left, operator, right, .. } => {
             format!("({} {} {})", 

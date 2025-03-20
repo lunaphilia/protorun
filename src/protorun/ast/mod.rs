@@ -68,6 +68,21 @@ pub enum Expr {
     StringLiteral(String, Span),
     /// ユニットリテラル
     UnitLiteral(Span),
+    /// リストリテラル
+    ListLiteral {
+        elements: Vec<Expr>,
+        span: Span,
+    },
+    /// マップリテラル
+    MapLiteral {
+        entries: Vec<(Expr, Expr)>,
+        span: Span,
+    },
+    /// セットリテラル
+    SetLiteral {
+        elements: Vec<Expr>,
+        span: Span,
+    },
     /// 識別子
     Identifier(String, Span),
     /// 二項演算

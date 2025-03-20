@@ -1216,3 +1216,190 @@ fn test_parse_with_expr() {
         }
     }
 }
+
+#[test]
+fn test_parse_list_literal() {
+    let input = "[1, 2, 3]";
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
+    
+    match expr {
+        Expr::ListLiteral { elements, .. } => {
+            assert_eq!(elements.len(), 3);
+            
+            match &elements[0] {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 1),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+            
+            match &elements[1] {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 2),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+            
+            match &elements[2] {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 3),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+        },
+        _ => panic!("期待されるリストリテラルではありません"),
+    }
+}
+
+#[test]
+fn test_parse_map_literal() {
+    let input = "{\"key\" -> 42, \"another\" -> 100}";
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
+    
+    match expr {
+        Expr::MapLiteral { entries, .. } => {
+            assert_eq!(entries.len(), 2);
+            
+            match &entries[0].0 {
+                Expr::StringLiteral(key, _) => assert_eq!(key, "key"),
+                _ => panic!("期待される文字列リテラルではありません"),
+            }
+            
+            match &entries[0].1 {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 42),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+            
+            match &entries[1].0 {
+                Expr::StringLiteral(key, _) => assert_eq!(key, "another"),
+                _ => panic!("期待される文字列リテラルではありません"),
+            }
+            
+            match &entries[1].1 {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 100),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+        },
+        _ => panic!("期待されるマップリテラルではありません"),
+    }
+}
+
+#[test]
+fn test_parse_set_literal() {
+    let input = "#{1, 2, 3}";
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
+    
+    match expr {
+        Expr::SetLiteral { elements, .. } => {
+            assert_eq!(elements.len(), 3);
+            
+            match &elements[0] {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 1),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+            
+            match &elements[1] {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 2),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+            
+            match &elements[2] {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 3),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+        },
+        _ => panic!("期待されるセットリテラルではありません"),
+    }
+}
+
+#[test]
+fn test_parse_empty_collections() {
+    // 空のリスト
+    {
+        let input = "[]";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::ListLiteral { elements, .. } => {
+                assert_eq!(elements.len(), 0);
+            },
+            _ => panic!("期待される空のリストリテラルではありません"),
+        }
+    }
+    
+    // 空のマップ
+    {
+        let input = "{}";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::MapLiteral { entries, .. } => {
+                assert_eq!(entries.len(), 0);
+            },
+            _ => panic!("期待される空のマップリテラルではありません"),
+        }
+    }
+    
+    // 空のセット
+    {
+        let input = "#{}";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::SetLiteral { elements, .. } => {
+                assert_eq!(elements.len(), 0);
+            },
+            _ => panic!("期待される空のセットリテラルではありません"),
+        }
+    }
+}
+
+#[test]
+fn test_parse_nested_collections() {
+    let input = "[[1, 2], [3, 4]]";
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
+    
+    match expr {
+        Expr::ListLiteral { elements, .. } => {
+            assert_eq!(elements.len(), 2);
+            
+            // 最初のネストされたリスト
+            match &elements[0] {
+                Expr::ListLiteral { elements: nested_elements, .. } => {
+                    assert_eq!(nested_elements.len(), 2);
+                    
+                    match &nested_elements[0] {
+                        Expr::IntLiteral(value, _) => assert_eq!(*value, 1),
+                        _ => panic!("期待される整数リテラルではありません"),
+                    }
+                    
+                    match &nested_elements[1] {
+                        Expr::IntLiteral(value, _) => assert_eq!(*value, 2),
+                        _ => panic!("期待される整数リテラルではありません"),
+                    }
+                },
+                _ => panic!("期待されるリストリテラルではありません"),
+            }
+            
+            // 2番目のネストされたリスト
+            match &elements[1] {
+                Expr::ListLiteral { elements: nested_elements, .. } => {
+                    assert_eq!(nested_elements.len(), 2);
+                    
+                    match &nested_elements[0] {
+                        Expr::IntLiteral(value, _) => assert_eq!(*value, 3),
+                        _ => panic!("期待される整数リテラルではありません"),
+                    }
+                    
+                    match &nested_elements[1] {
+                        Expr::IntLiteral(value, _) => assert_eq!(*value, 4),
+                        _ => panic!("期待される整数リテラルではありません"),
+                    }
+                },
+                _ => panic!("期待されるリストリテラルではありません"),
+            }
+        },
+        _ => panic!("期待されるリストリテラルではありません"),
+    }
+}
