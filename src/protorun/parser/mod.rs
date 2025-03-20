@@ -281,6 +281,31 @@ fn primary(input: &str) -> ParseResult<Expr> {
     )(input)
 }
 
+// ブロック式をパース
+fn block_expr(input: &str) -> ParseResult<Expr> {
+    let (input, _) = ws_comments(char('{'))(input)?;
+    let (input, (_statements, expr)) = block_contents(input)?;
+    let (input, _) = cut(ws_comments(char('}')))(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    // 最後の式がある場合はそれを返し、なければUnitLiteralを返す
+    let result = match expr {
+        Some(e) => e,
+        None => Expr::UnitLiteral(span),
+    };
+    
+    // TODO: 将来的にはブロック式として適切なASTノードを作成する
+    // 現在は簡略化のため、最後の式だけを返している
+    
+    Ok((input, result))
+}
+
 // ブロックの内容をパース
 fn block_contents(input: &str) -> ParseResult<(Vec<Stmt>, Option<Expr>)> {
     let (input, statements) = many0(terminated(statement, ws_comments(char(';'))))(input)?;
@@ -545,9 +570,406 @@ fn logical_or(input: &str) -> ParseResult<Expr> {
     })))
 }
 
+// if式をパース
+fn if_expr(input: &str) -> ParseResult<Expr> {
+    let (input, _) = ws_comments(tag("if"))(input)?;
+    let (input, condition) = expression(input)?;
+    let (input, then_branch) = block_expr(input)?;
+    let (input, else_branch) = opt(
+        preceded(
+            ws_comments(tag("else")),
+            alt((
+                if_expr,
+                block_expr
+            ))
+        )
+    )(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Expr::IfExpr {
+        condition: Box::new(condition),
+        then_branch: Box::new(then_branch),
+        else_branch: else_branch.map(Box::new),
+        span,
+    }))
+}
+
+// パターンをパース
+fn pattern(input: &str) -> ParseResult<crate::protorun::ast::Pattern> {
+    ws_comments(
+        alt((
+            // リテラルパターン
+            map(int_literal, |value| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                crate::protorun::ast::Pattern::Literal(crate::protorun::ast::LiteralValue::Int(value), span)
+            }),
+            map(float_literal, |value| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                crate::protorun::ast::Pattern::Literal(crate::protorun::ast::LiteralValue::Float(value), span)
+            }),
+            map(string_literal, |value| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                crate::protorun::ast::Pattern::Literal(crate::protorun::ast::LiteralValue::String(value), span)
+            }),
+            map(bool_literal, |value| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                crate::protorun::ast::Pattern::Literal(crate::protorun::ast::LiteralValue::Bool(value), span)
+            }),
+            // ワイルドカードパターン
+            map(ws_comments(tag("_")), |_| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                crate::protorun::ast::Pattern::Wildcard(span)
+            }),
+            // タプルパターン
+            map(
+                delimited(
+                    ws_comments(char('(')),
+                    separated_list0(
+                        ws_comments(char(',')),
+                        pattern
+                    ),
+                    cut(ws_comments(char(')')))
+                ),
+                |patterns| {
+                    // 少なくとも1つの要素があることを確認
+                    if patterns.is_empty() {
+                        // 空のタプルはユニットとして扱う
+                        let span = Span {
+                            start: 0,
+                            end: 0,
+                            line: 0,
+                            column: 0,
+                        };
+                        crate::protorun::ast::Pattern::Literal(crate::protorun::ast::LiteralValue::Unit, span)
+                    } else {
+                        let span = Span {
+                            start: 0,
+                            end: 0,
+                            line: 0,
+                            column: 0,
+                        };
+                        crate::protorun::ast::Pattern::Tuple(patterns, span)
+                    }
+                }
+            ),
+            // コンストラクタパターン（引数がある場合のみ）
+            map(
+                pair(
+                    identifier_string,
+                    delimited(
+                        ws_comments(char('(')),
+                        separated_list0(
+                            ws_comments(char(',')),
+                            pattern
+                        ),
+                        cut(ws_comments(char(')')))
+                    )
+                ),
+                |(name, args)| {
+                    let span = Span {
+                        start: 0,
+                        end: 0,
+                        line: 0,
+                        column: 0,
+                    };
+                    crate::protorun::ast::Pattern::Constructor {
+                        name,
+                        arguments: args,
+                        span,
+                    }
+                }
+            ),
+            // 識別子パターン（最後に配置して他のパターンが優先されるようにする）
+            map(identifier_string, |name| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                crate::protorun::ast::Pattern::Identifier(name, span)
+            })
+        ))
+    )(input)
+}
+
+// match式のケースをパース
+fn match_case(input: &str) -> ParseResult<(crate::protorun::ast::Pattern, Option<Expr>, Expr)> {
+    let (input, pattern) = pattern(input)?;
+    let (input, guard) = opt(
+        preceded(
+            ws_comments(tag("if")),
+            expression
+        )
+    )(input)?;
+    let (input, _) = ws_comments(tag("=>"))(input)?;
+    let (input, expr) = expression(input)?;
+    
+    Ok((input, (pattern, guard, expr)))
+}
+
+// match式をパース
+fn match_expr(input: &str) -> ParseResult<Expr> {
+    let (input, _) = ws_comments(tag("match"))(input)?;
+    let (input, scrutinee) = expression(input)?;
+    let (input, _) = ws_comments(char('{'))(input)?;
+    let (input, cases) = separated_list0(
+        ws_comments(char(',')),
+        match_case
+    )(input)?;
+    let (input, _) = opt(ws_comments(char(',')))(input)?;  // 末尾のカンマはオプション
+    let (input, _) = cut(ws_comments(char('}')))(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Expr::MatchExpr {
+        scrutinee: Box::new(scrutinee),
+        cases,
+        span,
+    }))
+}
+
+// リスト内包表記をパース
+fn list_comprehension(input: &str) -> ParseResult<Expr> {
+    let (input, _) = ws_comments(char('['))(input)?;
+    let (input, output_expr) = expression(input)?;
+    let (input, _) = ws_comments(tag("for"))(input)?;
+    let (input, pattern) = pattern(input)?;
+    let (input, _) = ws_comments(tag("<-"))(input)?;
+    let (input, input_expr) = expression(input)?;
+    let (input, condition) = opt(
+        preceded(
+            ws_comments(tag("if")),
+            expression
+        )
+    )(input)?;
+    let (input, _) = ws_comments(char(']'))(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Expr::CollectionComprehension {
+        kind: crate::protorun::ast::ComprehensionKind::List,
+        output_expr: Box::new(output_expr),
+        input_expr: Box::new(input_expr),
+        pattern,
+        condition: condition.map(Box::new),
+        span,
+    }))
+}
+
+// マップ内包表記をパース
+fn map_comprehension(input: &str) -> ParseResult<Expr> {
+    let (input, _) = ws_comments(char('{'))(input)?;
+    let (input, key_expr) = expression(input)?;
+    let (input, _) = ws_comments(tag("->"))(input)?;
+    let (input, value_expr) = expression(input)?;
+    let (input, _) = ws_comments(tag("for"))(input)?;
+    let (input, pattern) = pattern(input)?;
+    let (input, _) = ws_comments(tag("<-"))(input)?;
+    let (input, input_expr) = expression(input)?;
+    let (input, condition) = opt(
+        preceded(
+            ws_comments(tag("if")),
+            expression
+        )
+    )(input)?;
+    let (input, _) = ws_comments(char('}'))(input)?;
+    
+    // マップ内包表記は、キーと値のペアを出力する特殊なケース
+    // 内部的には、タプル式を出力するリスト内包表記として扱う
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    // キーと値のペアを表すタプル式を作成
+    let output_expr = Expr::ParenExpr(
+        Box::new(Expr::BinaryOp {
+            left: Box::new(key_expr),
+            operator: BinaryOperator::Add, // 実際にはタプルを表すための仮のオペレータ
+            right: Box::new(value_expr),
+            span: span.clone(),
+        }),
+        span.clone(),
+    );
+    
+    Ok((input, Expr::CollectionComprehension {
+        kind: crate::protorun::ast::ComprehensionKind::Map,
+        output_expr: Box::new(output_expr),
+        input_expr: Box::new(input_expr),
+        pattern,
+        condition: condition.map(Box::new),
+        span,
+    }))
+}
+
+// セット内包表記をパース
+fn set_comprehension(input: &str) -> ParseResult<Expr> {
+    let (input, _) = ws_comments(tag("#{"))(input)?;
+    let (input, output_expr) = expression(input)?;
+    let (input, _) = ws_comments(tag("for"))(input)?;
+    let (input, pattern) = pattern(input)?;
+    let (input, _) = ws_comments(tag("<-"))(input)?;
+    let (input, input_expr) = expression(input)?;
+    let (input, condition) = opt(
+        preceded(
+            ws_comments(tag("if")),
+            expression
+        )
+    )(input)?;
+    let (input, _) = ws_comments(char('}'))(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Expr::CollectionComprehension {
+        kind: crate::protorun::ast::ComprehensionKind::Set,
+        output_expr: Box::new(output_expr),
+        input_expr: Box::new(input_expr),
+        pattern,
+        condition: condition.map(Box::new),
+        span,
+    }))
+}
+
+// コレクション内包表記をパース（統合版）
+fn collection_comprehension(input: &str) -> ParseResult<Expr> {
+    alt((
+        list_comprehension,
+        map_comprehension,
+        set_comprehension
+    ))(input)
+}
+
+// bind式のバインド文をパース
+fn bind_statement(input: &str) -> ParseResult<(crate::protorun::ast::Pattern, Expr)> {
+    let (input, pattern) = pattern(input)?;
+    let (input, _) = ws_comments(tag("<-"))(input)?;
+    let (input, expr) = expression(input)?;
+    let (input, _) = ws_comments(char(';'))(input)?;
+    
+    Ok((input, (pattern, expr)))
+}
+
+// bind式をパース
+fn bind_expr(input: &str) -> ParseResult<Expr> {
+    let (input, _) = ws_comments(tag("bind"))(input)?;
+    let (input, _) = ws_comments(char('{'))(input)?;
+    
+    let (input, bindings) = many0(bind_statement)(input)?;
+    
+    let (input, final_expr) = expression(input)?;
+    let (input, _) = ws_comments(char('}'))(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Expr::BindExpr {
+        bindings,
+        final_expr: Box::new(final_expr),
+        span,
+    }))
+}
+
+// with式をパース
+fn with_expr(input: &str) -> ParseResult<Expr> {
+    let (input, _) = ws_comments(tag("with"))(input)?;
+    
+    // ハンドラ指定（式または型）
+    let (input, handler) = alt((
+        // 型としてのハンドラ
+        map(type_parser, |ty| crate::protorun::ast::HandlerSpec::Type(ty)),
+        // 式としてのハンドラ
+        map(logical_or, |expr| crate::protorun::ast::HandlerSpec::Expr(Box::new(expr)))
+    ))(input)?;
+    
+    // オプションの効果型
+    let (input, effect_type) = opt(
+        preceded(
+            ws_comments(char(':')),
+            type_parser
+        )
+    )(input)?;
+    
+    // 本体（ブロック式）
+    let (input, body) = block_expr(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Expr::WithExpr {
+        handler,
+        effect_type,
+        body: Box::new(body),
+        span,
+    }))
+}
+
 // 式をパース
 fn expression(input: &str) -> ParseResult<Expr> {
-    logical_or(input)
+    alt((
+        if_expr,
+        match_expr,
+        collection_comprehension,
+        bind_expr,
+        with_expr,
+        logical_or
+    ))(input)
 }
 
 // 単純型をパース

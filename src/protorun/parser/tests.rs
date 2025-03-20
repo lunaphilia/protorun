@@ -1,7 +1,7 @@
 // パーサーモジュールのテスト
 
 use super::*;
-use crate::protorun::ast::{BinaryOperator, Expr, Stmt, UnaryOperator};
+use crate::protorun::ast::{BinaryOperator, Expr, Stmt, UnaryOperator, ComprehensionKind, Pattern as AstPattern, LiteralValue};
 use crate::protorun::error::ErrorKind;
 
 #[test]
@@ -839,5 +839,380 @@ fn test_parse_complex_type() {
             }
         },
         _ => panic!("期待されるlet文ではありません"),
+    }
+}
+
+// 制御構造のテスト
+
+#[test]
+fn test_parse_if_expr() {
+    // 基本的なif式
+    {
+        let input = "if x > 0 { 42 } else { -42 }";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::IfExpr { condition, then_branch, else_branch, .. } => {
+                match *condition {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gt),
+                    _ => panic!("期待される二項演算ではありません"),
+                }
+                
+                match *then_branch {
+                    Expr::IntLiteral(value, _) => assert_eq!(value, 42),
+                    _ => panic!("期待される整数リテラルではありません"),
+                }
+                
+                match else_branch {
+                    Some(else_expr) => {
+                        match *else_expr {
+                            Expr::UnaryOp { operator, .. } => assert_eq!(operator, UnaryOperator::Neg),
+                            _ => panic!("期待される単項演算ではありません"),
+                        }
+                    },
+                    None => panic!("else部が期待されます"),
+                }
+            },
+            _ => panic!("期待されるif式ではありません"),
+        }
+    }
+    
+    // else部がないif式
+    {
+        let input = "if x > 0 { 42 }";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::IfExpr { condition, then_branch, else_branch, .. } => {
+                match *condition {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gt),
+                    _ => panic!("期待される二項演算ではありません"),
+                }
+                
+                match *then_branch {
+                    Expr::IntLiteral(value, _) => assert_eq!(value, 42),
+                    _ => panic!("期待される整数リテラルではありません"),
+                }
+                
+                assert!(else_branch.is_none());
+            },
+            _ => panic!("期待されるif式ではありません"),
+        }
+    }
+    
+    // ネストされたif式
+    {
+        let input = "if x > 0 { 42 } else if x < 0 { -42 } else { 0 }";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::IfExpr { condition, then_branch, else_branch, .. } => {
+                match *condition {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gt),
+                    _ => panic!("期待される二項演算ではありません"),
+                }
+                
+                match *then_branch {
+                    Expr::IntLiteral(value, _) => assert_eq!(value, 42),
+                    _ => panic!("期待される整数リテラルではありません"),
+                }
+                
+                match else_branch {
+                    Some(else_expr) => {
+                        match *else_expr {
+                            Expr::IfExpr { .. } => (), // ネストされたif式
+                            _ => panic!("期待されるif式ではありません"),
+                        }
+                    },
+                    None => panic!("else部が期待されます"),
+                }
+            },
+            _ => panic!("期待されるif式ではありません"),
+        }
+    }
+}
+
+#[test]
+fn test_parse_match_expr() {
+    let input = "match x { 
+        0 => 42, 
+        n if n > 0 => n * 2, 
+        _ => -1 
+    }";
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
+    
+    match expr {
+        Expr::MatchExpr { scrutinee, cases, .. } => {
+            match *scrutinee {
+                Expr::Identifier(ref name, _) => assert_eq!(name, "x"),
+                _ => panic!("期待される識別子ではありません"),
+            }
+            
+            assert_eq!(cases.len(), 3);
+            
+            // 最初のケース: 0 => 42
+            match &cases[0] {
+                (pattern, guard, expr) => {
+            match pattern {
+                AstPattern::Literal(LiteralValue::Int(value), _) => assert_eq!(*value, 0),
+                _ => panic!("期待されるリテラルパターンではありません"),
+            }
+                    
+                    assert!(guard.is_none());
+                    
+                    match expr {
+                        Expr::IntLiteral(value, _) => assert_eq!(*value, 42),
+                        _ => panic!("期待される整数リテラルではありません"),
+                    }
+                }
+            }
+            
+            // 2番目のケース: n if n > 0 => n * 2
+            match &cases[1] {
+                (pattern, guard, expr) => {
+            match pattern {
+                AstPattern::Identifier(name, _) => assert_eq!(name, "n"),
+                _ => panic!("期待される識別子パターンではありません"),
+            }
+                    
+                    assert!(guard.is_some());
+                    
+                    match expr {
+                        Expr::BinaryOp { operator, .. } => assert_eq!(*operator, BinaryOperator::Mul),
+                        _ => panic!("期待される二項演算ではありません"),
+                    }
+                }
+            }
+            
+            // 3番目のケース: _ => -1
+            match &cases[2] {
+                (pattern, guard, expr) => {
+                    match pattern {
+                        AstPattern::Wildcard(_) => (),
+                        _ => panic!("期待されるワイルドカードパターンではありません"),
+                    }
+                    
+                    assert!(guard.is_none());
+                    
+                    match expr {
+                        Expr::UnaryOp { operator, expr, .. } => {
+                            assert_eq!(*operator, UnaryOperator::Neg);
+                            match &**expr {
+                                Expr::IntLiteral(value, _) => assert_eq!(*value, 1),
+                                _ => panic!("期待される整数リテラルではありません"),
+                            }
+                        },
+                        _ => panic!("期待される単項演算ではありません"),
+                    }
+                }
+            }
+        },
+        _ => panic!("期待されるmatch式ではありません"),
+    }
+}
+
+#[test]
+fn test_parse_list_comprehension() {
+    let input = "[x * 2 for x <- numbers if x > 0]";
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
+    
+    match expr {
+        Expr::CollectionComprehension { kind, output_expr, input_expr, pattern, condition, .. } => {
+            assert_eq!(kind, ComprehensionKind::List);
+            
+            match *output_expr {
+                Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Mul),
+                _ => panic!("期待される二項演算ではありません"),
+            }
+            
+            match *input_expr {
+                Expr::Identifier(ref name, _) => assert_eq!(name, "numbers"),
+                _ => panic!("期待される識別子ではありません"),
+            }
+            
+            match pattern {
+                AstPattern::Identifier(ref name, _) => assert_eq!(name, "x"),
+                _ => panic!("期待される識別子パターンではありません"),
+            }
+            
+            assert!(condition.is_some());
+            match *condition.unwrap() {
+                Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gt),
+                _ => panic!("期待される二項演算ではありません"),
+            }
+        },
+        _ => panic!("期待されるコレクション内包表記ではありません"),
+    }
+}
+
+#[test]
+fn test_parse_map_comprehension() {
+    let input = "{k -> v * 2 for (k, v) <- entries}";
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
+    
+    match expr {
+        Expr::CollectionComprehension { kind, output_expr, input_expr, pattern, .. } => {
+            assert_eq!(kind, ComprehensionKind::Map);
+            
+            // 出力式はキーと値のペアを表すタプル式
+            match *output_expr {
+                Expr::ParenExpr(_, _) => (),
+                _ => panic!("期待されるタプル式ではありません"),
+            }
+            
+            match *input_expr {
+                Expr::Identifier(ref name, _) => assert_eq!(name, "entries"),
+                _ => panic!("期待される識別子ではありません"),
+            }
+            
+            match pattern {
+                AstPattern::Tuple(patterns, _) => {
+                    assert_eq!(patterns.len(), 2);
+                    
+                    match &patterns[0] {
+                        AstPattern::Identifier(name, _) => assert_eq!(name, "k"),
+                        _ => panic!("期待される識別子パターンではありません"),
+                    }
+                    
+                    match &patterns[1] {
+                        AstPattern::Identifier(name, _) => assert_eq!(name, "v"),
+                        _ => panic!("期待される識別子パターンではありません"),
+                    }
+                },
+                _ => panic!("期待されるタプルパターンではありません"),
+            }
+        },
+        _ => panic!("期待されるコレクション内包表記ではありません"),
+    }
+}
+
+#[test]
+fn test_parse_bind_expr() {
+    let input = "bind { 
+        x <- getX(); 
+        y <- getY(); 
+        x + y 
+    }";
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
+    
+    match expr {
+        Expr::BindExpr { bindings, final_expr, .. } => {
+            assert_eq!(bindings.len(), 2);
+            
+            // 最初のバインド: x <- getX()
+            match &bindings[0] {
+                (pattern, expr) => {
+                    match pattern {
+                        AstPattern::Identifier(name, _) => assert_eq!(name, "x"),
+                        _ => panic!("期待される識別子パターンではありません"),
+                    }
+                    
+                    match expr {
+                        Expr::FunctionCall { .. } => (),
+                        _ => panic!("期待される関数呼び出しではありません"),
+                    }
+                }
+            }
+            
+            // 2番目のバインド: y <- getY()
+            match &bindings[1] {
+                (pattern, expr) => {
+                    match pattern {
+                        AstPattern::Identifier(name, _) => assert_eq!(name, "y"),
+                        _ => panic!("期待される識別子パターンではありません"),
+                    }
+                    
+                    match expr {
+                        Expr::FunctionCall { .. } => (),
+                        _ => panic!("期待される関数呼び出しではありません"),
+                    }
+                }
+            }
+            
+            // 最終式: x + y
+            match *final_expr {
+                Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Add),
+                _ => panic!("期待される二項演算ではありません"),
+            }
+        },
+        _ => panic!("期待されるbind式ではありません"),
+    }
+}
+
+#[test]
+fn test_parse_with_expr() {
+    // 式としてのハンドラ
+    {
+        let input = "with logger { 
+            log(\"Hello\"); 
+            42 
+        }";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::WithExpr { handler, effect_type, body, .. } => {
+                match handler {
+                    crate::protorun::ast::HandlerSpec::Type(ty) => {
+                        match ty {
+                            crate::protorun::ast::Type::Simple { name, .. } => assert_eq!(name, "logger"),
+                            _ => panic!("期待される単純型ではありません"),
+                        }
+                    },
+                    _ => panic!("期待される型ハンドラではありません"),
+                }
+                
+                assert!(effect_type.is_none());
+                
+                match *body {
+                    Expr::IntLiteral(value, _) => assert_eq!(value, 42),
+                    _ => panic!("期待される整数リテラルではありません"),
+                }
+            },
+            _ => panic!("期待されるwith式ではありません"),
+        }
+    }
+    
+    // 型としてのハンドラと効果型
+    {
+        let input = "with Logger: IO { 
+            log(\"Hello\"); 
+            42 
+        }";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::WithExpr { handler, effect_type, body, .. } => {
+                match handler {
+                    crate::protorun::ast::HandlerSpec::Type(ty) => {
+                        match ty {
+                            crate::protorun::ast::Type::Simple { name, .. } => assert_eq!(name, "Logger"),
+                            _ => panic!("期待される単純型ではありません"),
+                        }
+                    },
+                    _ => panic!("期待される型ハンドラではありません"),
+                }
+                
+                assert!(effect_type.is_some());
+                match effect_type.unwrap() {
+                    crate::protorun::ast::Type::Simple { name, .. } => assert_eq!(name, "IO"),
+                    _ => panic!("期待される単純型ではありません"),
+                }
+                
+                match *body {
+                    Expr::IntLiteral(value, _) => assert_eq!(value, 42),
+                    _ => panic!("期待される整数リテラルではありません"),
+                }
+            },
+            _ => panic!("期待されるwith式ではありません"),
+        }
     }
 }
