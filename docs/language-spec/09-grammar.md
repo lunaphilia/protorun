@@ -20,7 +20,7 @@ Program ::= (Declaration | Statement)*
 Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl
 
 FunctionDecl ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("&" EffectType)? "=" Expression
-               | "fn" Identifier GenericParams? ParamList ("(" "with" Param ("," Param)* ")")? (":" Type)? ("&" EffectType)? "=" Expression
+               | "fn" Identifier GenericParams? ParamList ImplicitParamList? (":" Type)? ("&" EffectType)? "=" Expression
 
 TypeDecl ::= "type" Identifier GenericParams? "=" (RecordType | Type)
            | "sealed" "trait" Identifier GenericParams? ("{" TraitMember* "}")? (":" TypeRef)?
@@ -42,15 +42,19 @@ ImplMember ::= FunctionDecl
 HandlerMember ::= HandlerFunction | FieldDecl
 
 HandlerFunction ::= Identifier GenericParams? ParamList (":" ReturnType)? "=" Expression
-                  | Identifier GenericParams? ParamList "," "resume" ":" ResumeType ":" ReturnType "=" Expression
+                  | Identifier GenericParams? ParamList "," "resume" ":" ResumeType (":" ReturnType)? "=" Expression
                   | Identifier GenericParams? ParamList ":" "noresume" ReturnType "=" Expression
                   | Identifier GenericParams? ParamList ":" "multiresume" ReturnType "=" Expression
 
 FieldDecl ::= Identifier ":" Type
 
 EffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)? ";"
+                  | "fn" "acquire" GenericParams? ParamList (":" Type)? ";"
+                  | "fn" "release" "(" "resource" ":" TypeRef ")" ":" Type? ";"
 
 ParamList ::= "(" (Param ("," Param)*)? ")"
+
+ImplicitParamList ::= "(" "with" Param ("," Param)* ")"
 
 Param ::= Identifier ":" Type
 
@@ -104,8 +108,16 @@ Expression ::= LiteralExpr
              | HandleExpr
              | WithExpr
              | ScopedEffectExpr
+             | RangeExpr
 
 LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral
+              | ListLiteral | MapLiteral | SetLiteral
+
+ListLiteral ::= "[" (Expression ("," Expression)*)? "]"
+
+MapLiteral ::= "{" (Expression "->" Expression ("," Expression "->" Expression)*)? "}"
+
+SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
 
 IdentifierExpr ::= Identifier
 
@@ -115,7 +127,14 @@ IfExpr ::= "if" Expression BlockExpr ("else" (IfExpr | BlockExpr))?
 
 MatchExpr ::= "match" Expression "{" (Pattern ("if" Expression)? "=>" Expression ",")* "}"
 
-CollectionComprehensionExpr ::= "[" Expression "for" Pattern "<-" Expression ("if" Expression)? "]"
+CollectionComprehensionExpr ::= ListComprehension | MapComprehension | SetComprehension
+
+ListComprehension ::= "[" Expression "for" Pattern "<-" Expression ("if" Expression)? "]"
+                    | "[" Expression "for" Pattern "<-" Expression "for" Pattern "<-" Expression ("if" Expression)? "]"
+
+MapComprehension ::= "{" Expression "->" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
+
+SetComprehension ::= "#{" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
 
 BindExpr ::= "bind" "{" (Pattern "<-" Expression ";")* Expression "}"
 
@@ -132,10 +151,15 @@ UnaryExpr ::= Operator Expression
 HandleExpr ::= "handle" Expression "{" (EffectCase)* "}"
 
 WithExpr ::= "with" (Expression | TypeRef) (":" TypeRef)? BlockExpr
+           | "with" (Expression | TypeRef) ("," (Expression | TypeRef))* BlockExpr
 
 ScopedEffectExpr ::= "with" "scoped" Identifier BlockExpr
 
+RangeExpr ::= Expression ".." Expression
+
 EffectCase ::= QualifiedIdentifier ParamList "=>" BlockExpr
+             | QualifiedIdentifier ParamList "," "resume" ":" ResumeType "=>" BlockExpr
+             | "return" Pattern "=>" BlockExpr
 
 Pattern ::= LiteralPattern
           | IdentifierPattern
@@ -154,6 +178,8 @@ ConstructorPattern ::= QualifiedIdentifier ("(" Pattern ("," Pattern)* ")")?
 WildcardPattern ::= "_"
 
 QualifiedIdentifier ::= (Identifier ".")* Identifier
+
+Operator ::= "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" | "!" | "|>" | "|>*" | ">>>" | ">>>*"
 ```
 
 ## 10.3 文法の説明
@@ -173,7 +199,7 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 
 ### 10.3.3 型システム
 
-- **型参照（TypeRef）**: 型名とジェネリック引数で構成されます。
+- **型参照（TypeRef）**: 型名とジェネリック引数で構成されます。所有権修飾子（`own`、`&`、`&mut`）を含むことができます。
 - **関数型（FunctionType）**: パラメータ型、戻り値の型、効果型で構成されます。
 - **タプル型（TupleType）**: 複数の型の組み合わせです。
 - **配列型（ArrayType）**: 要素型の配列です。
@@ -181,12 +207,12 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 
 ### 10.3.4 式
 
-- **リテラル式（LiteralExpr）**: 整数、浮動小数点数、文字列、真偽値、ユニットのリテラルです。
+- **リテラル式（LiteralExpr）**: 整数、浮動小数点数、文字列、真偽値、ユニットのリテラル、およびコレクションリテラル（リスト、マップ、セット）です。
 - **識別子式（IdentifierExpr）**: 変数や関数の名前です。
 - **ブロック式（BlockExpr）**: 文の集合と最終的な式で構成されます。
 - **条件式（IfExpr）**: 条件に基づいて異なる式を評価します。
 - **パターンマッチング式（MatchExpr）**: 値をパターンと照合して異なる式を評価します。
-- **コレクション内包表記式（CollectionComprehensionExpr）**: コレクションを反復処理して新しいコレクションを生成します。
+- **コレクション内包表記式（CollectionComprehensionExpr）**: コレクションを反復処理して新しいコレクションを生成します。リスト、マップ、セットの内包表記をサポートします。
 - **バインド式（BindExpr）**: モナド連鎖のための式です。
 - **ラムダ式（LambdaExpr）**: 無名関数です。
 - **関数呼び出し式（CallExpr）**: 関数を呼び出します。
@@ -194,8 +220,9 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 - **二項演算式（BinaryExpr）**: 二つの式を演算子で結合します。
 - **単項演算式（UnaryExpr）**: 一つの式に演算子を適用します。
 - **ハンドル式（HandleExpr）**: 効果をハンドルします。
-- **with式（WithExpr）**: 効果ハンドラを適用するスコープを定義します。
+- **with式（WithExpr）**: 効果ハンドラを適用するスコープを定義します。複数のハンドラをカンマで区切って指定することもできます。
 - **スコープ付き効果式（ScopedEffectExpr）**: 効果のスコープを定義します。
+- **範囲式（RangeExpr）**: 範囲を表現します。
 
 ### 10.3.5 パターン
 
@@ -207,53 +234,10 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 
 ## 10.4 特殊な構文要素
 
-### 10.4.1 効果ハンドラの構文
+以下の特殊な構文要素の詳細については、対応する言語仕様の章を参照してください：
 
-効果ハンドラは、`handler`キーワードを使用して定義されます。ハンドラ関数には以下の形式があります：
-
-1. **暗黙的な継続**: 通常の関数と同様の構文で、継続は暗黙的に呼び出されます。
-2. **明示的な継続**: `resume`パラメータを持ち、継続を明示的に呼び出します。
-3. **継続を呼び出さないハンドラ**: `noresume`キーワードを使用し、継続を呼び出しません。
-4. **複数回継続を呼び出すハンドラ**: `multiresume`キーワードを使用し、継続を複数回呼び出します。
-
-### 10.4.2 ライフサイクル管理効果
-
-ライフサイクル管理効果は、`LifecycleEffect<R>`型を継承する効果として定義されます。これには以下の特殊な操作が含まれます：
-
-1. **獲得操作**: `acquire`関数として定義され、リソースの獲得を実装します。
-2. **解放操作**: `release`関数として定義され、リソースの解放を実装します。
-
-ライフサイクル管理効果を使用すると、リソースの獲得と解放が自動的に管理されます。`acquire`関数で獲得されたリソースは、スコープ終了時に自動的に`release`関数によって解放されます。このシンプルなモデルは、C++のRAIIパターンやRustの所有権システムに近く、リソース管理を直感的かつ安全に行うことができます。
-
-### 10.4.3 暗黙的パラメータ
-
-暗黙的パラメータは、関数シグネチャの後に`(with param: Type)`構文で宣言されます。これにより、スコープ内で利用可能な値を明示的に渡すことなく、関数に提供することができます。
-
-```
-// 暗黙的パラメータを宣言
-fn processData(data: String)(with logger: Logger): Result<ProcessedData, Error> = {
-  logger.log("データ処理開始")
-  // 処理...
-  logger.log("データ処理完了")
-  Result.Ok(processedData)
-}
-
-// 暗黙的パラメータの提供
-with LoggerHandler: Logger {
-  // この呼び出しでは、スコープ内のLoggerが暗黙的に渡される
-  processData("raw data")
-}
-```
-
-## 10.5 文法の進化
-
-Protorun言語の文法は、言語の進化に伴って拡張されています。最近の追加には以下が含まれます：
-
-1. **効果ハンドラの構文**: `handler`キーワードと特殊な継続制御（`noresume`、`multiresume`）
-2. **ライフサイクル管理効果**: `LifecycleEffect<R>`型の導入
-3. **暗黙的パラメータ**: `(with param: Type)`構文の導入
-4. **所有権修飾子**: `own`キーワード
-5. **コレクション内包表記とバインド式**: `for`式と`do`式の代わりに導入
-6. **型注釈パターン**: 「エンティティ: 型」パターンの一貫した使用
-
-これらの追加は、言語の表現力と安全性を向上させるために設計されています。
+- **効果ハンドラ**: [5. 代数的効果](05-algebraic-effects.md)
+- **ライフサイクル管理効果**: [5.4 ライフサイクル管理効果](05-algebraic-effects.md#54-ライフサイクル管理効果)
+- **暗黙的パラメータ**: [5.8 暗黙的パラメータと効果システム](05-algebraic-effects.md#58-暗黙的パラメータと効果システム)
+- **コレクション内包表記**: [4.4.1 コレクションリテラル内包表記](03-expressions.md#441-コレクションリテラル内包表記)
+- **バインド式**: [4.4.2 バインド式](03-expressions.md#442-バインド式)
