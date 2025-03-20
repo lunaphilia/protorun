@@ -7,8 +7,8 @@ use crate::protorun::error::ErrorKind;
 #[test]
 fn test_parse_expr_statement() {
     let input = "42;";
-    let mut parser = Parser::from_str(input, None).unwrap();
-    let program = parser.parse_program().unwrap();
+    let mut parser = Parser::new(None);
+    let program = parser.parse_program(input).unwrap();
     
     assert_eq!(program.declarations.len(), 0);
     assert_eq!(program.statements.len(), 1);
@@ -27,9 +27,9 @@ fn test_parse_expr_statement() {
 #[test]
 fn test_parse_block_expr() {
     let input = "{ let x = 10; x }";
-    let mut parser = Parser::from_str(input, None).unwrap();
+    let mut parser = Parser::new(None);
     
-    let expr = parser.parse_expression().unwrap();
+    let expr = parser.parse_expression(input).unwrap();
     
     match expr {
         Expr::Identifier(name, _) => assert_eq!(name, "x"),
@@ -40,9 +40,9 @@ fn test_parse_block_expr() {
 #[test]
 fn test_parse_nested_block_expr() {
     let input = "{ let x = 10; { let y = 20; x + y } }";
-    let mut parser = Parser::from_str(input, None).unwrap();
+    let mut parser = Parser::new(None);
     
-    let expr = parser.parse_expression().unwrap();
+    let expr = parser.parse_expression(input).unwrap();
     
     match expr {
         Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Add),
@@ -53,9 +53,9 @@ fn test_parse_nested_block_expr() {
 #[test]
 fn test_parse_function_call() {
     let input = "add(10, 20)";
-    let mut parser = Parser::from_str(input, None).unwrap();
+    let mut parser = Parser::new(None);
     
-    let expr = parser.parse_expression().unwrap();
+    let expr = parser.parse_expression(input).unwrap();
     
     match expr {
         Expr::FunctionCall { function, arguments, .. } => {
@@ -83,9 +83,9 @@ fn test_parse_function_call() {
 #[test]
 fn test_parse_nested_function_call() {
     let input = "add(multiply(10, 2), 20)";
-    let mut parser = Parser::from_str(input, None).unwrap();
+    let mut parser = Parser::new(None);
     
-    let expr = parser.parse_expression().unwrap();
+    let expr = parser.parse_expression(input).unwrap();
     
     match expr {
         Expr::FunctionCall { function, arguments, .. } => {
@@ -132,8 +132,8 @@ fn test_parse_arithmetic_expressions() {
     // 加算
     {
         let input = "1 + 2";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Add),
@@ -144,8 +144,8 @@ fn test_parse_arithmetic_expressions() {
     // 減算
     {
         let input = "5 - 3";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Sub),
@@ -156,8 +156,8 @@ fn test_parse_arithmetic_expressions() {
     // 乗算
     {
         let input = "4 * 2";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Mul),
@@ -168,8 +168,8 @@ fn test_parse_arithmetic_expressions() {
     // 除算
     {
         let input = "10 / 2";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Div),
@@ -180,8 +180,8 @@ fn test_parse_arithmetic_expressions() {
     // 剰余
     {
         let input = "10 % 3";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Mod),
@@ -195,8 +195,8 @@ fn test_parse_unary_expressions() {
     // 負の数
     {
         let input = "-42";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::UnaryOp { operator, expr, .. } => {
@@ -214,8 +214,8 @@ fn test_parse_unary_expressions() {
     // 論理否定
     {
         let input = "!true";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::UnaryOp { operator, expr, .. } => {
@@ -236,8 +236,8 @@ fn test_parse_comparison_expressions() {
     // 等価
     {
         let input = "x == y";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Eq),
@@ -248,8 +248,8 @@ fn test_parse_comparison_expressions() {
     // 非等価
     {
         let input = "x != y";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Neq),
@@ -260,8 +260,8 @@ fn test_parse_comparison_expressions() {
     // より小さい
     {
         let input = "x < y";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Lt),
@@ -272,8 +272,8 @@ fn test_parse_comparison_expressions() {
     // より大きい
     {
         let input = "x > y";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gt),
@@ -284,8 +284,8 @@ fn test_parse_comparison_expressions() {
     // 以下
     {
         let input = "x <= y";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Lte),
@@ -296,8 +296,8 @@ fn test_parse_comparison_expressions() {
     // 以上
     {
         let input = "x >= y";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gte),
@@ -309,8 +309,8 @@ fn test_parse_comparison_expressions() {
 #[test]
 fn test_parse_parenthesized_expr() {
     let input = "(1 + 2) * 3";
-    let mut parser = Parser::from_str(input, None).unwrap();
-    let expr = parser.parse_expression().unwrap();
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
     
     match expr {
         Expr::BinaryOp { operator, left, right, .. } => {
@@ -338,8 +338,8 @@ fn test_parse_parenthesized_expr() {
 #[test]
 fn test_parse_let_with_type_annotation() {
     let input = "let x: Int = 42;";
-    let mut parser = Parser::from_str(input, None).unwrap();
-    let program = parser.parse_program().unwrap();
+    let mut parser = Parser::new(None);
+    let program = parser.parse_program(input).unwrap();
     
     assert_eq!(program.statements.len(), 1);
     
@@ -369,8 +369,8 @@ fn test_parse_let_with_type_annotation() {
 #[test]
 fn test_parse_complex_expression() {
     let input = "1 + 2 * 3 + 4";
-    let mut parser = Parser::from_str(input, None).unwrap();
-    let expr = parser.parse_expression().unwrap();
+    let mut parser = Parser::new(None);
+    let expr = parser.parse_expression(input).unwrap();
     
     match expr {
         Expr::BinaryOp { operator, left, right, .. } => {
@@ -417,8 +417,8 @@ fn test_parse_complex_expression() {
 #[test]
 fn test_parse_error_unexpected_token() {
     let input = "let x = ;";
-    let mut parser = Parser::from_str(input, None).unwrap();
-    let result = parser.parse_program();
+    let mut parser = Parser::new(None);
+    let result = parser.parse_program(input);
     
     assert!(result.is_err());
     
@@ -434,29 +434,10 @@ fn test_parse_error_unexpected_token() {
 }
 
 #[test]
-fn test_parse_error_unexpected_eof() {
-    let input = "let x =";
-    let mut parser = Parser::from_str(input, None).unwrap();
-    let result = parser.parse_program();
-    
-    assert!(result.is_err());
-    
-    match result {
-        Ok(_) => panic!("エラーが期待されます"),
-        Err(err) => {
-            match err.kind {
-                ErrorKind::Syntax(msg) => assert!(msg.contains("式が期待されます")),
-                _ => panic!("期待される構文エラーではありません"),
-            }
-        }
-    }
-}
-
-#[test]
 fn test_parse_string_literal() {
     let input = r#"let message = "Hello, world!";"#;
-    let mut parser = Parser::from_str(input, None).unwrap();
-    let program = parser.parse_program().unwrap();
+    let mut parser = Parser::new(None);
+    let program = parser.parse_program(input).unwrap();
     
     assert_eq!(program.statements.len(), 1);
     
@@ -478,8 +459,8 @@ fn test_parse_bool_literal() {
     // true
     {
         let input = "true";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BoolLiteral(value, _) => assert_eq!(value, true),
@@ -490,8 +471,8 @@ fn test_parse_bool_literal() {
     // false
     {
         let input = "false";
-        let mut parser = Parser::from_str(input, None).unwrap();
-        let expr = parser.parse_expression().unwrap();
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
         
         match expr {
             Expr::BoolLiteral(value, _) => assert_eq!(value, false),

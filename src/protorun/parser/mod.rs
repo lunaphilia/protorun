@@ -1,670 +1,686 @@
-// Protorun言語の構文解析器
+// Protorun言語の構文解析器 - nomパーサーコンビネータ版
+
+use nom::{
+    branch::alt,
+    bytes::complete::{tag, take_while1},
+    character::complete::{alpha1, alphanumeric1, char, digit1, multispace0, multispace1, none_of},
+    combinator::{cut, map, map_res, opt, recognize, value},
+    error::{context, ErrorKind, VerboseError},
+    multi::{many0, separated_list0},
+    sequence::{delimited, pair, preceded, terminated, tuple},
+    Finish, IResult,
+};
 
 use super::ast::{
     BinaryOperator, Decl, Expr, Parameter, Program, Span, Stmt, Type, UnaryOperator,
 };
 use super::error::{Error, Result};
-use super::lexer::{Lexer, Token, TokenKind};
 
 /// パーサー
 pub struct Parser {
-    /// トークン
-    tokens: Vec<Token>,
-    /// 現在のトークンのインデックス
-    current: usize,
     /// ファイル名
     filename: Option<String>,
 }
 
 impl Parser {
     /// 新しいパーサーを作成
-    pub fn new(tokens: Vec<Token>, filename: Option<String>) -> Self {
-        Self {
-            tokens,
-            current: 0,
-            filename,
-        }
-    }
-
-    /// 入力文字列からパーサーを作成
-    pub fn from_str(input: &str, filename: Option<String>) -> Result<Self> {
-        let mut lexer = Lexer::new(input, filename.clone());
-        let tokens = lexer.tokenize()?;
-        Ok(Self::new(tokens, filename))
-    }
-
-    /// 現在のトークンを取得
-    fn current_token(&self) -> Option<&Token> {
-        self.tokens.get(self.current)
-    }
-
-    /// 次のトークンへ進む
-    fn advance(&mut self) -> Option<&Token> {
-        if self.current < self.tokens.len() {
-            self.current += 1;
-        }
-        self.current_token()
-    }
-
-    /// 現在のトークンが指定された種類かチェック
-    fn check(&self, kind: &TokenKind) -> bool {
-        match self.current_token() {
-            Some(token) => &token.kind == kind,
-            None => false,
-        }
-    }
-
-    /// 現在のトークンが指定された種類なら次へ進む
-    fn match_token(&mut self, kind: &TokenKind) -> bool {
-        if self.check(kind) {
-            self.advance();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// 指定された種類のトークンを期待し、次へ進む
-    fn expect(&mut self, kind: &TokenKind, message: &str) -> Result<&Token> {
-        if let Some(token) = self.current_token() {
-            // TokenKind::Identifierの場合は、名前の一致を無視して型だけチェック
-            let match_token = match (&token.kind, kind) {
-                (TokenKind::Identifier(_), TokenKind::Identifier(_)) => true,
-                _ => &token.kind == kind,
-            };
-            
-            if match_token {
-                self.advance();
-                return Ok(&self.tokens[self.current - 1]);
-            }
-
-            return Err(Error::syntax(
-                format!("{}: {:?}の代わりに{:?}を受け取りました", message, kind, token.kind),
-                Some(token.span.clone()),
-                self.filename.clone(),
-            ));
-        }
-
-        Err(Error::syntax(
-            format!("{}: 入力が予期せず終了しました", message),
-            None,
-            self.filename.clone(),
-        ))
+    pub fn new(filename: Option<String>) -> Self {
+        Self { filename }
     }
 
     // プログラム全体をパース
-    pub fn parse_program(&mut self) -> Result<Program> {
-        let mut declarations = Vec::new();
-        let mut statements = Vec::new();
-
-        while let Some(token) = self.current_token() {
-            if token.kind == TokenKind::Eof {
-                break;
-            }
-
-            match token.kind {
-                TokenKind::Fn => {
-                    let decl = self.parse_function_declaration()?;
-                    declarations.push(decl);
-                }
-                _ => {
-                    let stmt = self.parse_statement()?;
-                    statements.push(stmt);
-                }
-            }
-        }
-
-        Ok(Program {
-            declarations,
-            statements,
-        })
-    }
-
-    // 関数宣言をパース
-    fn parse_function_declaration(&mut self) -> Result<Decl> {
-        let fn_token = self.expect(&TokenKind::Fn, "関数宣言が期待されます")?;
-        let start_pos = fn_token.span.start;
-        let start_line = fn_token.span.line;
-        let start_column = fn_token.span.column;
-
-        // 関数名
-        let name_token = self.expect(&TokenKind::Identifier("".to_string()), "関数名が期待されます")?;
-        let name = match &name_token.kind {
-            TokenKind::Identifier(name) => name.clone(),
-            _ => unreachable!(),
-        };
-
-        // パラメータリスト
-        self.expect(&TokenKind::LeftParen, "パラメータリストの開始('(')が期待されます")?;
-        let parameters = self.parse_parameters()?;
-        self.expect(&TokenKind::RightParen, "パラメータリストの終了(')')が期待されます")?;
-
-        // 戻り値の型（オプション）
-        let return_type = if self.match_token(&TokenKind::Colon) {
-            Some(self.parse_type()?)
-        } else {
-            None
-        };
-
-        // 関数本体
-        self.expect(&TokenKind::Equal, "関数本体の開始('=')が期待されます")?;
-        let body = self.parse_expression()?;
-
-        // セミコロン（オプション）
-        self.match_token(&TokenKind::Semicolon);
-
-        let end_pos = if let Some(last_token) = self.tokens.get(self.current - 1) {
-            last_token.span.end
-        } else {
-            self.tokens.last().map_or(0, |t| t.span.end)
-        };
-
-        let span = Span {
-            start: start_pos,
-            end: end_pos,
-            line: start_line,
-            column: start_column,
-        };
-
-        Ok(Decl::Function {
-            name,
-            parameters,
-            return_type,
-            body,
-            span,
-        })
-    }
-
-    // パラメータリストをパース
-    fn parse_parameters(&mut self) -> Result<Vec<Parameter>> {
-        let mut parameters = Vec::new();
-
-        // パラメータがない場合はすぐに戻る
-        if self.check(&TokenKind::RightParen) {
-            return Ok(parameters);
-        }
-
-        loop {
-            let param_token = self.expect(&TokenKind::Identifier("".to_string()), "パラメータ名が期待されます")?;
-            let param_name = match &param_token.kind {
-                TokenKind::Identifier(name) => name.clone(),
-                _ => unreachable!(),
-            };
-
-            let span = param_token.span.clone();
-
-            // 型注釈（オプション）
-            let type_annotation = if self.match_token(&TokenKind::Colon) {
-                Some(self.parse_type()?)
-            } else {
-                None
-            };
-
-            parameters.push(Parameter {
-                name: param_name,
-                type_annotation,
-                span,
-            });
-
-            // コンマがなければパラメータリストの終了
-            if !self.match_token(&TokenKind::Comma) {
-                break;
-            }
-        }
-
-        Ok(parameters)
-    }
-
-    // 型をパース
-    fn parse_type(&mut self) -> Result<Type> {
-        let type_token = self.expect(&TokenKind::Identifier("".to_string()), "型名が期待されます")?;
-        let type_name = match &type_token.kind {
-            TokenKind::Identifier(name) => name.clone(),
-            _ => unreachable!(),
-        };
-
-        let span = type_token.span.clone();
-
-        // 今は簡単な型のみサポート
-        Ok(Type::Simple { name: type_name, span })
-    }
-
-    // 文をパース
-    fn parse_statement(&mut self) -> Result<Stmt> {
-        match self.current_token() {
-            Some(token) => match token.kind {
-                TokenKind::Let => self.parse_let_statement(),
-                _ => {
-                    let expr = self.parse_expression()?;
-                    let span = expr.span();
-
-                    // セミコロン（オプション）
-                    self.match_token(&TokenKind::Semicolon);
-
-                    Ok(Stmt::Expr { expr, span })
-                }
-            },
-            None => Err(Error::syntax(
-                "文が期待されます".to_string(),
-                None,
-                self.filename.clone(),
-            )),
+    pub fn parse_program(&mut self, input: &str) -> Result<Program> {
+        match program(input).finish() {
+            Ok((_, program)) => Ok(program),
+            Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }
     }
 
-    // let文をパース
-    fn parse_let_statement(&mut self) -> Result<Stmt> {
-        let let_token = self.expect(&TokenKind::Let, "let文が期待されます")?;
-        let start_pos = let_token.span.start;
-        let start_line = let_token.span.line;
-        let start_column = let_token.span.column;
-
-        // 変数名
-        let name_token = self.expect(&TokenKind::Identifier("".to_string()), "変数名が期待されます")?;
-        let name = match &name_token.kind {
-            TokenKind::Identifier(name) => name.clone(),
-            _ => unreachable!(),
-        };
-
-        // 型注釈（オプション）
-        let type_annotation = if self.match_token(&TokenKind::Colon) {
-            Some(self.parse_type()?)
-        } else {
-            None
-        };
-
-        // 初期値
-        self.expect(&TokenKind::Equal, "let文の代入演算子('=')が期待されます")?;
-        let value = self.parse_expression()?;
-
-        // セミコロン
-        self.expect(&TokenKind::Semicolon, "let文の終了(';')が期待されます")?;
-
-        let end_pos = if let Some(last_token) = self.tokens.get(self.current - 1) {
-            last_token.span.end
-        } else {
-            self.tokens.last().map_or(0, |t| t.span.end)
-        };
-
-        let span = Span {
-            start: start_pos,
-            end: end_pos,
-            line: start_line,
-            column: start_column,
-        };
-
-        Ok(Stmt::Let {
-            name,
-            type_annotation,
-            value,
-            span,
-        })
-    }
-
-    // 式をパース（優先順位に基づく）
-    fn parse_expression(&mut self) -> Result<Expr> {
-        self.parse_equality()
-    }
-
-    // 等価性の式をパース
-    fn parse_equality(&mut self) -> Result<Expr> {
-        let mut expr = self.parse_comparison()?;
-
-        while let Some(token) = self.current_token() {
-            let operator = match token.kind {
-                TokenKind::EqualEqual => BinaryOperator::Eq,
-                TokenKind::NotEqual => BinaryOperator::Neq,
-                _ => break,
-            };
-
-            let op_span = token.span.clone();
-            self.advance();
-
-            let right = self.parse_comparison()?;
-            let span = Span {
-                start: expr.span().start,
-                end: right.span().end,
-                line: expr.span().line,
-                column: expr.span().column,
-            };
-
-            expr = Expr::BinaryOp {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
-                span,
-            };
+    // 式をパース
+    pub fn parse_expression(&mut self, input: &str) -> Result<Expr> {
+        match expression(input).finish() {
+            Ok((_, expr)) => Ok(expr),
+            Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }
-
-        Ok(expr)
     }
+}
 
-    // 比較の式をパース
-    fn parse_comparison(&mut self) -> Result<Expr> {
-        let mut expr = self.parse_term()?;
+// パーサーの結果型
+type ParseResult<'a, T> = IResult<&'a str, T, VerboseError<&'a str>>;
 
-        while let Some(token) = self.current_token() {
-            let operator = match token.kind {
-                TokenKind::Less => BinaryOperator::Lt,
-                TokenKind::Greater => BinaryOperator::Gt,
-                TokenKind::LessEqual => BinaryOperator::Lte,
-                TokenKind::GreaterEqual => BinaryOperator::Gte,
-                _ => break,
-            };
-
-            let op_span = token.span.clone();
-            self.advance();
-
-            let right = self.parse_term()?;
-            let span = Span {
-                start: expr.span().start,
-                end: right.span().end,
-                line: expr.span().line,
-                column: expr.span().column,
-            };
-
-            expr = Expr::BinaryOp {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
-                span,
-            };
+// 構文エラーをProtorunのエラーに変換
+fn to_syntax_error<'a>(input: &'a str, error: VerboseError<&'a str>, filename: Option<String>) -> Error {
+    // 簡単なエラーメッセージの生成
+    let message = if error.errors.is_empty() {
+        "構文解析エラー".to_string()
+    } else {
+        let (input_slice, kind) = &error.errors[0];
+        match kind {
+            nom::error::VerboseErrorKind::Nom(ErrorKind::Tag) => format!("期待されるキーワードが見つかりません: '{}'", input_slice),
+            nom::error::VerboseErrorKind::Nom(ErrorKind::Char) => format!("期待される文字が見つかりません: '{}'", input_slice),
+            nom::error::VerboseErrorKind::Nom(ErrorKind::Eof) => "式が期待されます".to_string(),
+            nom::error::VerboseErrorKind::Context(_) => "式が期待されます".to_string(),
+            _ => format!("構文解析エラー: {:?}", kind),
         }
+    };
 
-        Ok(expr)
-    }
+    // エラーの位置情報
+    // 正確な位置情報を取得するのは難しいため、おおよその位置を設定
+    let pos = input.len().saturating_sub(input.trim_start().len());
+    let span = Span {
+        start: pos,
+        end: pos + 1,
+        line: 1 + input[..pos].chars().filter(|&c| c == '\n').count(),
+        column: 1 + input[..pos].chars().rev().take_while(|&c| c != '\n').count(),
+    };
 
-    // 項をパース
-    fn parse_term(&mut self) -> Result<Expr> {
-        let mut expr = self.parse_factor()?;
+    Error::syntax(message, Some(span), filename)
+}
 
-        while let Some(token) = self.current_token() {
-            let operator = match token.kind {
-                TokenKind::Plus => BinaryOperator::Add,
-                TokenKind::Minus => BinaryOperator::Sub,
-                _ => break,
-            };
+// 行コメントをスキップ
+fn skip_comment(input: &str) -> ParseResult<&str> {
+    preceded(
+        tag("//"),
+        terminated(
+            take_while1(|c| c != '\n'),
+            alt((value((), char('\n')), value((), nom::combinator::eof)))
+        )
+    )(input)
+}
 
-            let op_span = token.span.clone();
-            self.advance();
+// 空白とコメントをスキップ（コメント対応版）
+fn ws_comments<'a, F, O>(inner: F) -> impl FnMut(&'a str) -> ParseResult<'a, O>
+where
+    F: FnMut(&'a str) -> ParseResult<'a, O>,
+{
+    delimited(
+        many0(alt((
+            value((), multispace1),
+            value((), skip_comment),
+        ))),
+        inner,
+        many0(alt((
+            value((), multispace1),
+            value((), skip_comment),
+        )))
+    )
+}
 
-            let right = self.parse_factor()?;
-            let span = Span {
-                start: expr.span().start,
-                end: right.span().end,
-                line: expr.span().line,
-                column: expr.span().column,
-            };
+// 識別子をパース
+fn identifier(input: &str) -> ParseResult<&str> {
+    recognize(
+        pair(
+            alt((alpha1, tag("_"))),
+            many0(alt((alphanumeric1, tag("_"))))
+        )
+    )(input)
+}
 
-            expr = Expr::BinaryOp {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
-                span,
-            };
-        }
+// 識別子文字列をパース
+fn identifier_string(input: &str) -> ParseResult<String> {
+    map(identifier, |s: &str| s.to_string())(input)
+}
 
-        Ok(expr)
-    }
+// 整数リテラルをパース
+fn int_literal(input: &str) -> ParseResult<i64> {
+    map_res(
+        recognize(
+            pair(
+                opt(char('-')),
+                digit1
+            )
+        ),
+        |s: &str| s.parse::<i64>()
+    )(input)
+}
 
-    // 因子をパース
-    fn parse_factor(&mut self) -> Result<Expr> {
-        let mut expr = self.parse_unary()?;
+// 浮動小数点リテラルをパース
+fn float_literal(input: &str) -> ParseResult<f64> {
+    map_res(
+        recognize(
+            tuple((
+                opt(char('-')),
+                digit1,
+                char('.'),
+                digit1
+            ))
+        ),
+        |s: &str| s.parse::<f64>()
+    )(input)
+}
 
-        while let Some(token) = self.current_token() {
-            let operator = match token.kind {
-                TokenKind::Star => BinaryOperator::Mul,
-                TokenKind::Slash => BinaryOperator::Div,
-                TokenKind::Percent => BinaryOperator::Mod,
-                _ => break,
-            };
+// 文字列リテラルをパース
+fn string_literal(input: &str) -> ParseResult<String> {
+    delimited(
+        char('"'),
+        map(
+            many0(
+                alt((
+                    map(tag("\\n"), |_| '\n'),
+                    map(tag("\\r"), |_| '\r'),
+                    map(tag("\\t"), |_| '\t'),
+                    map(tag("\\\\"), |_| '\\'),
+                    map(tag("\\\""), |_| '"'),
+                    none_of("\"\\")
+                ))
+            ),
+            |chars| chars.into_iter().collect()
+        ),
+        char('"')
+    )(input)
+}
 
-            let op_span = token.span.clone();
-            self.advance();
+// 真偽値リテラルをパース
+fn bool_literal(input: &str) -> ParseResult<bool> {
+    alt((
+        value(true, tag("true")),
+        value(false, tag("false"))
+    ))(input)
+}
 
-            let right = self.parse_unary()?;
-            let span = Span {
-                start: expr.span().start,
-                end: right.span().end,
-                line: expr.span().line,
-                column: expr.span().column,
-            };
-
-            expr = Expr::BinaryOp {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
-                span,
-            };
-        }
-
-        Ok(expr)
-    }
-
-    // 単項式をパース
-    fn parse_unary(&mut self) -> Result<Expr> {
-        if let Some(token) = self.current_token() {
-            let operator = match token.kind {
-                TokenKind::Minus => UnaryOperator::Neg,
-                TokenKind::Bang => UnaryOperator::Not,
-                _ => return self.parse_call(),
-            };
-
-            let op_span = token.span.clone();
-            let start_pos = op_span.start;
-            let start_line = op_span.line;
-            let start_column = op_span.column;
-            self.advance();
-
-            let expr = self.parse_unary()?;
-            let span = Span {
-                start: start_pos,
-                end: expr.span().end,
-                line: start_line,
-                column: start_column,
-            };
-
-            return Ok(Expr::UnaryOp {
-                operator,
-                expr: Box::new(expr),
-                span,
-            });
-        }
-
-        self.parse_call()
-    }
-
-    // 関数呼び出しをパース
-    fn parse_call(&mut self) -> Result<Expr> {
-        let mut expr = self.parse_primary()?;
-
-        loop {
-            if self.match_token(&TokenKind::LeftParen) {
-                expr = self.finish_call(expr)?;
-            } else {
-                break;
-            }
-        }
-
-        Ok(expr)
-    }
-
-    // 関数呼び出しの引数をパース
-    fn finish_call(&mut self, function: Expr) -> Result<Expr> {
-        let start_pos = function.span().start;
-        let start_line = function.span().line;
-        let start_column = function.span().column;
-        let mut arguments = Vec::new();
-
-        // 引数がない場合
-        if !self.check(&TokenKind::RightParen) {
-            loop {
-                arguments.push(self.parse_expression()?);
-                if !self.match_token(&TokenKind::Comma) {
-                    break;
-                }
-            }
-        }
-
-        let close_paren = self.expect(&TokenKind::RightParen, "関数呼び出しの終了(')')が期待されます")?;
-        let end_pos = close_paren.span.end;
-
-        let span = Span {
-            start: start_pos,
-            end: end_pos,
-            line: start_line,
-            column: start_column,
-        };
-
-        Ok(Expr::FunctionCall {
-            function: Box::new(function),
-            arguments,
-            span,
-        })
-    }
-
-    // 基本式をパース
-    fn parse_primary(&mut self) -> Result<Expr> {
-        if let Some(token) = self.current_token().cloned() {
-            let expr = match &token.kind {
-                TokenKind::True => {
-                    self.advance();
-                    Expr::BoolLiteral(true, token.span)
-                }
-                TokenKind::False => {
-                    self.advance();
-                    Expr::BoolLiteral(false, token.span)
-                }
-                TokenKind::IntLiteral(value) => {
-                    let value = *value;
-                    self.advance();
-                    Expr::IntLiteral(value, token.span)
-                }
-                TokenKind::FloatLiteral(value) => {
-                    let value = *value;
-                    self.advance();
-                    Expr::FloatLiteral(value, token.span)
-                }
-                TokenKind::StringLiteral(value) => {
-                    let value = value.clone();
-                    self.advance();
-                    Expr::StringLiteral(value, token.span)
-                }
-                TokenKind::Identifier(name) => {
-                    let name = name.clone();
-                    self.advance();
-                    Expr::Identifier(name, token.span)
-                }
-                TokenKind::LeftParen => {
-                    let start_pos = token.span.start;
-                    let start_line = token.span.line;
-                    let start_column = token.span.column;
-                    self.advance();
-                    let expr = self.parse_expression()?;
-                    let close_paren = self.expect(&TokenKind::RightParen, "式の終了(')')が期待されます")?;
+// 基本式をパース
+fn primary(input: &str) -> ParseResult<Expr> {
+    ws_comments(
+        alt((
+            // 整数リテラル
+            map(int_literal, |value| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                Expr::IntLiteral(value, span)
+            }),
+            // 浮動小数点リテラル
+            map(float_literal, |value| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                Expr::FloatLiteral(value, span)
+            }),
+            // 文字列リテラル
+            map(string_literal, |value| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                Expr::StringLiteral(value, span)
+            }),
+            // 真偽値リテラル
+            map(bool_literal, |value| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                Expr::BoolLiteral(value, span)
+            }),
+            // 括弧式
+            map(
+                delimited(
+                    char('('),
+                    ws_comments(expression),
+                    cut(char(')'))
+                ),
+                |expr| {
                     let span = Span {
-                        start: start_pos,
-                        end: close_paren.span.end,
-                        line: start_line,
-                        column: start_column,
+                        start: 0,
+                        end: 0,
+                        line: 0,
+                        column: 0,
                     };
                     Expr::ParenExpr(Box::new(expr), span)
                 }
-                TokenKind::LeftBrace => {
-                    let start_pos = token.span.start;
-                    let start_line = token.span.line;
-                    let start_column = token.span.column;
-                    self.advance();
-                    
-                    // ブロック内の文をパース
-                    let mut statements = Vec::new();
-                    let mut last_expr = None;
-                    
-                    // 複数の文と最後の式をパースする
-                    while !self.check(&TokenKind::RightBrace) && !self.check(&TokenKind::Eof) {
-                        if let Some(token) = self.current_token() {
-                            if token.kind == TokenKind::RightBrace {
-                                break;
-                            }
-                            
-                            if self.check(&TokenKind::Let) {
-                                let stmt = self.parse_statement()?;
-                                statements.push(stmt);
-                            } else {
-                                // セミコロンで終わっていれば文、そうでなければ式
-                                let expr = self.parse_expression()?;
-                                
-                                if self.match_token(&TokenKind::Semicolon) {
-                                    let span = expr.span();
-                                    statements.push(Stmt::Expr { expr, span });
-                                } else {
-                                    last_expr = Some(expr);
-                                    break; // ブロックの最後の式
-                                }
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                    
-                    let close_brace = self.expect(&TokenKind::RightBrace, "ブロックの終了('}')が期待されます")?;
-                    
+            ),
+            // 識別子
+            map(identifier_string, |name| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                Expr::Identifier(name, span)
+            }),
+            // ブロック式
+            map(
+                delimited(
+                    char('{'),
+                    block_contents,
+                    cut(char('}'))
+                ),
+                |(_statements, expr)| {
                     let span = Span {
-                        start: start_pos,
-                        end: close_brace.span.end,
-                        line: start_line,
-                        column: start_column,
+                        start: 0,
+                        end: 0,
+                        line: 0,
+                        column: 0,
                     };
-                    
-                    // Blockエクスプレッションを未実装の場合は、下記のようなプレースホルダー実装を使う
-                    // 本来はここにExpr::Block { statements, last_expr, span }のようなものが必要
-                    // 暫定的にlast_expr があれば返し、なければ UnitLiteral を返す
-                    if let Some(expr) = last_expr {
-                        expr
-                    } else {
-                        Expr::UnitLiteral(span)
+                    match expr {
+                        Some(e) => e,
+                        None => Expr::UnitLiteral(span)
                     }
                 }
-                _ => {
-                    return Err(Error::syntax(
-                        format!("式が期待されます: {:?}", token.kind),
-                        Some(token.span.clone()),
-                        self.filename.clone(),
-                    ));
-                }
+            )
+        ))
+    )(input)
+}
+
+// ブロックの内容をパース
+fn block_contents(input: &str) -> ParseResult<(Vec<Stmt>, Option<Expr>)> {
+    let (input, statements) = many0(terminated(statement, ws_comments(char(';'))))(input)?;
+    let (input, expr) = opt(expression)(input)?;
+    Ok((input, (statements, expr)))
+}
+
+// 関数呼び出しをパース
+fn function_call(input: &str) -> ParseResult<Expr> {
+    let (input, func) = primary(input)?;
+    
+    let (input, args_opt) = opt(
+        delimited(
+            ws_comments(char('(')),
+            separated_list0(
+                ws_comments(char(',')),
+                expression
+            ),
+            cut(ws_comments(char(')')))
+        )
+    )(input)?;
+    
+    match args_opt {
+        Some(args) => {
+            let span = Span {
+                start: 0,
+                end: 0,
+                line: 0,
+                column: 0,
             };
-
-            Ok(expr)
-        } else {
-            Err(Error::syntax(
-                "式が期待されます（入力が予期せず終了しました）".to_string(),
-                None,
-                self.filename.clone(),
-            ))
-        }
+            Ok((input, Expr::FunctionCall {
+                function: Box::new(func),
+                arguments: args,
+                span,
+            }))
+        },
+        None => Ok((input, func))
     }
 }
 
-// ASTノードのspan取得用のヘルパートレイト
-trait Spannable {
-    fn span(&self) -> Span;
+// 単項演算をパース
+fn unary(input: &str) -> ParseResult<Expr> {
+    alt((
+        map(
+            pair(
+                ws_comments(char('-')),
+                unary
+            ),
+            |(_, expr)| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                Expr::UnaryOp {
+                    operator: UnaryOperator::Neg,
+                    expr: Box::new(expr),
+                    span,
+                }
+            }
+        ),
+        map(
+            pair(
+                ws_comments(char('!')),
+                unary
+            ),
+            |(_, expr)| {
+                let span = Span {
+                    start: 0,
+                    end: 0,
+                    line: 0,
+                    column: 0,
+                };
+                Expr::UnaryOp {
+                    operator: UnaryOperator::Not,
+                    expr: Box::new(expr),
+                    span,
+                }
+            }
+        ),
+        function_call
+    ))(input)
 }
 
-impl Spannable for Expr {
-    fn span(&self) -> Span {
-        match self {
-            Expr::IntLiteral(_, span) => span.clone(),
-            Expr::FloatLiteral(_, span) => span.clone(),
-            Expr::BoolLiteral(_, span) => span.clone(),
-            Expr::StringLiteral(_, span) => span.clone(),
-            Expr::UnitLiteral(span) => span.clone(),
-            Expr::Identifier(_, span) => span.clone(),
-            Expr::BinaryOp { span, .. } => span.clone(),
-            Expr::UnaryOp { span, .. } => span.clone(),
-            Expr::FunctionCall { span, .. } => span.clone(),
-            Expr::ParenExpr(_, span) => span.clone(),
+// 因子をパース（乗除算）
+fn factor(input: &str) -> ParseResult<Expr> {
+    let (input, first) = unary(input)?;
+    
+    let (input, rest) = many0(
+        pair(
+            ws_comments(alt((
+                value(BinaryOperator::Mul, char('*')),
+                value(BinaryOperator::Div, char('/')),
+                value(BinaryOperator::Mod, char('%'))
+            ))),
+            unary
+        )
+    )(input)?;
+    
+    Ok((input, rest.into_iter().fold(first, |acc, (op, right)| {
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            column: 0,
+        };
+        Expr::BinaryOp {
+            left: Box::new(acc),
+            operator: op,
+            right: Box::new(right),
+            span,
         }
-    }
+    })))
+}
+
+// 項をパース（加減算）
+fn term(input: &str) -> ParseResult<Expr> {
+    let (input, first) = factor(input)?;
+    
+    let (input, rest) = many0(
+        pair(
+            ws_comments(alt((
+                value(BinaryOperator::Add, char('+')),
+                value(BinaryOperator::Sub, char('-'))
+            ))),
+            factor
+        )
+    )(input)?;
+    
+    Ok((input, rest.into_iter().fold(first, |acc, (op, right)| {
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            column: 0,
+        };
+        Expr::BinaryOp {
+            left: Box::new(acc),
+            operator: op,
+            right: Box::new(right),
+            span,
+        }
+    })))
+}
+
+// 比較演算をパース
+fn comparison(input: &str) -> ParseResult<Expr> {
+    let (input, first) = term(input)?;
+    
+    let (input, rest) = many0(
+        pair(
+            ws_comments(alt((
+                // 2文字演算子を先に試す
+                value(BinaryOperator::Lte, tag("<=")),
+                value(BinaryOperator::Gte, tag(">=")),
+                // 1文字演算子は後
+                value(BinaryOperator::Lt, tag("<")),
+                value(BinaryOperator::Gt, tag(">"))
+            ))),
+            term
+        )
+    )(input)?;
+    
+    Ok((input, rest.into_iter().fold(first, |acc, (op, right)| {
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            column: 0,
+        };
+        Expr::BinaryOp {
+            left: Box::new(acc),
+            operator: op,
+            right: Box::new(right),
+            span,
+        }
+    })))
+}
+
+// 等価演算をパース
+fn equality(input: &str) -> ParseResult<Expr> {
+    let (input, first) = comparison(input)?;
+    
+    let (input, rest) = many0(
+        pair(
+            ws_comments(alt((
+                value(BinaryOperator::Eq, tag("==")),
+                value(BinaryOperator::Neq, tag("!="))
+            ))),
+            comparison
+        )
+    )(input)?;
+    
+    Ok((input, rest.into_iter().fold(first, |acc, (op, right)| {
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            column: 0,
+        };
+        Expr::BinaryOp {
+            left: Box::new(acc),
+            operator: op,
+            right: Box::new(right),
+            span,
+        }
+    })))
+}
+
+// 論理AND演算をパース
+fn logical_and(input: &str) -> ParseResult<Expr> {
+    let (input, first) = equality(input)?;
+    
+    let (input, rest) = many0(
+        pair(
+            ws_comments(tag("&&")),
+            equality
+        )
+    )(input)?;
+    
+    Ok((input, rest.into_iter().fold(first, |acc, (_, right)| {
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            column: 0,
+        };
+        Expr::BinaryOp {
+            left: Box::new(acc),
+            operator: BinaryOperator::And,
+            right: Box::new(right),
+            span,
+        }
+    })))
+}
+
+// 論理OR演算をパース
+fn logical_or(input: &str) -> ParseResult<Expr> {
+    let (input, first) = logical_and(input)?;
+    
+    let (input, rest) = many0(
+        pair(
+            ws_comments(tag("||")),
+            logical_and
+        )
+    )(input)?;
+    
+    Ok((input, rest.into_iter().fold(first, |acc, (_, right)| {
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            column: 0,
+        };
+        Expr::BinaryOp {
+            left: Box::new(acc),
+            operator: BinaryOperator::Or,
+            right: Box::new(right),
+            span,
+        }
+    })))
+}
+
+// 式をパース
+fn expression(input: &str) -> ParseResult<Expr> {
+    logical_or(input)
+}
+
+// 型をパース
+fn type_parser(input: &str) -> ParseResult<Type> {
+    map(
+        ws_comments(identifier_string),
+        |name| {
+            let span = Span {
+                start: 0,
+                end: 0,
+                line: 0,
+                column: 0,
+            };
+            Type::Simple { name, span }
+        }
+    )(input)
+}
+
+// パラメータをパース
+fn parameter(input: &str) -> ParseResult<Parameter> {
+    let (input, name) = ws_comments(identifier_string)(input)?;
+    let (input, type_annotation) = opt(
+        preceded(
+            ws_comments(char(':')),
+            type_parser
+        )
+    )(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Parameter {
+        name,
+        type_annotation,
+        span,
+    }))
+}
+
+// let文をパース
+fn let_statement(input: &str) -> ParseResult<Stmt> {
+    let (input, _) = ws_comments(tag("let"))(input)?;
+    let (input, name) = ws_comments(identifier_string)(input)?;
+    let (input, type_annotation) = opt(
+        preceded(
+            ws_comments(char(':')),
+            type_parser
+        )
+    )(input)?;
+    let (input, _) = ws_comments(char('='))(input)?;
+    // ここにコンテキストを追加
+    let (input, value) = context("expression", cut(expression))(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Stmt::Let {
+        name,
+        type_annotation,
+        value,
+        span,
+    }))
+}
+
+// 文をパース
+fn statement(input: &str) -> ParseResult<Stmt> {
+    alt((
+        let_statement,
+        map(expression, |expr| {
+            let span = Span {
+                start: 0,
+                end: 0,
+                line: 0,
+                column: 0,
+            };
+            Stmt::Expr { expr, span }
+        })
+    ))(input)
+}
+
+// 関数宣言をパース
+fn function_declaration(input: &str) -> ParseResult<Decl> {
+    let (input, _) = ws_comments(tag("fn"))(input)?;
+    let (input, name) = ws_comments(identifier_string)(input)?;
+    let (input, parameters) = delimited(
+        ws_comments(char('(')),
+        separated_list0(
+            ws_comments(char(',')),
+            parameter
+        ),
+        cut(ws_comments(char(')')))
+    )(input)?;
+    let (input, return_type) = opt(
+        preceded(
+            ws_comments(char(':')),
+            type_parser
+        )
+    )(input)?;
+    let (input, _) = ws_comments(char('='))(input)?;
+    let (input, body) = cut(expression)(input)?;
+    let (input, _) = opt(ws_comments(char(';')))(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Decl::Function {
+        name,
+        parameters,
+        return_type,
+        body,
+        span,
+    }))
+}
+
+// プログラム全体をパース
+fn program(input: &str) -> ParseResult<Program> {
+    let (input, _) = multispace0(input)?;
+    let (input, declarations) = many0(function_declaration)(input)?;
+    let (input, statements) = many0(
+        terminated(
+            statement,
+            ws_comments(char(';'))
+        )
+    )(input)?;
+    let (input, _) = multispace0(input)?;
+    
+    Ok((input, Program {
+        declarations,
+        statements,
+    }))
 }
 
 #[cfg(test)]
