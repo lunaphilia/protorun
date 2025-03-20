@@ -313,6 +313,22 @@ fn expr_to_string(expr: &Expr) -> String {
                 expr_to_string(body)
             )
         },
+        Expr::LambdaExpr { parameters, body, .. } => {
+            let params: Vec<String> = parameters.iter()
+                .map(|p| {
+                    if let Some(t) = &p.type_annotation {
+                        format!("{}: {}", p.name, type_to_string(t))
+                    } else {
+                        p.name.clone()
+                    }
+                })
+                .collect();
+            
+            format!("({}) => {}",
+                params.join(", "),
+                expr_to_string(body)
+            )
+        },
     }
 }
 

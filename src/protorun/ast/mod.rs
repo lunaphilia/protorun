@@ -83,6 +83,12 @@ pub enum Expr {
         elements: Vec<Expr>,
         span: Span,
     },
+    /// ラムダ式
+    LambdaExpr {
+        parameters: Vec<Parameter>,
+        body: Box<Expr>,
+        span: Span,
+    },
     /// 識別子
     Identifier(String, Span),
     /// 二項演算

@@ -1403,3 +1403,122 @@ fn test_parse_nested_collections() {
         _ => panic!("期待されるリストリテラルではありません"),
     }
 }
+
+#[test]
+fn test_parse_lambda_expr() {
+    // 基本的なラムダ式
+    {
+        let input = "(x) => x + 1";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::LambdaExpr { parameters, body, .. } => {
+                assert_eq!(parameters.len(), 1);
+                
+                assert_eq!(parameters[0].name, "x");
+                assert!(parameters[0].type_annotation.is_none());
+                
+                match *body {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Add),
+                    _ => panic!("期待される二項演算ではありません"),
+                }
+            },
+            _ => panic!("期待されるラムダ式ではありません"),
+        }
+    }
+    
+    // 型注釈付きのパラメータを持つラムダ式
+    {
+        let input = "(x: Int) => x * 2";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::LambdaExpr { parameters, body, .. } => {
+                assert_eq!(parameters.len(), 1);
+                
+                assert_eq!(parameters[0].name, "x");
+                assert!(parameters[0].type_annotation.is_some());
+                
+                match &parameters[0].type_annotation {
+                    Some(ty) => {
+                        match ty {
+                            crate::protorun::ast::Type::Simple { name, .. } => assert_eq!(name, "Int"),
+                            _ => panic!("期待される単純型ではありません"),
+                        }
+                    },
+                    None => panic!("型注釈が期待されます"),
+                }
+                
+                match *body {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Mul),
+                    _ => panic!("期待される二項演算ではありません"),
+                }
+            },
+            _ => panic!("期待されるラムダ式ではありません"),
+        }
+    }
+    
+    // 複数のパラメータを持つラムダ式
+    {
+        let input = "(x: Int, y: Int) => x + y";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::LambdaExpr { parameters, body, .. } => {
+                assert_eq!(parameters.len(), 2);
+                
+                assert_eq!(parameters[0].name, "x");
+                assert_eq!(parameters[1].name, "y");
+                
+                match *body {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Add),
+                    _ => panic!("期待される二項演算ではありません"),
+                }
+            },
+            _ => panic!("期待されるラムダ式ではありません"),
+        }
+    }
+    
+    // 空のパラメータリストを持つラムダ式
+    {
+        let input = "() => 42";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::LambdaExpr { parameters, body, .. } => {
+                assert_eq!(parameters.len(), 0);
+                
+                match *body {
+                    Expr::IntLiteral(value, _) => assert_eq!(value, 42),
+                    _ => panic!("期待される整数リテラルではありません"),
+                }
+            },
+            _ => panic!("期待されるラムダ式ではありません"),
+        }
+    }
+    
+    // ブロック式を本体に持つラムダ式
+    {
+        let input = "(x) => { let y = x * 2; y + 1 }";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::LambdaExpr { parameters, body, .. } => {
+                assert_eq!(parameters.len(), 1);
+                
+                assert_eq!(parameters[0].name, "x");
+                
+                match *body {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Add),
+                    _ => panic!("期待される二項演算ではありません"),
+                }
+            },
+            _ => panic!("期待されるラムダ式ではありません"),
+        }
+    }
+}
