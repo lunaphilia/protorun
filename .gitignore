@@ -1,0 +1,38 @@
+# Rustのビルド生成物
+/target/
+
+# IDEやエディタの設定ファイル
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS固有のファイル
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Rustバックトレースログ
+*.log
+
+# バイナリファイル
+*.exe
+*.pdb
+*.dll
+*.so
+*.dylib
+
+# 環境変数ファイル（必要に応じて）
+.env
+.env.*
+
+# Rustドキュメント生成物（必要に応じて）
+/doc/
+
+# プロトランパイラの出力やキャッシュファイル（将来的に必要になる可能性あり）
+*.prc
