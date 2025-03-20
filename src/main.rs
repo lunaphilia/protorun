@@ -188,6 +188,36 @@ fn type_to_string(typ: &protorun::ast::Type) -> String {
                 params.join(", "), 
                 type_to_string(return_type)
             )
+        },
+        protorun::ast::Type::Array { element_type, .. } => {
+            format!("[{}]", type_to_string(element_type))
+        },
+        protorun::ast::Type::Tuple { element_types, .. } => {
+            let types: Vec<String> = element_types.iter()
+                .map(type_to_string)
+                .collect();
+            
+            format!("({})", types.join(", "))
+        },
+        protorun::ast::Type::Generic { base_type, type_arguments, .. } => {
+            let args: Vec<String> = type_arguments.iter()
+                .map(type_to_string)
+                .collect();
+            
+            format!("{}<{}>", base_type, args.join(", "))
+        },
+        protorun::ast::Type::Reference { is_mutable, referenced_type, .. } => {
+            if *is_mutable {
+                format!("&mut {}", type_to_string(referenced_type))
+            } else {
+                format!("&{}", type_to_string(referenced_type))
+            }
+        },
+        protorun::ast::Type::Owned { owned_type, .. } => {
+            format!("own {}", type_to_string(owned_type))
+        },
+        protorun::ast::Type::WithEffect { base_type, effect_type, .. } => {
+            format!("{} & {}", type_to_string(base_type), type_to_string(effect_type))
         }
     }
 }

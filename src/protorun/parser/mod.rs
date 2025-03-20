@@ -43,6 +43,14 @@ impl Parser {
             Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }
     }
+    
+    // 型をパース
+    pub fn parse_type(&mut self, input: &str) -> Result<super::ast::Type> {
+        match type_parser(input).finish() {
+            Ok((_, ty)) => Ok(ty),
+            Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
+        }
+    }
 }
 
 // パーサーの結果型
@@ -542,8 +550,8 @@ fn expression(input: &str) -> ParseResult<Expr> {
     logical_or(input)
 }
 
-// 型をパース
-fn type_parser(input: &str) -> ParseResult<Type> {
+// 単純型をパース
+fn simple_type(input: &str) -> ParseResult<Type> {
     map(
         ws_comments(identifier_string),
         |name| {
@@ -556,6 +564,230 @@ fn type_parser(input: &str) -> ParseResult<Type> {
             Type::Simple { name, span }
         }
     )(input)
+}
+
+// ジェネリック型引数をパース
+fn generic_args(input: &str) -> ParseResult<Vec<Type>> {
+    delimited(
+        ws_comments(char('<')),
+        separated_list0(
+            ws_comments(char(',')),
+            type_parser
+        ),
+        cut(ws_comments(char('>')))
+    )(input)
+}
+
+// ジェネリック型をパース
+fn generic_type(input: &str) -> ParseResult<Type> {
+    let (input, base_name) = ws_comments(identifier_string)(input)?;
+    let (input, args_opt) = opt(generic_args)(input)?;
+    
+    match args_opt {
+        Some(args) if !args.is_empty() => {
+            let span = Span {
+                start: 0,
+                end: 0,
+                line: 0,
+                column: 0,
+            };
+            Ok((input, Type::Generic {
+                base_type: base_name,
+                type_arguments: args,
+                span,
+            }))
+        },
+        _ => {
+            // ジェネリック引数がない場合は単純型として扱う
+            let span = Span {
+                start: 0,
+                end: 0,
+                line: 0,
+                column: 0,
+            };
+            Ok((input, Type::Simple { name: base_name, span }))
+        }
+    }
+}
+
+// 配列型をパース
+fn array_type(input: &str) -> ParseResult<Type> {
+    let (input, _) = ws_comments(char('['))(input)?;
+    let (input, element_type) = type_parser(input)?;
+    let (input, _) = cut(ws_comments(char(']')))(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Type::Array {
+        element_type: Box::new(element_type),
+        span,
+    }))
+}
+
+// タプル型をパース
+fn tuple_type(input: &str) -> ParseResult<Type> {
+    let (input, _) = ws_comments(char('('))(input)?;
+    let (input, first_type) = type_parser(input)?;
+    
+    // カンマがある場合はタプル型、ない場合は括弧で囲まれた型
+    let (input, rest) = opt(
+        preceded(
+            ws_comments(char(',')),
+            separated_list0(
+                ws_comments(char(',')),
+                type_parser
+            )
+        )
+    )(input)?;
+    
+    let (input, _) = cut(ws_comments(char(')')))(input)?;
+    
+    match rest {
+        Some(mut types) => {
+            // タプル型
+            let span = Span {
+                start: 0,
+                end: 0,
+                line: 0,
+                column: 0,
+            };
+            
+            let mut element_types = vec![first_type];
+            element_types.append(&mut types);
+            
+            Ok((input, Type::Tuple {
+                element_types,
+                span,
+            }))
+        },
+        None => {
+            // 括弧で囲まれた型
+            Ok((input, first_type))
+        }
+    }
+}
+
+// 効果型をパース
+fn effect_type(input: &str) -> ParseResult<Type> {
+    preceded(
+        ws_comments(tag("&")),
+        type_parser
+    )(input)
+}
+
+// 関数型をパース
+fn function_type(input: &str) -> ParseResult<Type> {
+    let (input, _) = ws_comments(char('('))(input)?;
+    
+    // カンマで区切られた型のリストをパース
+    let (input, first_type_opt) = opt(type_parser)(input)?;
+    
+    let (input, params) = match first_type_opt {
+        Some(first_type) => {
+            let (input, rest_types) = many0(
+                preceded(
+                    ws_comments(char(',')),
+                    type_parser
+                )
+            )(input)?;
+            
+            let mut params = vec![first_type];
+            params.extend(rest_types);
+            (input, params)
+        },
+        None => (input, vec![])
+    };
+    
+    let (input, _) = cut(ws_comments(char(')')))(input)?;
+    
+    let (input, _) = ws_comments(tag("->"))(input)?;
+    let (input, return_type) = type_parser(input)?;
+    
+    // オプションの効果型
+    let (input, effect) = opt(effect_type)(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    let function_type = Type::Function {
+        parameters: params,
+        return_type: Box::new(return_type),
+        span: span.clone(),
+    };
+    
+    match effect {
+        Some(effect_type) => {
+            Ok((input, Type::WithEffect {
+                base_type: Box::new(function_type),
+                effect_type: Box::new(effect_type),
+                span,
+            }))
+        },
+        None => Ok((input, function_type))
+    }
+}
+
+// 参照型をパース
+fn reference_type(input: &str) -> ParseResult<Type> {
+    let (input, is_mutable) = alt((
+        value(true, preceded(ws_comments(char('&')), ws_comments(tag("mut")))),
+        value(false, ws_comments(char('&')))
+    ))(input)?;
+    
+    let (input, referenced_type) = type_parser(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Type::Reference {
+        is_mutable,
+        referenced_type: Box::new(referenced_type),
+        span,
+    }))
+}
+
+// 所有権型をパース
+fn owned_type(input: &str) -> ParseResult<Type> {
+    let (input, _) = ws_comments(tag("own"))(input)?;
+    let (input, owned_type) = type_parser(input)?;
+    
+    let span = Span {
+        start: 0,
+        end: 0,
+        line: 0,
+        column: 0,
+    };
+    
+    Ok((input, Type::Owned {
+        owned_type: Box::new(owned_type),
+        span,
+    }))
+}
+
+// 型をパース（統合版）
+fn type_parser(input: &str) -> ParseResult<Type> {
+    alt((
+        owned_type,
+        reference_type,
+        function_type,
+        array_type,
+        tuple_type,
+        generic_type,
+        simple_type  // simple_typeを追加
+    ))(input)
 }
 
 // パラメータをパース

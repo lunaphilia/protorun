@@ -99,6 +99,39 @@ pub enum Type {
         return_type: Box<Type>,
         span: Span,
     },
+    /// 配列型
+    Array {
+        element_type: Box<Type>,
+        span: Span,
+    },
+    /// タプル型
+    Tuple {
+        element_types: Vec<Type>,
+        span: Span,
+    },
+    /// ジェネリック型
+    Generic {
+        base_type: String,
+        type_arguments: Vec<Type>,
+        span: Span,
+    },
+    /// 参照型
+    Reference {
+        is_mutable: bool,
+        referenced_type: Box<Type>,
+        span: Span,
+    },
+    /// 所有権型
+    Owned {
+        owned_type: Box<Type>,
+        span: Span,
+    },
+    /// 効果付き型
+    WithEffect {
+        base_type: Box<Type>,
+        effect_type: Box<Type>,
+        span: Span,
+    },
 }
 
 /// 二項演算子
