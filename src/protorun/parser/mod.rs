@@ -37,10 +37,17 @@ impl Parser {
 
     /// 式をパース
     pub fn parse_expression(&mut self, input: &str) -> Result<Expr> {
+        println!("parse_expression: input = '{}'", input);
         let ctx = ParserContext::new(input, self.filename.clone());
         match expressions::expression(input, &ctx).finish() {
-            Ok((_, expr)) => Ok(expr),
-            Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
+            Ok((_, expr)) => {
+                println!("parse_expression: success");
+                Ok(expr)
+            },
+            Err(error) => {
+                println!("parse_expression: error = {:?}", error);
+                Err(to_syntax_error(input, error, self.filename.clone()))
+            },
         }
     }
     

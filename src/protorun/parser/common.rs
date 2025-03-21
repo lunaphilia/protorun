@@ -11,8 +11,11 @@ use nom::{
     Finish, IResult,
 };
 
+use std::rc::Rc;
+use std::cell::RefCell;
 use crate::protorun::ast::Span;
 use crate::protorun::error::{Error, Result};
+use crate::protorun::symbol::{Symbol, SymbolTable, ScopeKind};
 
 /// パーサーの結果型
 pub type ParseResult<'a, T> = IResult<&'a str, T, VerboseError<&'a str>>;
@@ -23,15 +26,48 @@ pub struct ParserContext<'a> {
     pub original_input: &'a str,
     /// ファイル名
     pub filename: Option<String>,
+    /// 現在のシンボルテーブル
+    pub symbol_table: Rc<RefCell<SymbolTable>>,
 }
 
 impl<'a> ParserContext<'a> {
     /// 新しいパーサーコンテキストを作成
     pub fn new(input: &'a str, filename: Option<String>) -> Self {
+        let global_scope = Rc::new(RefCell::new(SymbolTable::new(ScopeKind::Global)));
         Self {
             original_input: input,
             filename,
+            symbol_table: global_scope,
         }
+    }
+    
+    /// 新しいスコープを開始
+    pub fn enter_scope(&mut self, scope_kind: ScopeKind) {
+        let current = self.symbol_table.clone();
+        let new_scope = Rc::new(RefCell::new(SymbolTable::with_parent(scope_kind, current)));
+        self.symbol_table = new_scope;
+    }
+    
+    /// 現在のスコープを終了し、親スコープに戻る
+    pub fn exit_scope(&mut self) {
+        let parent = {
+            let current = self.symbol_table.borrow();
+            current.parent()
+        };
+        
+        if let Some(parent_scope) = parent {
+            self.symbol_table = parent_scope;
+        }
+    }
+    
+    /// シンボルを追加
+    pub fn add_symbol(&self, symbol: Symbol) -> bool {
+        self.symbol_table.borrow_mut().add_symbol(symbol)
+    }
+    
+    /// シンボルを検索
+    pub fn lookup_symbol(&self, name: &str) -> Option<Symbol> {
+        self.symbol_table.borrow().lookup_symbol_recursive(name)
     }
     
     /// 入力文字列と残りの文字列からSpan情報を計算

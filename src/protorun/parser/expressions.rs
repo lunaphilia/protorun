@@ -3,8 +3,9 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::char,
+    character::complete::{char, multispace0},
     combinator::{cut, map, opt, value},
+    error::{VerboseError, ParseError},
     multi::{many0, separated_list0},
     sequence::{delimited, pair, preceded, terminated, tuple},
 };
@@ -15,62 +16,36 @@ use super::literals::{int_literal_expr, float_literal_expr, string_literal_expr,
 use super::patterns::{pattern, match_case};
 use super::types::type_parser;
 
-/// 括弧式またはラムダ式をパース
-pub fn paren_or_lambda_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
-    use nom::combinator::{peek, not};
-    use nom::sequence::tuple;
+/// 括弧式をパース
+pub fn paren_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+    // ラムダ式のパターンに一致する場合のチェックは不要
+    // lambda_exprがparen_exprよりも先に試されるため
     
-    // 先読みして、パラメータリストの後に"=>"トークンがあるかどうかを確認
     let (input, _) = char('(')(input)?;
+    let (input, _) = multispace0(input)?;
     
-    // 先読みして、"=>"トークンがあるかどうかを確認
-    let is_lambda = peek(tuple((
-        ws_comments(opt(
-            separated_list0(
-                ws_comments(char(',')),
-                |i| super::statements::parameter(i, ctx)
-            )
-        )),
-        ws_comments(char(')')),
-        ws_comments(tag("=>"))
-    )))(input).is_ok();
-    
-    if is_lambda {
-        // ラムダ式の場合
-        let (input, parameters) = ws_comments(opt(
-            separated_list0(
-                ws_comments(char(',')),
-                |i| super::statements::parameter(i, ctx)
-            )
-        ))(input)?;
-        let (input, _) = ws_comments(char(')'))(input)?;
-        let (input, _) = ws_comments(tag("=>"))(input)?;
-        let (input, body) = expression(input, ctx)?;
-        
+    // 空の括弧 -> ユニットリテラル
+    if let Ok((_, _)) = char::<&str, VerboseError<&str>>(')')(&input) {
+        let (input, _) = char(')')(input)?;
         let span = ctx.calculate_span(input);
-        
-        Ok((input, Expr::LambdaExpr {
-            parameters: parameters.unwrap_or_else(Vec::new),
-            body: Box::new(body),
-            span,
-        }))
-    } else {
-        // 括弧式の場合
-        let (input, expr) = ws_comments(|i| expression(i, ctx))(input)?;
-        let (input, _) = cut(ws_comments(char(')')))(input)?;
-        
-        let span = ctx.calculate_span(input);
-        
-        Ok((input, Expr::ParenExpr(Box::new(expr), span)))
+        return Ok((input, Expr::UnitLiteral(span)));
     }
+    
+    // 括弧内の式をパース
+    let (input, expr) = ws_comments(|i| expression(i, ctx))(input)?;
+    let (input, _) = cut(ws_comments(char(')')))(input)?;
+    
+    let span = ctx.calculate_span(input);
+    
+    Ok((input, Expr::ParenExpr(Box::new(expr), span)))
 }
 
 /// 基本式をパース
 pub fn primary<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
-    ws_comments(
+    let result = ws_comments(
         alt((
-            // 括弧式またはラムダ式
-            |i| paren_or_lambda_expr(i, ctx),
+            // 括弧式
+            |i| paren_expr(i, ctx),
             // 整数リテラル
             |i| int_literal_expr(i, ctx),
             // 浮動小数点リテラル
@@ -92,7 +67,9 @@ pub fn primary<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, E
             // ブロック式
             |i| block_expr(i, ctx)
         ))
-    )(input)
+    )(input);
+    
+    result
 }
 
 /// ブロック式をパース
@@ -205,7 +182,7 @@ pub fn factor<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Ex
         )
     )(input)?;
     
-    Ok((input, rest.into_iter().fold(first, |acc, (op, right)| {
+    let result = rest.into_iter().fold(first, |acc, (op, right)| {
         let span = ctx.calculate_span(input);
         Expr::BinaryOp {
             left: Box::new(acc),
@@ -213,7 +190,9 @@ pub fn factor<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Ex
             right: Box::new(right),
             span,
         }
-    })))
+    });
+    
+    Ok((input, result))
 }
 
 /// 項をパース（加減算）
@@ -230,7 +209,7 @@ pub fn term<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr
         )
     )(input)?;
     
-    Ok((input, rest.into_iter().fold(first, |acc, (op, right)| {
+    let result = rest.into_iter().fold(first, |acc, (op, right)| {
         let span = ctx.calculate_span(input);
         Expr::BinaryOp {
             left: Box::new(acc),
@@ -238,7 +217,9 @@ pub fn term<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr
             right: Box::new(right),
             span,
         }
-    })))
+    });
+    
+    Ok((input, result))
 }
 
 /// 比較演算をパース
@@ -328,7 +309,7 @@ pub fn logical_or<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a
         )
     )(input)?;
     
-    Ok((input, rest.into_iter().fold(first, |acc, (_, right)| {
+    let result = rest.into_iter().fold(first, |acc, (_, right)| {
         let span = ctx.calculate_span(input);
         Expr::BinaryOp {
             left: Box::new(acc),
@@ -336,7 +317,9 @@ pub fn logical_or<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a
             right: Box::new(right),
             span,
         }
-    })))
+    });
+    
+    Ok((input, result))
 }
 
 /// if式をパース
@@ -625,56 +608,120 @@ pub fn collection_literal<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseR
 
 /// ラムダ式をパース
 pub fn lambda_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
-    use nom::combinator::{peek, recognize, opt};
+    // 入力が既に'('で始まっているかどうかを確認
+    if input.starts_with('(') {
+        // 先読みでラムダ式かどうかを確認
+        let (params_input, _) = char('(')(input)?;
+        let params_result = separated_list0(
+            ws_comments(char(',')),
+            |i| super::statements::parameter(i, ctx)
+        )(params_input);
+        
+        if let Ok((params_rest, _)) = params_result {
+            let close_paren_result = ws_comments(char(')'))(params_rest);
+            if let Ok((after_paren, _)) = close_paren_result {
+                let arrow_result = ws_comments(tag("=>"))(after_paren);
+                if arrow_result.is_ok() {
+                    // ラムダ式と確認できたので、パースを続行
+                    
+                    // 通常のパラメータリストのパース
+                    let (input, parameters) = delimited_list(
+                        '(',
+                        |i| super::statements::parameter(i, ctx),
+                        ',',
+                        ')'
+                    )(input)?;
+                    
+                    // "=>"トークンをパース
+                    let (input, _) = ws_comments(tag("=>"))(input)?;
+                    
+                    // 本体の式をパース
+                    let (input, body) = expression(input, ctx)?;
+                    
+                    let span = ctx.calculate_span(input);
+                    
+                    return Ok((input, Expr::LambdaExpr {
+                        parameters,
+                        body: Box::new(body),
+                        span,
+                    }));
+                }
+            }
+        }
+        
+        // ラムダ式ではないと判断
+        return Err(nom::Err::Error(VerboseError { errors: vec![(input, nom::error::VerboseErrorKind::Nom(nom::error::ErrorKind::Tag))] }));
+    } else {
+        // 既に'('が消費されている場合は、パラメータリストを直接パース
+        // パラメータリストをパース（'('は既に消費されている）
+        let (input, params) = separated_list0(
+            ws_comments(char(',')),
+            |i| super::statements::parameter(i, ctx)
+        )(input)?;
+        let (input, _) = ws_comments(char(')'))(input)?;
+        
+        // "=>"トークンをパース
+        let (input, _) = ws_comments(tag("=>"))(input)?;
+        
+        // 本体の式をパース
+        let (input, body) = expression(input, ctx)?;
+        
+        let span = ctx.calculate_span(input);
+        
+        Ok((input, Expr::LambdaExpr {
+            parameters: params,
+            body: Box::new(body),
+            span,
+        }))
+    }
+}
+
+/// ラムダ式のパターンに一致するかを確認する
+pub fn is_lambda_pattern<'a>(input: &'a str, ctx: &ParserContext<'a>) -> bool {
+    use nom::combinator::peek;
     use nom::sequence::tuple;
-    use nom::multi::separated_list0;
+    use nom::bytes::complete::take_until;
     
-    // 先読みして、パラメータリストの後に"=>"トークンがあるかどうかを確認
-    // パラメータリストには識別子と型注釈のみが含まれるようにする
-    let (input, _) = peek(recognize(tuple((
-        char('('),
-        ws_comments(opt(
-            separated_list0(
-                ws_comments(char(',')),
-                |i| super::statements::parameter(i, ctx)
-            )
-        )),
-        ws_comments(char(')')),
-        ws_comments(tag("=>"))
-    ))))(input)?;
+    if !input.starts_with('(') {
+        return false;
+    }
     
-    // パラメータリストをパース
-    let (input, parameters) = delimited_list(
-        '(',
-        |i| super::statements::parameter(i, ctx),
-        ',',
-        ')'
-    )(input)?;
+    // 括弧内の内容を取得
+    if let Ok((_, content)) = take_until::<&str, &str, VerboseError<&str>>(")")(input.trim_start_matches('(')) {
+        // 括弧内に演算子が含まれている場合は、ラムダ式ではない
+        if content.contains('+') || content.contains('-') || content.contains('*') || content.contains('/') {
+            return false;
+        }
+        
+        // 括弧の後に=>が続くかを確認
+        if let Ok((rest, _)) = char::<&str, VerboseError<&str>>(')')(input.trim_start_matches('(').trim_start_matches(content)) {
+            let rest = rest.trim_start();
+            return rest.starts_with("=>");
+        }
+    }
     
-    // "=>"トークンをパース
-    let (input, _) = ws_comments(tag("=>"))(input)?;
-    
-    // 本体の式をパース
-    let (input, body) = expression(input, ctx)?;
-    
-    let span = ctx.calculate_span(input);
-    
-    Ok((input, Expr::LambdaExpr {
-        parameters,
-        body: Box::new(body),
-        span,
-    }))
+    false
 }
 
 /// 式をパース
 pub fn expression<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
-    alt((
+    // 宣言的なアプローチでパーサーを組み合わせる
+    let result = alt((
+        |i| lambda_expr(i, ctx),
         |i| if_expr(i, ctx),
         |i| match_expr(i, ctx),
-        |i| collection_comprehension(i, ctx),
-        |i| collection_literal(i, ctx),
+        |i| list_comprehension(i, ctx),
+        |i| list_literal(i, ctx),
+        |i| map_comprehension(i, ctx),
+        |i| map_literal(i, ctx),
+        |i| set_comprehension(i, ctx),
+        |i| set_literal(i, ctx),
         |i| bind_expr(i, ctx),
         |i| with_expr(i, ctx),
-        |i| logical_or(i, ctx)      // 括弧式を含むprimary関数を呼び出す
-    ))(input)
+        |i| block_expr(i, ctx),
+        |i| logical_or(i, ctx),
+        |i| paren_expr(i, ctx)
+    ))(input);
+    
+    result
 }
