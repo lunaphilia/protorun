@@ -90,6 +90,10 @@ fn test_type_symbol_registration() {
         type_info: Some(TypeInfo {
             kind: TypeKind::Struct,
             type_parameters: vec!["T".to_string()],
+            fields: None,
+            variants: None,
+            super_trait: None,
+            aliased_type: None,
         }),
         is_used: false,
     };
@@ -160,6 +164,10 @@ fn test_find_symbols_by_kind() {
         type_info: Some(TypeInfo {
             kind: TypeKind::Struct,
             type_parameters: Vec::new(),
+            fields: None,
+            variants: None,
+            super_trait: None,
+            aliased_type: None,
         }),
         is_used: false,
     };

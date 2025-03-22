@@ -230,17 +230,34 @@ pub fn program<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseResult<'
     use nom::multi::many0;
     
     let (input, _) = multispace0(input)?;
+    
+    // 関数宣言をパース
     let (input, declarations) = many0(|i| function_declaration(i, ctx))(input)?;
+    
+    // 型宣言をパース
+    let (input, type_declarations) = many0(|i| super::declarations::parse_type_declaration(i, ctx))(input)?;
+    
+    // トレイト宣言をパース
+    let (input, trait_declarations) = many0(|i| super::declarations::parse_trait_declaration(i, ctx))(input)?;
+    
+    // 実装宣言をパース
+    let (input, impl_declarations) = many0(|i| super::declarations::parse_impl_declaration(i, ctx))(input)?;
+    
+    // 文をパース
     let (input, statements) = many0(
         terminated(
             |i| statement(i, ctx),
             ws_comments(char(';'))
         )
     )(input)?;
+    
     let (input, _) = multispace0(input)?;
     
     Ok((input, crate::protorun::ast::Program {
         declarations,
+        type_declarations,
+        trait_declarations,
+        impl_declarations,
         statements,
     }))
 }

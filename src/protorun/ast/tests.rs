@@ -396,6 +396,9 @@ fn test_program() {
     
     let program = Program {
         declarations: vec![decl],
+        type_declarations: Vec::new(),
+        trait_declarations: Vec::new(),
+        impl_declarations: Vec::new(),
         statements: vec![stmt],
     };
     

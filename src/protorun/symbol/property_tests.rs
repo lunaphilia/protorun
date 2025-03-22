@@ -204,6 +204,10 @@ mod property_tests {
                 type_info: Some(TypeInfo {
                     kind: TypeKind::Struct,
                     type_parameters: type_params.clone(),
+                    fields: None,
+                    variants: None,
+                    super_trait: None,
+                    aliased_type: None,
                 }),
                 is_used: false,
             };

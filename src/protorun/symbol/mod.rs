@@ -32,6 +32,14 @@ pub struct TypeInfo {
     pub kind: TypeKind,
     /// 型パラメータ（ジェネリック型の場合）
     pub type_parameters: Vec<String>,
+    /// フィールド（レコード型の場合）
+    pub fields: Option<Vec<(String, crate::protorun::ast::Type)>>,
+    /// バリアント（enum型の場合）
+    pub variants: Option<Vec<crate::protorun::ast::EnumVariant>>,
+    /// 親トレイト（トレイトの場合）
+    pub super_trait: Option<crate::protorun::ast::Type>,
+    /// エイリアス先の型（型エイリアスの場合）
+    pub aliased_type: Option<crate::protorun::ast::Type>,
 }
 
 /// スコープの種類
@@ -182,6 +190,10 @@ pub fn register_type_symbol(
         type_info: Some(TypeInfo {
             kind,
             type_parameters,
+            fields: None,
+            variants: None,
+            super_trait: None,
+            aliased_type: None,
         }),
         is_used: false,
     };

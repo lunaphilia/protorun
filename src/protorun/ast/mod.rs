@@ -284,10 +284,67 @@ pub enum UnaryOperator {
     Not,    // !
 }
 
+/// enum型のバリアント
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumVariant {
+    pub name: String,
+    pub fields: Vec<Type>,
+    pub span: Span,
+}
+
+/// 型宣言のAST
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeDecl {
+    /// レコード型宣言
+    Record {
+        name: String,
+        type_parameters: Vec<String>,
+        fields: Vec<(String, Type)>,
+        span: Span,
+    },
+    /// 代数的データ型（enum）宣言
+    Enum {
+        name: String,
+        type_parameters: Vec<String>,
+        variants: Vec<EnumVariant>,
+        span: Span,
+    },
+    /// 型エイリアス
+    Alias {
+        name: String,
+        type_parameters: Vec<String>,
+        aliased_type: Type,
+        span: Span,
+    },
+}
+
+/// トレイト宣言のAST
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitDecl {
+    pub name: String,
+    pub type_parameters: Vec<String>,
+    pub super_trait: Option<Type>,
+    pub methods: Vec<Decl>,
+    pub span: Span,
+}
+
+/// トレイト実装のAST
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImplDecl {
+    pub type_parameters: Vec<String>,
+    pub target_type: Type,
+    pub trait_type: Type,
+    pub methods: Vec<Decl>,
+    pub span: Span,
+}
+
 /// プログラム全体
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
     pub declarations: Vec<Decl>,
+    pub type_declarations: Vec<TypeDecl>,
+    pub trait_declarations: Vec<TraitDecl>,
+    pub impl_declarations: Vec<ImplDecl>,
     pub statements: Vec<Stmt>,
 }
 

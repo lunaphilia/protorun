@@ -7,6 +7,17 @@ pub mod patterns;
 pub mod types;
 pub mod statements;
 pub mod expressions;
+pub mod declarations;
+
+// 型宣言パーサーをエクスポート
+pub use declarations::{
+    parse_type_declaration,
+    parse_record_type_declaration,
+    parse_enum_declaration,
+    parse_type_alias,
+    parse_trait_declaration,
+    parse_impl_declaration,
+};
 
 use nom::Finish;
 
