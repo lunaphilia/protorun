@@ -15,7 +15,7 @@ use crate::protorun::symbol::ScopeKind;
 use super::common::{ParseResult, ParserContext, ws_comments, identifier_string, with_context, delimited_list};
 use super::literals::{int_literal_expr, float_literal_expr, string_literal_expr, bool_literal_expr, unit_literal_expr};
 use super::patterns::{pattern, match_case};
-use super::types::type_parser;
+use super::types::parse_type;
 
 /// 括弧式をパース
 pub fn paren_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
@@ -527,7 +527,7 @@ pub fn with_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a,
     // ハンドラ指定（式または型）
     let (input, handler) = alt((
         // 型としてのハンドラ
-        map(|i| type_parser(i, ctx), HandlerSpec::Type),
+        map(|i| parse_type(i, ctx), HandlerSpec::Type),
         // 式としてのハンドラ
         map(|i| logical_or(i, ctx), |expr| HandlerSpec::Expr(Box::new(expr)))
     ))(input)?;
@@ -536,7 +536,7 @@ pub fn with_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a,
     let (input, effect_type) = opt(
         preceded(
             ws_comments(char(':')),
-            |i| type_parser(i, ctx)
+            |i| parse_type(i, ctx)
         )
     )(input)?;
     
@@ -689,33 +689,6 @@ pub fn lambda_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'
             span,
         }))
     }
-}
-
-/// ラムダ式のパターンに一致するかを確認する
-pub fn is_lambda_pattern<'a>(input: &'a str, ctx: &ParserContext<'a>) -> bool {
-    use nom::combinator::peek;
-    use nom::sequence::tuple;
-    use nom::bytes::complete::take_until;
-    
-    if !input.starts_with('(') {
-        return false;
-    }
-    
-    // 括弧内の内容を取得
-    if let Ok((_, content)) = take_until::<&str, &str, VerboseError<&str>>(")")(input.trim_start_matches('(')) {
-        // 括弧内に演算子が含まれている場合は、ラムダ式ではない
-        if content.contains('+') || content.contains('-') || content.contains('*') || content.contains('/') {
-            return false;
-        }
-        
-        // 括弧の後に=>が続くかを確認
-        if let Ok((rest, _)) = char::<&str, VerboseError<&str>>(')')(input.trim_start_matches('(').trim_start_matches(content)) {
-            let rest = rest.trim_start();
-            return rest.starts_with("=>");
-        }
-    }
-    
-    false
 }
 
 /// 式をパース

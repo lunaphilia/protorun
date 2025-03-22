@@ -11,7 +11,7 @@ use nom::{
 use crate::protorun::ast::{Stmt, Span, Parameter, Decl};
 use crate::protorun::symbol::{Symbol, SymbolKind, ScopeKind};
 use super::common::{ParseResult, ParserContext, ws_comments, identifier_string, with_context};
-use super::types::type_parser;
+use super::types::parse_type;
 use super::expressions::expression;
 
 /// パラメータをパース
@@ -20,7 +20,7 @@ pub fn parameter<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a,
     let (input, type_annotation) = opt(
         preceded(
             ws_comments(char(':')),
-            |i| type_parser(i, ctx)
+            |i| parse_type(i, ctx)
         )
     )(input)?;
     
@@ -40,7 +40,7 @@ pub fn let_statement<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult
     let (input, type_annotation) = opt(
         preceded(
             ws_comments(char(':')),
-            |i| type_parser(i, ctx)
+            |i| parse_type(i, ctx)
         )
     )(input)?;
     let (input, _) = ws_comments(char('='))(input)?;
@@ -134,7 +134,7 @@ pub fn function_declaration<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> 
     let (input, return_type) = opt(
         preceded(
             ws_comments(char(':')),
-            |i| type_parser(i, ctx)
+            |i| parse_type(i, ctx)
         )
     )(input)?;
     let (input, _) = ws_comments(char('='))(input)?;

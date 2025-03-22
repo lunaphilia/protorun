@@ -37,24 +37,17 @@ impl Parser {
 
     /// 式をパース
     pub fn parse_expression(&mut self, input: &str) -> Result<Expr> {
-        println!("parse_expression: input = '{}'", input);
         let mut ctx = ParserContext::new(input, self.filename.clone());
         match expressions::expression(input, &mut ctx).finish() {
-            Ok((_, expr)) => {
-                println!("parse_expression: success");
-                Ok(expr)
-            },
-            Err(error) => {
-                println!("parse_expression: error = {:?}", error);
-                Err(to_syntax_error(input, error, self.filename.clone()))
-            },
+            Ok((_, expr)) => Ok(expr),
+            Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }
     }
     
     /// 型をパース
     pub fn parse_type(&mut self, input: &str) -> Result<Type> {
         let mut ctx = ParserContext::new(input, self.filename.clone());
-        match types::type_parser(input, &mut ctx).finish() {
+        match types::parse_type(input, &mut ctx).finish() {
             Ok((_, ty)) => Ok(ty),
             Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }

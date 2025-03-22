@@ -82,6 +82,14 @@
 - 実装の複雑さと実行効率のトレードオフ
 
 ## 最近の成果
+- パーサーコードのリファクタリング：
+  - `src/protorun/parser/mod.rs`の`parse_expression`メソッドからデバッグ用の`println!`文を削除
+  - `src/protorun/parser/expressions.rs`から未使用の`is_lambda_pattern`関数を削除
+  - `src/protorun/parser/literals.rs`の`tuple`関数のインポートを修正
+  - `src/protorun/parser/types.rs`の`type_parser`関数を`parse_type`に名前変更し、より一貫性のある命名規則に変更
+  - 関連するすべての参照も更新
+  - テストを実行し、すべてのテストが正常に通過することを確認
+
 - シンボルテーブルを使ったパーサーの構造整理：
   - ParserContextのenter_scopeとexit_scopeメソッドを内部可変性を使って実装し、不変参照で呼び出せるように修正
   - パーサー関数を不変参照(&ParserContext)を受け取るように修正

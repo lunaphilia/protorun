@@ -29,7 +29,7 @@ pub fn generic_args<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<
         ws_comments(char('<')),
         separated_list0(
             ws_comments(char(',')),
-            |i| type_parser(i, ctx)
+            |i| parse_type(i, ctx)
         ),
         cut(ws_comments(char('>')))
     )(input)
@@ -60,7 +60,7 @@ pub fn generic_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<
 /// 配列型をパース
 pub fn array_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Type> {
     let (input, _) = ws_comments(char('['))(input)?;
-    let (input, element_type) = type_parser(input, ctx)?;
+    let (input, element_type) = parse_type(input, ctx)?;
     let (input, _) = cut(ws_comments(char(']')))(input)?;
     
     let span = ctx.calculate_span(input);
@@ -74,7 +74,7 @@ pub fn array_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a
 /// タプル型をパース
 pub fn tuple_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Type> {
     let (input, _) = ws_comments(char('('))(input)?;
-    let (input, first_type) = type_parser(input, ctx)?;
+    let (input, first_type) = parse_type(input, ctx)?;
     
     // カンマがある場合はタプル型、ない場合は括弧で囲まれた型
     let (input, rest) = opt(
@@ -82,7 +82,7 @@ pub fn tuple_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a
             ws_comments(char(',')),
             separated_list0(
                 ws_comments(char(',')),
-                |i| type_parser(i, ctx)
+                |i| parse_type(i, ctx)
             )
         )
     )(input)?;
@@ -113,7 +113,7 @@ pub fn tuple_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a
 pub fn effect_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Type> {
     preceded(
         ws_comments(tag("&")),
-        |i| type_parser(i, ctx)
+        |i| parse_type(i, ctx)
     )(input)
 }
 
@@ -122,14 +122,14 @@ pub fn function_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult
     let (input, _) = ws_comments(char('('))(input)?;
     
     // カンマで区切られた型のリストをパース
-    let (input, first_type_opt) = opt(|i| type_parser(i, ctx))(input)?;
+    let (input, first_type_opt) = opt(|i| parse_type(i, ctx))(input)?;
     
     let (input, params) = match first_type_opt {
         Some(first_type) => {
             let (input, rest_types) = many0(
                 preceded(
                     ws_comments(char(',')),
-                    |i| type_parser(i, ctx)
+                    |i| parse_type(i, ctx)
                 )
             )(input)?;
             
@@ -143,7 +143,7 @@ pub fn function_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult
     let (input, _) = cut(ws_comments(char(')')))(input)?;
     
     let (input, _) = ws_comments(tag("->"))(input)?;
-    let (input, return_type) = type_parser(input, ctx)?;
+    let (input, return_type) = parse_type(input, ctx)?;
     
     // オプションの効果型
     let (input, effect) = opt(|i| effect_type(i, ctx))(input)?;
@@ -175,7 +175,7 @@ pub fn reference_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResul
         map(ws_comments(char('&')), |_| false)
     ))(input)?;
     
-    let (input, referenced_type) = type_parser(input, ctx)?;
+    let (input, referenced_type) = parse_type(input, ctx)?;
     
     let span = ctx.calculate_span(input);
     
@@ -189,7 +189,7 @@ pub fn reference_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResul
 /// 所有権型をパース
 pub fn owned_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Type> {
     let (input, _) = ws_comments(tag("own"))(input)?;
-    let (input, owned_type) = type_parser(input, ctx)?;
+    let (input, owned_type) = parse_type(input, ctx)?;
     
     let span = ctx.calculate_span(input);
     
@@ -200,7 +200,7 @@ pub fn owned_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a
 }
 
 /// 型をパース（統合版）
-pub fn type_parser<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Type> {
+pub fn parse_type<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Type> {
     alt((
         |i| owned_type(i, ctx),
         |i| reference_type(i, ctx),

@@ -6,7 +6,7 @@ use nom::{
     character::complete::{char, digit1, none_of},
     combinator::{map, map_res, opt, value},
     multi::many0,
-    sequence::{delimited, pair, preceded},
+    sequence::{delimited, pair, preceded, tuple},
     IResult,
 };
 
@@ -125,5 +125,3 @@ pub fn literal_pattern_value<'a>(input: &'a str, ctx: &ParserContext<'a>) -> Par
         map(ws_comments(tag("()")), |_| LiteralValue::Unit)
     ))(input)
 }
-
-use nom::sequence::tuple;
