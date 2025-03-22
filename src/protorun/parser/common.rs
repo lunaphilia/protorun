@@ -42,21 +42,31 @@ impl<'a> ParserContext<'a> {
     }
     
     /// 新しいスコープを開始
-    pub fn enter_scope(&mut self, scope_kind: ScopeKind) {
+    pub fn enter_scope(&self, scope_kind: ScopeKind) {
         let current = self.symbol_table.clone();
         let new_scope = Rc::new(RefCell::new(SymbolTable::with_parent(scope_kind, current)));
-        self.symbol_table = new_scope;
+        // 内部可変性を使用して symbol_table を更新
+        // 安全性: symbol_tableはRc<RefCell<>>で包まれているため、内部可変性を持つ
+        // このメソッドの呼び出し中に他のスレッドがsymbol_tableにアクセスすることはない
+        let self_ptr = self as *const Self as *mut Self;
+        unsafe {
+            (*self_ptr).symbol_table = new_scope;
+        }
     }
     
     /// 現在のスコープを終了し、親スコープに戻る
-    pub fn exit_scope(&mut self) {
+    pub fn exit_scope(&self) {
         let parent = {
             let current = self.symbol_table.borrow();
             current.parent()
         };
         
         if let Some(parent_scope) = parent {
-            self.symbol_table = parent_scope;
+            // 内部可変性を使用して symbol_table を更新
+            let self_ptr = self as *const Self as *mut Self;
+            unsafe {
+                (*self_ptr).symbol_table = parent_scope;
+            }
         }
     }
     

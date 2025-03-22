@@ -11,6 +11,7 @@ use nom::{
 };
 
 use crate::protorun::ast::{Expr, Span, BinaryOperator, UnaryOperator, HandlerSpec, ComprehensionKind};
+use crate::protorun::symbol::ScopeKind;
 use super::common::{ParseResult, ParserContext, ws_comments, identifier_string, with_context, delimited_list};
 use super::literals::{int_literal_expr, float_literal_expr, string_literal_expr, bool_literal_expr, unit_literal_expr};
 use super::patterns::{pattern, match_case};
@@ -82,6 +83,10 @@ pub fn primary<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, E
 /// ブロック式をパース
 pub fn block_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
     let (input, _) = ws_comments(char('{'))(input)?;
+    
+    // ブロックスコープを開始
+    ctx.enter_scope(ScopeKind::Block);
+    
     let (input, (statements, expr)) = block_contents(input, ctx)?;
     let (input, _) = cut(ws_comments(char('}')))(input)?;
     
@@ -92,6 +97,9 @@ pub fn block_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a
         Some(e) => e,
         None => Expr::UnitLiteral(span),
     };
+    
+    // ブロックスコープを終了
+    ctx.exit_scope();
     
     Ok((input, result))
 }

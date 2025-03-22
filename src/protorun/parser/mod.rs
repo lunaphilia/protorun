@@ -28,8 +28,8 @@ impl Parser {
 
     /// プログラム全体をパース
     pub fn parse_program(&mut self, input: &str) -> Result<Program> {
-        let ctx = ParserContext::new(input, self.filename.clone());
-        match statements::program(input, &ctx).finish() {
+        let mut ctx = ParserContext::new(input, self.filename.clone());
+        match statements::program(input, &mut ctx).finish() {
             Ok((_, program)) => Ok(program),
             Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }
@@ -38,8 +38,8 @@ impl Parser {
     /// 式をパース
     pub fn parse_expression(&mut self, input: &str) -> Result<Expr> {
         println!("parse_expression: input = '{}'", input);
-        let ctx = ParserContext::new(input, self.filename.clone());
-        match expressions::expression(input, &ctx).finish() {
+        let mut ctx = ParserContext::new(input, self.filename.clone());
+        match expressions::expression(input, &mut ctx).finish() {
             Ok((_, expr)) => {
                 println!("parse_expression: success");
                 Ok(expr)
@@ -53,8 +53,8 @@ impl Parser {
     
     /// 型をパース
     pub fn parse_type(&mut self, input: &str) -> Result<Type> {
-        let ctx = ParserContext::new(input, self.filename.clone());
-        match types::type_parser(input, &ctx).finish() {
+        let mut ctx = ParserContext::new(input, self.filename.clone());
+        match types::type_parser(input, &mut ctx).finish() {
             Ok((_, ty)) => Ok(ty),
             Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }
@@ -63,3 +63,4 @@ impl Parser {
 
 #[cfg(test)]
 mod tests;
+mod tests_scope;

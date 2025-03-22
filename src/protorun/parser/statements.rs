@@ -9,6 +9,7 @@ use nom::{
 };
 
 use crate::protorun::ast::{Stmt, Span, Parameter, Decl};
+use crate::protorun::symbol::{Symbol, SymbolKind, ScopeKind};
 use super::common::{ParseResult, ParserContext, ws_comments, identifier_string, with_context};
 use super::types::type_parser;
 use super::expressions::expression;
@@ -52,6 +53,20 @@ pub fn let_statement<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult
     
     let span = ctx.calculate_span(input);
     
+    // シンボルテーブルに変数を登録
+    let symbol = Symbol {
+        name: name.clone(),
+        kind: SymbolKind::Variable,
+        type_annotation: type_annotation.clone(),
+        declaration_span: span.clone(),
+        is_mutable: false, // 将来的にはmut修飾子をサポート
+        type_info: None,
+        is_used: false,
+    };
+    
+    // シンボル登録（エラーは無視して構文解析を続行）
+    let _ = ctx.add_symbol(symbol);
+    
     Ok((input, Stmt::Let {
         name,
         type_annotation,
@@ -75,15 +90,47 @@ pub fn statement<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a,
 }
 
 /// 関数宣言をパース
-pub fn function_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Decl> {
+pub fn function_declaration<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseResult<'a, Decl> {
     let (input, _) = ws_comments(tag("fn"))(input)?;
     let (input, name) = ws_comments(identifier_string)(input)?;
+    
+    // 関数名をシンボルテーブルに登録
+    let func_span = ctx.calculate_span(input);
+    let func_symbol = Symbol {
+        name: name.clone(),
+        kind: SymbolKind::Function,
+        type_annotation: None, // 関数の型は後で構築
+        declaration_span: func_span.clone(),
+        is_mutable: false,
+        type_info: None,
+        is_used: false,
+    };
+    let _ = ctx.add_symbol(func_symbol);
+    
+    // 関数スコープを開始
+    ctx.enter_scope(ScopeKind::Function);
+    
     let (input, parameters) = super::common::delimited_list(
         '(',
         |i| parameter(i, ctx),
         ',',
         ')'
     )(input)?;
+    
+    // パラメータをシンボルテーブルに登録
+    for param in &parameters {
+        let param_symbol = Symbol {
+            name: param.name.clone(),
+            kind: SymbolKind::Parameter,
+            type_annotation: param.type_annotation.clone(),
+            declaration_span: param.span.clone(),
+            is_mutable: false,
+            type_info: None,
+            is_used: false,
+        };
+        let _ = ctx.add_symbol(param_symbol);
+    }
+    
     let (input, return_type) = opt(
         preceded(
             ws_comments(char(':')),
@@ -96,6 +143,9 @@ pub fn function_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> Pars
     
     let span = ctx.calculate_span(input);
     
+    // 関数スコープを終了
+    ctx.exit_scope();
+    
     Ok((input, Decl::Function {
         name,
         parameters,
@@ -106,7 +156,7 @@ pub fn function_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> Pars
 }
 
 /// プログラム全体をパース
-pub fn program<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, crate::protorun::ast::Program> {
+pub fn program<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseResult<'a, crate::protorun::ast::Program> {
     use nom::character::complete::multispace0;
     use nom::multi::many0;
     
