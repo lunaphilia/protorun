@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::protorun::ast::{Span, Type};
 use crate::protorun::error::{Error, Result};
+use crate::protorun::parser::common::ParserContext;
 
 /// シンボルの種類
 #[derive(Debug, Clone, PartialEq)]
@@ -13,6 +14,24 @@ pub enum SymbolKind {
     Function,
     Type,
     Parameter,
+}
+
+/// 型の種類
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeKind {
+    Struct,
+    Enum,
+    Trait,
+    TypeAlias,
+}
+
+/// 型定義の詳細情報
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeInfo {
+    /// 型の種類（enum, struct, trait など）
+    pub kind: TypeKind,
+    /// 型パラメータ（ジェネリック型の場合）
+    pub type_parameters: Vec<String>,
 }
 
 /// スコープの種類
@@ -38,6 +57,10 @@ pub struct Symbol {
     pub declaration_span: Span,
     /// 可変かどうか
     pub is_mutable: bool,
+    /// 型定義の詳細情報（型シンボルの場合）
+    pub type_info: Option<TypeInfo>,
+    /// 使用されているかどうか
+    pub is_used: bool,
 }
 
 /// シンボルテーブル
@@ -106,7 +129,68 @@ impl SymbolTable {
     pub fn parent(&self) -> Option<Rc<RefCell<SymbolTable>>> {
         self.parent.clone()
     }
+    
+    /// シンボルの使用をマークするメソッド
+    pub fn mark_symbol_used(&mut self, name: &str) -> bool {
+        if let Some(symbol) = self.symbols.get_mut(name) {
+            symbol.is_used = true;
+            return true;
+        }
+        
+        // 親スコープで再帰的に検索
+        if let Some(parent) = &self.parent {
+            return parent.borrow_mut().mark_symbol_used(name);
+        }
+        
+        false
+    }
+    
+    /// 未使用シンボルを検出するメソッド
+    pub fn find_unused_symbols(&self) -> Vec<&Symbol> {
+        self.symbols.values()
+            .filter(|symbol| !symbol.is_used)
+            .collect()
+    }
+    
+    /// 特定の種類のシンボルを検索するメソッド
+    pub fn find_symbols_by_kind(&self, kind: SymbolKind) -> Vec<&Symbol> {
+        self.symbols.values()
+            .filter(|symbol| symbol.kind == kind)
+            .collect()
+    }
+    
+    /// スコープ内のすべてのシンボルを取得するメソッド
+    pub fn get_all_symbols(&self) -> Vec<&Symbol> {
+        self.symbols.values().collect()
+    }
+}
+
+/// 型定義のシンボル登録ヘルパー関数
+pub fn register_type_symbol(
+    ctx: &ParserContext,
+    name: &str,
+    kind: TypeKind,
+    type_parameters: Vec<String>,
+    span: Span
+) -> bool {
+    let symbol = Symbol {
+        name: name.to_string(),
+        kind: SymbolKind::Type,
+        type_annotation: None,
+        declaration_span: span,
+        is_mutable: false,
+        type_info: Some(TypeInfo {
+            kind,
+            type_parameters,
+        }),
+        is_used: false,
+    };
+    
+    ctx.add_symbol(symbol)
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod property_tests;

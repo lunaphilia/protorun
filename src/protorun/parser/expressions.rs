@@ -61,6 +61,13 @@ pub fn primary<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, E
                 identifier_string,
                 move |name| {
                     let span = ctx.calculate_span(input);
+                    
+                    // シンボルテーブルで名前解決（エラーは報告するが、パースは続行）
+                    if let Some(_) = ctx.lookup_symbol(&name) {
+                        // シンボルの使用をマーク
+                        let _ = ctx.mark_symbol_used(&name);
+                    }
+                    
                     Expr::Identifier(name, span)
                 }
             ),

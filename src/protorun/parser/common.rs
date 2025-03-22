@@ -15,7 +15,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::protorun::ast::Span;
 use crate::protorun::error::{Error, Result};
-use crate::protorun::symbol::{Symbol, SymbolTable, ScopeKind};
+use crate::protorun::symbol::{Symbol, SymbolTable, ScopeKind, SymbolKind};
 
 /// パーサーの結果型
 pub type ParseResult<'a, T> = IResult<&'a str, T, VerboseError<&'a str>>;
@@ -68,6 +68,49 @@ impl<'a> ParserContext<'a> {
     /// シンボルを検索
     pub fn lookup_symbol(&self, name: &str) -> Option<Symbol> {
         self.symbol_table.borrow().lookup_symbol_recursive(name)
+    }
+    
+    /// シンボルの使用をマークするメソッド
+    pub fn mark_symbol_used(&self, name: &str) -> bool {
+        self.symbol_table.borrow_mut().mark_symbol_used(name)
+    }
+    
+    /// 未使用シンボルを検出するメソッド
+    pub fn find_unused_symbols(&self) -> Vec<Symbol> {
+        self.symbol_table.borrow().find_unused_symbols()
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+    
+    /// 特定の種類のシンボルを検索するメソッド
+    pub fn find_symbols_by_kind(&self, kind: SymbolKind) -> Vec<Symbol> {
+        self.symbol_table.borrow().find_symbols_by_kind(kind)
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+    
+    /// 現在のスコープの種類を取得するメソッド
+    pub fn current_scope_kind(&self) -> ScopeKind {
+        self.symbol_table.borrow().scope_kind()
+    }
+    
+    /// スコープのネスト深度を取得するメソッド
+    pub fn scope_depth(&self) -> usize {
+        let mut depth = 0;
+        let mut current_opt = Some(self.symbol_table.clone());
+        
+        while let Some(current) = current_opt {
+            if let Some(parent) = current.borrow().parent() {
+                depth += 1;
+                current_opt = Some(parent);
+            } else {
+                break;
+            }
+        }
+        
+        depth
     }
     
     /// 入力文字列と残りの文字列からSpan情報を計算
