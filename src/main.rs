@@ -134,6 +134,22 @@ fn stmt_to_string(stmt: &Stmt) -> String {
             
             format!("let {}{} = {}", name, type_str, expr_to_string(value))
         }
+        Stmt::Var { name, type_annotation, value, .. } => {
+            let type_str = if let Some(t) = type_annotation {
+                format!(": {}", type_to_string(t))
+            } else {
+                String::new()
+            };
+            
+            format!("var {}{} = {}", name, type_str, expr_to_string(value))
+        }
+        Stmt::Return { value, .. } => {
+            if let Some(expr) = value {
+                format!("return {}", expr_to_string(expr))
+            } else {
+                "return".to_string()
+            }
+        }
         Stmt::Expr { expr, .. } => {
             expr_to_string(expr)
         }
@@ -220,6 +236,9 @@ fn expr_to_string(expr: &Expr) -> String {
             
             format!("{}({})", expr_to_string(function), args.join(", "))
         }
+        Expr::MemberAccess { object, member, .. } => {
+            format!("{}.{}", expr_to_string(object), member)
+        },
         Expr::ParenExpr(expr, _) => {
             format!("({})", expr_to_string(expr))
         },

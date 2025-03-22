@@ -110,6 +110,12 @@ pub enum Expr {
         arguments: Vec<Expr>,
         span: Span,
     },
+    /// メンバーアクセス
+    MemberAccess {
+        object: Box<Expr>,
+        member: String,
+        span: Span,
+    },
     /// カッコで囲まれた式
     ParenExpr(Box<Expr>, Span),
     /// if式
@@ -157,6 +163,18 @@ pub enum Stmt {
         name: String,
         type_annotation: Option<Type>,
         value: Expr,
+        span: Span,
+    },
+    /// var宣言文（可変変数）
+    Var {
+        name: String,
+        type_annotation: Option<Type>,
+        value: Expr,
+        span: Span,
+    },
+    /// return文
+    Return {
+        value: Option<Expr>,
         span: Span,
     },
     /// 式文

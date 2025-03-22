@@ -200,6 +200,13 @@
   - 型注釈パターン「エンティティ: 型」の一貫した使用による言語全体の統一性向上
 
 ## 最近の変更
+- メンバーアクセス式（MemberAccessExpr）の実装：
+  - AST拡張：`Expr` 列挙型に `MemberAccess` バリアントを追加
+  - パーサー実装：`function_call` 関数を `postfix` 関数にリネームし、関数呼び出しとメンバーアクセスの両方をパースできるように拡張
+  - メンバーアクセス式（`obj.property`）と関数呼び出し式（`func(args)`）を左結合性を持つ後置演算子として実装
+  - チェーンされたメンバーアクセス（`obj.inner.property`）やメンバーアクセス後の関数呼び出し（`obj.method(args)`）のサポート
+  - テストケースの追加と検証
+
 - パーサーコードのリファクタリング：
   - `src/protorun/parser/mod.rs`の`parse_expression`メソッドからデバッグ用の`println!`文を削除
   - `src/protorun/parser/expressions.rs`から未使用の`is_lambda_pattern`関数を削除

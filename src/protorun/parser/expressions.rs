@@ -119,32 +119,50 @@ pub fn block_contents<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResul
     Ok((input, (statements, expr)))
 }
 
-/// 関数呼び出しをパース
-pub fn function_call<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
-    let (input, func) = primary(input, ctx)?;
+/// 後置式（関数呼び出しとメンバーアクセス）をパース
+pub fn postfix<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+    let (mut current_input, mut expr) = primary(input, ctx)?;
     
-    let (input, args_opt) = opt(
-        delimited(
+    // 関数呼び出しとメンバーアクセスを繰り返しパース
+    loop {
+        // 関数呼び出し
+        if let Ok((new_input, args)) = delimited(
             ws_comments(char('(')),
             separated_list0(
                 ws_comments(char(',')),
                 |i| expression(i, ctx)
             ),
             cut(ws_comments(char(')')))
-        )
-    )(input)?;
-    
-    match args_opt {
-        Some(args) => {
-            let span = ctx.calculate_span(input);
-            Ok((input, Expr::FunctionCall {
-                function: Box::new(func),
+        )(current_input) {
+            let span = ctx.calculate_span(new_input);
+            expr = Expr::FunctionCall {
+                function: Box::new(expr),
                 arguments: args,
                 span,
-            }))
-        },
-        None => Ok((input, func))
+            };
+            current_input = new_input;
+            continue;
+        }
+        
+        // メンバーアクセス
+        if let Ok((new_input, _)) = ws_comments(char('.'))(current_input) {
+            if let Ok((new_input, member)) = ws_comments(identifier_string)(new_input) {
+                let span = ctx.calculate_span(new_input);
+                expr = Expr::MemberAccess {
+                    object: Box::new(expr),
+                    member,
+                    span,
+                };
+                current_input = new_input;
+                continue;
+            }
+        }
+        
+        // どちらもマッチしなければループを抜ける
+        break;
     }
+    
+    Ok((current_input, expr))
 }
 
 /// 単項演算をパース
@@ -178,7 +196,7 @@ pub fn unary<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Exp
                 }
             }
         ),
-        |i| function_call(i, ctx)
+        |i| postfix(i, ctx)
     ))(input)
 }
 

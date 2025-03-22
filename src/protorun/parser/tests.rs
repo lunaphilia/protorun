@@ -1,7 +1,7 @@
 // パーサーモジュールのテスト
 
 use super::*;
-use crate::protorun::ast::{BinaryOperator, Expr, Stmt, UnaryOperator, ComprehensionKind, Pattern as AstPattern, LiteralValue};
+use crate::protorun::ast::{BinaryOperator, Expr, Stmt, Decl, UnaryOperator, ComprehensionKind, Pattern as AstPattern, LiteralValue};
 use crate::protorun::error::ErrorKind;
 
 #[test]
@@ -363,6 +363,119 @@ fn test_parse_let_with_type_annotation() {
             }
         },
         _ => panic!("期待されるlet文ではありません"),
+    }
+}
+
+#[test]
+fn test_parse_var_statement() {
+    let input = "var x = 42;";
+    let mut parser = Parser::new(None);
+    let program = parser.parse_program(input).unwrap();
+    
+    assert_eq!(program.statements.len(), 1);
+    
+    match &program.statements[0] {
+        Stmt::Var { name, type_annotation, value, .. } => {
+            assert_eq!(name, "x");
+            assert!(type_annotation.is_none());
+            
+            match value {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 42),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+        },
+        _ => panic!("期待されるvar文ではありません"),
+    }
+}
+
+#[test]
+fn test_parse_var_with_type_annotation() {
+    let input = "var counter: Int = 0;";
+    let mut parser = Parser::new(None);
+    let program = parser.parse_program(input).unwrap();
+    
+    assert_eq!(program.statements.len(), 1);
+    
+    match &program.statements[0] {
+        Stmt::Var { name, type_annotation, value, .. } => {
+            assert_eq!(name, "counter");
+            
+            match type_annotation {
+                Some(ty) => {
+                    match ty {
+                        crate::protorun::ast::Type::Simple { name, .. } => assert_eq!(name, "Int"),
+                        _ => panic!("期待される単純型ではありません"),
+                    }
+                },
+                None => panic!("型注釈が期待されます"),
+            }
+            
+            match value {
+                Expr::IntLiteral(value, _) => assert_eq!(*value, 0),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+        },
+        _ => panic!("期待されるvar文ではありません"),
+    }
+}
+
+#[test]
+fn test_parse_return_statement() {
+    // 値を返すreturn文
+    {
+        let input = "return 42;";
+        let mut parser = Parser::new(None);
+        let program = parser.parse_program(input).unwrap();
+        
+        assert_eq!(program.statements.len(), 1);
+        
+        match &program.statements[0] {
+            Stmt::Return { value, .. } => {
+                assert!(value.is_some());
+                match value.as_ref().unwrap() {
+                    Expr::IntLiteral(val, _) => assert_eq!(*val, 42),
+                    _ => panic!("期待される整数リテラルではありません"),
+                }
+            },
+            _ => panic!("期待されるreturn文ではありません"),
+        }
+    }
+    
+    // 値なしのreturn文
+    {
+        let input = "return;";
+        let mut parser = Parser::new(None);
+        let program = parser.parse_program(input).unwrap();
+        
+        assert_eq!(program.statements.len(), 1);
+        
+        match &program.statements[0] {
+            Stmt::Return { value, .. } => {
+                assert!(value.is_none());
+            },
+            _ => panic!("期待されるreturn文ではありません"),
+        }
+    }
+}
+
+#[test]
+fn test_parse_complex_return_statement() {
+    let input = "return x * y + z;";
+    let mut parser = Parser::new(None);
+    let program = parser.parse_program(input).unwrap();
+    
+    assert_eq!(program.statements.len(), 1);
+    
+    match &program.statements[0] {
+        Stmt::Return { value, .. } => {
+            assert!(value.is_some());
+            
+            match value.as_ref().unwrap() {
+                Expr::BinaryOp { operator, .. } => assert_eq!(*operator, BinaryOperator::Add),
+                _ => panic!("期待される二項演算ではありません"),
+            }
+        },
+        _ => panic!("期待されるreturn文ではありません"),
     }
 }
 
@@ -1519,6 +1632,108 @@ fn test_parse_lambda_expr() {
                 }
             },
             _ => panic!("期待されるラムダ式ではありません"),
+        }
+    }
+}
+
+#[test]
+fn test_parse_member_access() {
+    // 基本的なメンバーアクセス
+    {
+        let input = "obj.property";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::MemberAccess { object, member, .. } => {
+                match *object {
+                    Expr::Identifier(ref name, _) => assert_eq!(name, "obj"),
+                    _ => panic!("期待される識別子ではありません"),
+                }
+                
+                assert_eq!(member, "property");
+            },
+            _ => panic!("期待されるメンバーアクセスではありません"),
+        }
+    }
+    
+    // チェーンされたメンバーアクセス
+    {
+        let input = "obj.inner.property";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::MemberAccess { object, member, .. } => {
+                assert_eq!(member, "property");
+                
+                match *object {
+                    Expr::MemberAccess { object: ref inner_obj, member: ref inner_member, .. } => {
+                        match **inner_obj {
+                            Expr::Identifier(ref name, _) => assert_eq!(name, "obj"),
+                            _ => panic!("期待される識別子ではありません"),
+                        }
+                        
+                        assert_eq!(*inner_member, "inner");
+                    },
+                    _ => panic!("期待されるメンバーアクセスではありません"),
+                }
+            },
+            _ => panic!("期待されるメンバーアクセスではありません"),
+        }
+    }
+    
+    // メンバーアクセス後の関数呼び出し
+    {
+        let input = "obj.method(42)";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::FunctionCall { function, arguments, .. } => {
+                match *function {
+                    Expr::MemberAccess { object, member, .. } => {
+                        match *object {
+                            Expr::Identifier(ref name, _) => assert_eq!(name, "obj"),
+                            _ => panic!("期待される識別子ではありません"),
+                        }
+                        
+                        assert_eq!(member, "method");
+                    },
+                    _ => panic!("期待されるメンバーアクセスではありません"),
+                }
+                
+                assert_eq!(arguments.len(), 1);
+                match &arguments[0] {
+                    Expr::IntLiteral(value, _) => assert_eq!(*value, 42),
+                    _ => panic!("期待される整数リテラルではありません"),
+                }
+            },
+            _ => panic!("期待される関数呼び出しではありません"),
+        }
+    }
+    
+    // 複雑な式の結果に対するメンバーアクセス
+    {
+        let input = "(obj.get_inner()).property";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        
+        match expr {
+            Expr::MemberAccess { object, member, .. } => {
+                assert_eq!(member, "property");
+                
+                match *object {
+                    Expr::ParenExpr(ref inner, _) => {
+                        match **inner {
+                            Expr::FunctionCall { .. } => (), // 関数呼び出しの詳細は省略
+                            _ => panic!("期待される関数呼び出しではありません"),
+                        }
+                    },
+                    _ => panic!("期待される括弧式ではありません"),
+                }
+            },
+            _ => panic!("期待されるメンバーアクセスではありません"),
         }
     }
 }

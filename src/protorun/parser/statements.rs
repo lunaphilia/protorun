@@ -75,10 +75,79 @@ pub fn let_statement<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult
     }))
 }
 
+/// var文をパース
+pub fn var_statement<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Stmt> {
+    let (input, _) = ws_comments(tag("var"))(input)?;
+    let (input, name) = ws_comments(identifier_string)(input)?;
+    let (input, type_annotation) = opt(
+        preceded(
+            ws_comments(char(':')),
+            |i| parse_type(i, ctx)
+        )
+    )(input)?;
+    let (input, _) = ws_comments(char('='))(input)?;
+    
+    // ここにコンテキストを追加
+    let (input, value) = with_context(
+        "式の解析中にエラーが発生しました",
+        cut(|i| expression(i, ctx))
+    )(input)?;
+    
+    let span = ctx.calculate_span(input);
+    
+    // シンボルテーブルに変数を登録（可変変数）
+    let symbol = Symbol {
+        name: name.clone(),
+        kind: SymbolKind::Variable,
+        type_annotation: type_annotation.clone(),
+        declaration_span: span.clone(),
+        is_mutable: true, // var宣言は可変変数
+        type_info: None,
+        is_used: false,
+    };
+    
+    // シンボル登録（エラーは無視して構文解析を続行）
+    let _ = ctx.add_symbol(symbol);
+    
+    Ok((input, Stmt::Var {
+        name,
+        type_annotation,
+        value,
+        span,
+    }))
+}
+
+/// return文をパース
+pub fn return_statement<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Stmt> {
+    let (input, _) = ws_comments(tag("return"))(input)?;
+    
+    // 現在のスコープが関数スコープかチェック
+    let scope_kind = ctx.current_scope_kind();
+    if scope_kind != ScopeKind::Function && scope_kind != ScopeKind::Global {
+        // 関数外でのreturnはエラー（ただし、グローバルスコープは許可）
+        // 注意: 実際の型チェッカーでより厳密にチェックする
+        let mut err = nom::error::VerboseError { errors: Vec::new() };
+        err.errors.push((input, nom::error::VerboseErrorKind::Context("関数外でのreturn文は許可されていません")));
+        return Err(nom::Err::Error(err));
+    }
+    
+    // 戻り値の式（オプション）
+    let (input, value) = opt(|i| expression(i, ctx))(input)?;
+    
+    let span = ctx.calculate_span(input);
+    
+    Ok((input, Stmt::Return {
+        value,
+        span,
+    }))
+}
+
 /// 文をパース
 pub fn statement<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Stmt> {
     alt((
         |i| let_statement(i, ctx),
+        |i| var_statement(i, ctx),
+        |i| return_statement(i, ctx),
         map(
             |i| expression(i, ctx),
             move |expr| {
