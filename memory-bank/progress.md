@@ -82,6 +82,21 @@
 - 実装の複雑さと実行効率のトレードオフ
 
 ## 最近の成果
+- パーサーのテストを機能別に分割：
+  - 元の`tests.rs`ファイルを9つの機能別テストファイルに分割
+  - `tests_common.rs`：共通ユーティリティのテスト
+  - `tests_literals.rs`：リテラル値パーサーのテスト
+  - `tests_expressions.rs`：式パーサーのテスト
+  - `tests_statements.rs`：文パーサーのテスト
+  - `tests_declarations.rs`：宣言パーサーのテスト
+  - `tests_modules.rs`：モジュールパーサーのテスト
+  - `tests_types.rs`：型パーサーのテスト
+  - `tests_patterns.rs`：パターンマッチングパーサーのテスト
+  - `tests_scope.rs`：スコープ管理のテスト
+  - 新しいテストを追加してコードカバレッジを向上
+  - テストコードの見通しを改善し、特定の機能に関するテストを見つけやすく
+  - すべてのテストが正常に実行されることを確認
+
 - モジュール構造の実装：
   - AST定義の拡張：`Module`、`ExportDecl`、`ImportDecl`、`ImportItem`などのモジュール関連の構造体・列挙型を追加
   - モジュール宣言パーサーの実装：`module Name { ... }`構文の解析

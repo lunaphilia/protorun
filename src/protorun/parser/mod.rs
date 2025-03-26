@@ -74,5 +74,20 @@ impl Parser {
 }
 
 #[cfg(test)]
-mod tests;
 mod tests_scope;
+#[cfg(test)]
+mod tests_expressions;
+#[cfg(test)]
+mod tests_statements;
+#[cfg(test)]
+mod tests_declarations;
+#[cfg(test)]
+mod tests_modules;
+#[cfg(test)]
+mod tests_types;
+#[cfg(test)]
+mod tests_patterns;
+#[cfg(test)]
+mod tests_literals;
+#[cfg(test)]
+mod tests_common;
