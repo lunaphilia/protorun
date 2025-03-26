@@ -8,6 +8,7 @@ pub mod types;
 pub mod statements;
 pub mod expressions;
 pub mod declarations;
+pub mod modules;
 
 // 型宣言パーサーをエクスポート
 pub use declarations::{
@@ -17,6 +18,13 @@ pub use declarations::{
     parse_type_alias,
     parse_trait_declaration,
     parse_impl_declaration,
+};
+
+// モジュールパーサーをエクスポート
+pub use modules::{
+    parse_module,
+    parse_export,
+    parse_import,
 };
 
 use nom::Finish;

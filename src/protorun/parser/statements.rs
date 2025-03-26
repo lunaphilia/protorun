@@ -228,25 +228,62 @@ pub fn function_declaration<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> 
 pub fn program<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseResult<'a, crate::protorun::ast::Program> {
     use nom::character::complete::multispace0;
     use nom::multi::many0;
+    use nom::sequence::terminated;
     
     let (input, _) = multispace0(input)?;
     
+    // モジュール宣言をパース
+    let (input, modules) = many0(terminated(
+        |i| {
+            let (i, _) = multispace0(i)?;
+            super::modules::parse_module(i, ctx)
+        },
+        multispace0
+    ))(input)?;
+    
     // 関数宣言をパース
-    let (input, declarations) = many0(|i| function_declaration(i, ctx))(input)?;
+    let (input, declarations) = many0(terminated(
+        |i| {
+            let (i, _) = multispace0(i)?;
+            function_declaration(i, ctx)
+        },
+        multispace0
+    ))(input)?;
     
     // 型宣言をパース
-    let (input, type_declarations) = many0(|i| super::declarations::parse_type_declaration(i, ctx))(input)?;
+    let (input, type_declarations) = many0(terminated(
+        |i| {
+            let (i, _) = multispace0(i)?;
+            super::declarations::parse_type_declaration(i, ctx)
+        },
+        multispace0
+    ))(input)?;
     
     // トレイト宣言をパース
-    let (input, trait_declarations) = many0(|i| super::declarations::parse_trait_declaration(i, ctx))(input)?;
+    let (input, trait_declarations) = many0(terminated(
+        |i| {
+            let (i, _) = multispace0(i)?;
+            super::declarations::parse_trait_declaration(i, ctx)
+        },
+        multispace0
+    ))(input)?;
     
     // 実装宣言をパース
-    let (input, impl_declarations) = many0(|i| super::declarations::parse_impl_declaration(i, ctx))(input)?;
+    let (input, impl_declarations) = many0(terminated(
+        |i| {
+            let (i, _) = multispace0(i)?;
+            super::declarations::parse_impl_declaration(i, ctx)
+        },
+        multispace0
+    ))(input)?;
     
     // 文をパース
     let (input, statements) = many0(
         terminated(
-            |i| statement(i, ctx),
+            |i| {
+                let (i, _) = multispace0(i)?;
+                statement(i, ctx)
+            },
             ws_comments(char(';'))
         )
     )(input)?;
@@ -254,6 +291,7 @@ pub fn program<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseResult<'
     let (input, _) = multispace0(input)?;
     
     Ok((input, crate::protorun::ast::Program {
+        modules,
         declarations,
         type_declarations,
         trait_declarations,

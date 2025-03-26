@@ -338,9 +338,64 @@ pub struct ImplDecl {
     pub span: Span,
 }
 
+/// エクスポート宣言
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExportDecl {
+    /// 個別エクスポート
+    Single {
+        name: String,
+        span: Span,
+    },
+    /// グループエクスポート
+    Group {
+        names: Vec<String>,
+        span: Span,
+    }
+}
+
+/// インポート宣言のアイテム
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportItem {
+    pub name: String,
+    pub alias: Option<String>,
+    pub span: Span,
+}
+
+/// インポート宣言
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportDecl {
+    /// 選択的インポート
+    Selective {
+        module_path: String,
+        imports: Vec<ImportItem>,
+        span: Span,
+    },
+    /// モジュール全体のインポート
+    Module {
+        module_path: String,
+        alias: String,
+        span: Span,
+    }
+}
+
+/// モジュール定義
+#[derive(Debug, Clone, PartialEq)]
+pub struct Module {
+    pub path: String,
+    pub exports: Vec<ExportDecl>,
+    pub imports: Vec<ImportDecl>,
+    pub declarations: Vec<Decl>,
+    pub type_declarations: Vec<TypeDecl>,
+    pub trait_declarations: Vec<TraitDecl>,
+    pub impl_declarations: Vec<ImplDecl>,
+    pub statements: Vec<Stmt>,
+    pub span: Span,
+}
+
 /// プログラム全体
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
+    pub modules: Vec<Module>,
     pub declarations: Vec<Decl>,
     pub type_declarations: Vec<TypeDecl>,
     pub trait_declarations: Vec<TraitDecl>,

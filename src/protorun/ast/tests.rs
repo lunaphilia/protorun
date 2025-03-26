@@ -364,53 +364,175 @@ fn test_decl_function() {
 }
 
 #[test]
-fn test_program() {
-    let span_func = Span {
+fn test_export_decl() {
+    let span = Span {
+        start: 0,
+        end: 10,
+        line: 1,
+        column: 1,
+    };
+
+    // 個別エクスポートのテスト
+    let single_export = ExportDecl::Single {
+        name: "add".to_string(),
+        span: span.clone(),
+    };
+
+    match single_export {
+        ExportDecl::Single { name, span: export_span } => {
+            assert_eq!(name, "add");
+            assert_eq!(export_span, span);
+        }
+        _ => panic!("期待される個別エクスポートではありません"),
+    }
+
+    // グループエクスポートのテスト
+    let group_export = ExportDecl::Group {
+        names: vec!["add".to_string(), "subtract".to_string()],
+        span: span.clone(),
+    };
+
+    match group_export {
+        ExportDecl::Group { names, span: export_span } => {
+            assert_eq!(names.len(), 2);
+            assert_eq!(names[0], "add");
+            assert_eq!(names[1], "subtract");
+            assert_eq!(export_span, span);
+        }
+        _ => panic!("期待されるグループエクスポートではありません"),
+    }
+}
+
+#[test]
+fn test_import_decl() {
+    let span = Span {
         start: 0,
         end: 15,
         line: 1,
         column: 1,
     };
-    
-    let span_stmt = Span {
-        start: 16,
-        end: 25,
-        line: 2,
+
+    // 選択的インポートのテスト
+    let selective_import = ImportDecl::Selective {
+        module_path: "math".to_string(),
+        imports: vec![
+            ImportItem {
+                name: "add".to_string(),
+                alias: None,
+                span: span.clone(),
+            },
+            ImportItem {
+                name: "subtract".to_string(),
+                alias: Some("sub".to_string()),
+                span: span.clone(),
+            },
+        ],
+        span: span.clone(),
+    };
+
+    match selective_import {
+        ImportDecl::Selective { module_path, imports, span: import_span } => {
+            assert_eq!(module_path, "math");
+            assert_eq!(imports.len(), 2);
+            assert_eq!(imports[0].name, "add");
+            assert_eq!(imports[0].alias, None);
+            assert_eq!(imports[1].name, "subtract");
+            assert_eq!(imports[1].alias, Some("sub".to_string()));
+            assert_eq!(import_span, span);
+        }
+        _ => panic!("期待される選択的インポートではありません"),
+    }
+
+    // モジュール全体のインポートのテスト
+    let module_import = ImportDecl::Module {
+        module_path: "math".to_string(),
+        alias: "Math".to_string(),
+        span: span.clone(),
+    };
+
+    match module_import {
+        ImportDecl::Module { module_path, alias, span: import_span } => {
+            assert_eq!(module_path, "math");
+            assert_eq!(alias, "Math");
+            assert_eq!(import_span, span);
+        }
+        _ => panic!("期待されるモジュールインポートではありません"),
+    }
+}
+
+#[test]
+fn test_module() {
+    let span = Span {
+        start: 0,
+        end: 50,
+        line: 1,
         column: 1,
     };
-    
-    let decl = Decl::Function {
-        name: "foo".to_string(),
-        parameters: vec![],
-        return_type: None,
-        body: Expr::IntLiteral(42, span_func.clone()),
-        span: span_func,
-    };
-    
-    let stmt = Stmt::Let {
-        name: "x".to_string(),
-        type_annotation: None,
-        value: Expr::IntLiteral(10, span_stmt.clone()),
-        span: span_stmt,
-    };
-    
-    let program = Program {
-        declarations: vec![decl],
+
+    let module = Module {
+        path: "math".to_string(),
+        exports: vec![
+            ExportDecl::Single {
+                name: "add".to_string(),
+                span: span.clone(),
+            },
+        ],
+        imports: vec![
+            ImportDecl::Module {
+                module_path: "core".to_string(),
+                alias: "Core".to_string(),
+                span: span.clone(),
+            },
+        ],
+        declarations: Vec::new(),
         type_declarations: Vec::new(),
         trait_declarations: Vec::new(),
         impl_declarations: Vec::new(),
-        statements: vec![stmt],
+        statements: Vec::new(),
+        span: span.clone(),
     };
-    
-    assert_eq!(program.declarations.len(), 1);
-    assert_eq!(program.statements.len(), 1);
-    
-    match &program.declarations[0] {
-        Decl::Function { name, .. } => assert_eq!(name, "foo"),
-    }
-    
-    match &program.statements[0] {
-        Stmt::Let { name, .. } => assert_eq!(name, "x"),
-        _ => panic!("期待されるlet文ではありません"),
-    }
+
+    assert_eq!(module.path, "math");
+    assert_eq!(module.exports.len(), 1);
+    assert_eq!(module.imports.len(), 1);
+}
+
+#[test]
+fn test_program() {
+    let span = Span {
+        start: 0,
+        end: 100,
+        line: 1,
+        column: 1,
+    };
+
+    let math_module = Module {
+        path: "math".to_string(),
+        exports: vec![
+            ExportDecl::Single {
+                name: "add".to_string(),
+                span: span.clone(),
+            },
+        ],
+        imports: Vec::new(),
+        declarations: Vec::new(),
+        type_declarations: Vec::new(),
+        trait_declarations: Vec::new(),
+        impl_declarations: Vec::new(),
+        statements: Vec::new(),
+        span: span.clone(),
+    };
+
+    let program = Program {
+        modules: vec![math_module],
+        declarations: Vec::new(),
+        type_declarations: Vec::new(),
+        trait_declarations: Vec::new(),
+        impl_declarations: Vec::new(),
+        statements: Vec::new(),
+    };
+
+    assert_eq!(program.modules.len(), 1);
+    assert_eq!(program.modules[0].path, "math");
+    assert_eq!(program.modules[0].exports.len(), 1);
 }
