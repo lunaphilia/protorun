@@ -4,14 +4,14 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{char, digit1, none_of},
-    combinator::{map, map_res, opt, value},
+    combinator::{map, map_res, opt, value, recognize},
     multi::many0,
     sequence::{delimited, pair, preceded, tuple},
     IResult,
 };
 
 use crate::protorun::ast::{Expr, Span, LiteralValue};
-use super::common::{ParseResult, ParserContext, ws_comments};
+use super::common::{ParseResult, ws_comments, calculate_span};
 
 /// 整数リテラルをパース
 pub fn int_literal(input: &str) -> ParseResult<i64> {
@@ -23,7 +23,7 @@ pub fn int_literal(input: &str) -> ParseResult<i64> {
 
 /// 整数リテラルを認識
 pub fn recognize_int_literal(input: &str) -> ParseResult<&str> {
-    nom::combinator::recognize(
+    recognize(
         pair(
             opt(char('-')),
             digit1
@@ -34,7 +34,7 @@ pub fn recognize_int_literal(input: &str) -> ParseResult<&str> {
 /// 浮動小数点リテラルをパース
 pub fn float_literal(input: &str) -> ParseResult<f64> {
     map_res(
-        nom::combinator::recognize(
+        recognize(
             tuple((
                 opt(char('-')),
                 digit1,
@@ -76,47 +76,47 @@ pub fn bool_literal(input: &str) -> ParseResult<bool> {
 }
 
 /// 整数リテラル式をパース
-pub fn int_literal_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+pub fn int_literal_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
     let (remaining, value) = int_literal(input)?;
-    let span = ctx.calculate_span(remaining);
+    let span = calculate_span(original_input, remaining);
     
     Ok((remaining, Expr::IntLiteral(value, span)))
 }
 
 /// 浮動小数点リテラル式をパース
-pub fn float_literal_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+pub fn float_literal_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
     let (remaining, value) = float_literal(input)?;
-    let span = ctx.calculate_span(remaining);
+    let span = calculate_span(original_input, remaining);
     
     Ok((remaining, Expr::FloatLiteral(value, span)))
 }
 
 /// 文字列リテラル式をパース
-pub fn string_literal_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+pub fn string_literal_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
     let (remaining, value) = string_literal(input)?;
-    let span = ctx.calculate_span(remaining);
+    let span = calculate_span(original_input, remaining);
     
     Ok((remaining, Expr::StringLiteral(value, span)))
 }
 
 /// 真偽値リテラル式をパース
-pub fn bool_literal_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+pub fn bool_literal_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
     let (remaining, value) = bool_literal(input)?;
-    let span = ctx.calculate_span(remaining);
+    let span = calculate_span(original_input, remaining);
     
     Ok((remaining, Expr::BoolLiteral(value, span)))
 }
 
 /// ユニットリテラル式をパース
-pub fn unit_literal_expr<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, Expr> {
+pub fn unit_literal_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
     let (remaining, _) = ws_comments(tag("()"))(input)?;
-    let span = ctx.calculate_span(remaining);
+    let span = calculate_span(original_input, remaining);
     
     Ok((remaining, Expr::UnitLiteral(span)))
 }
 
 /// リテラルパターン値をパース
-pub fn literal_pattern_value<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, LiteralValue> {
+pub fn literal_pattern_value<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, LiteralValue> {
     alt((
         map(int_literal, LiteralValue::Int),
         map(float_literal, LiteralValue::Float),

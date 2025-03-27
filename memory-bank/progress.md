@@ -119,6 +119,16 @@
 - パーサーの性能最適化
 
 ## 最近の成果
+- パーサーのマルチパスアプローチへの変更：
+  - パーサーの実装をマルチパスアプローチに変更し、コンテキスト情報の引き回しを削除
+  - `simple`という接尾辞がついた関数（コンテキストを使わない純粋なパーサー関数）を標準の関数として採用し、コンテキストを使う関数を削除
+  - `modules.rs`ファイルから、`parse_module_simple`などの関数を削除
+  - `statements.rs`ファイルで、`let_statement_simple`などの関数の接尾辞を削除
+  - `expressions.rs`ファイルで、`match_expr_simple`などの関数の接尾辞を削除
+  - `declarations.rs`ファイルで、`parse_record_type_declaration_simple`などの関数の接尾辞を削除
+  - デバッグ用のprint文を削除（`expressions.rs`と`modules.rs`ファイルから）
+  - マルチパスアプローチでは、最初のパスでASTを構築し、その後の別のパスでコンテキスト情報（スコープなど）を処理
+
 - モジュール構造の実装：
   - AST定義の拡張：`Module`、`ExportDecl`、`ImportDecl`、`ImportItem`などのモジュール関連の構造体・列挙型を追加
   - モジュール宣言パーサーの実装：`module Name { ... }`構文の解析

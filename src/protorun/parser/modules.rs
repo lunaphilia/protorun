@@ -10,8 +10,7 @@ use nom::{
 };
 
 use crate::protorun::ast::{Module, ExportDecl, ImportDecl, ImportItem, Span, Decl};
-use crate::protorun::symbol::{Symbol, SymbolKind, ScopeKind};
-use super::common::{ParseResult, ParserContext, ws_comments, identifier_string, delimited_list};
+use super::common::{ParseResult, ws_comments, identifier_string, delimited_list, calculate_span};
 use super::declarations::{parse_type_declaration, parse_trait_declaration, parse_impl_declaration};
 use super::statements::{statement, function_declaration};
 
@@ -22,14 +21,14 @@ enum ImportType {
 }
 
 /// エクスポート宣言のパース
-pub fn parse_export<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseResult<'a, (ExportDecl, Option<Decl>)> {
+pub fn parse_export<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, (ExportDecl, Option<Decl>)> {
     let (input, _) = ws_comments(tag("export"))(input)?;
     
     // 関数宣言のエクスポート
-    let (input, decl) = opt(|i| function_declaration(i, ctx))(input)?;
+    let (input, decl) = opt(|i| function_declaration(i, original_input))(input)?;
     
     if let Some(decl) = decl {
-        let span = ctx.calculate_span(input);
+        let span = calculate_span(original_input, input);
         match &decl {
             Decl::Function { name, .. } => {
                 return Ok((input, (ExportDecl::Single { name: name.clone(), span }, Some(decl))));
@@ -53,7 +52,7 @@ pub fn parse_export<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseRes
                 ))
             ),
             |names| {
-                let span = ctx.calculate_span(input);
+                let span = calculate_span(original_input, input);
                 (ExportDecl::Group { names, span }, None)
             }
         ),
@@ -61,7 +60,7 @@ pub fn parse_export<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseRes
         map(
             ws_comments(identifier_string),
             |name| {
-                let span = ctx.calculate_span(input);
+                let span = calculate_span(original_input, input);
                 (ExportDecl::Single { name, span }, None)
             }
         )
@@ -71,10 +70,8 @@ pub fn parse_export<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseRes
 }
 
 /// インポートアイテムのパース
-fn parse_import_item<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, ImportItem> {
-    println!("parse_import_item: 開始 input='{}'", input.trim());
+fn parse_import_item<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, ImportItem> {
     let (input, name) = ws_comments(identifier_string)(input)?;
-    println!("parse_import_item: 名前をパース name='{}'", name);
     
     // asキーワードの後のスペースを必須にしない
     let (input, alias) = opt(
@@ -84,9 +81,7 @@ fn parse_import_item<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult
         )
     )(input)?;
     
-    println!("parse_import_item: エイリアスをパース alias={:?}", alias);
-    
-    let span = ctx.calculate_span(input);
+    let span = calculate_span(original_input, input);
     
     let result = ImportItem {
         name,
@@ -94,13 +89,11 @@ fn parse_import_item<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult
         span,
     };
     
-    println!("parse_import_item: 終了 result={{ name: {}, alias: {:?} }}", result.name, result.alias);
     Ok((input, result))
 }
 
 /// インポート宣言のパース
-pub fn parse_import<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, ImportDecl> {
-    println!("parse_import: 開始 input='{}'", input.trim());
+pub fn parse_import<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, ImportDecl> {
     let (input, _) = ws_comments(tag("import"))(input)?;
     
     // 選択的インポートまたはモジュール全体のインポートをパース
@@ -113,13 +106,7 @@ pub fn parse_import<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<
                     cut(terminated(
                         many0(terminated(
                             |i: &'a str| -> ParseResult<'a, ImportItem> {
-                                println!("parse_import: インポートアイテムのパース開始 i='{}'", i.trim());
-                                let result = parse_import_item(i, ctx);
-                                match &result {
-                                    Ok((_, item)) => println!("parse_import: インポートアイテムのパース成功 name={}, alias={:?}", item.name, item.alias),
-                                    Err(e) => println!("parse_import: インポートアイテムのパース失敗 error={:?}", e),
-                                }
-                                result
+                                parse_import_item(i, original_input)
                             },
                             opt(ws_comments(char(',')))
                         )),
@@ -136,10 +123,6 @@ pub fn parse_import<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<
                 )
             )),
             |(imports, module_path)| {
-                println!("parse_import: 選択的インポート module_path={}, imports.len()={}", module_path, imports.len());
-                for (i, item) in imports.iter().enumerate() {
-                    println!("parse_import:   imports[{}]: name={}, alias={:?}", i, item.name, item.alias);
-                }
                 ImportType::Selective(imports, module_path)
             }
         ),
@@ -157,16 +140,14 @@ pub fn parse_import<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<
                 )
             )),
             |(module_path, alias)| {
-                println!("parse_import: モジュール全体のインポート module_path={}, alias={}", module_path, alias);
                 ImportType::Module(module_path, alias)
             }
         )
     ))(input)?;
 
-    let span = ctx.calculate_span(input);
+    let span = calculate_span(original_input, input);
     let import = match import_type {
         ImportType::Selective(imports, module_path) => {
-            println!("parse_import: ImportDecl::Selective 作成 module_path={}, imports.len()={}", module_path, imports.len());
             ImportDecl::Selective {
                 module_path,
                 imports,
@@ -174,7 +155,6 @@ pub fn parse_import<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<
             }
         },
         ImportType::Module(module_path, alias) => {
-            println!("parse_import: ImportDecl::Module 作成 module_path={}, alias={}", module_path, alias);
             ImportDecl::Module {
                 module_path,
                 alias,
@@ -183,27 +163,24 @@ pub fn parse_import<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<
         },
     };
     
-    println!("parse_import: 終了");
     Ok((input, import))
 }
 
+
 /// モジュール宣言のパース
-pub fn parse_module<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseResult<'a, Module> {
+pub fn parse_module<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Module> {
     let (input, _) = ws_comments(tag("module"))(input)?;
     let (input, path) = ws_comments(identifier_string)(input)?;
     let (input, _) = ws_comments(char('{'))(input)?;
     
-    // モジュールスコープを開始
-    ctx.enter_scope(ScopeKind::Module);
-    
     // エクスポート宣言をパース
-    let (input, export_results) = many0(|i| parse_export(i, ctx))(input)?;
+    let (input, exports_and_decls) = many0(|i| parse_export(i, original_input))(input)?;
     
     // エクスポート宣言と関数宣言を分離
     let mut exports = Vec::new();
     let mut declarations = Vec::new();
     
-    for (export, decl_opt) in export_results {
+    for (export, decl_opt) in exports_and_decls {
         exports.push(export);
         if let Some(decl) = decl_opt {
             declarations.push(decl);
@@ -211,48 +188,34 @@ pub fn parse_module<'a>(input: &'a str, ctx: &mut ParserContext<'a>) -> ParseRes
     }
     
     // インポート宣言をパース
-    println!("parse_module: インポート宣言のパース開始");
-    let (input, imports) = many0(|i| parse_import(i, ctx))(input)?;
-    println!("parse_module: インポート宣言のパース終了 imports.len()={}", imports.len());
-    for (i, import) in imports.iter().enumerate() {
-        match import {
-            ImportDecl::Selective { module_path, imports, .. } => {
-                println!("parse_module: imports[{}]: Selective {{ module_path: {}, imports.len(): {} }}", i, module_path, imports.len());
-                for (j, item) in imports.iter().enumerate() {
-                    println!("parse_module:   imports[{}].imports[{}]: {{ name: {}, alias: {:?} }}", i, j, item.name, item.alias);
-                }
-            },
-            ImportDecl::Module { module_path, alias, .. } => {
-                println!("parse_module: imports[{}]: Module {{ module_path: {}, alias: {} }}", i, module_path, alias);
-            }
-        }
-    }
+    let (input, imports) = many0(|i| parse_import(i, original_input))(input)?;
+    
+    // 非エクスポート関数宣言をパース
+    let (input, non_export_decls) = many0(|i| function_declaration(i, original_input))(input)?;
+    
+    // 非エクスポート関数宣言を追加
+    declarations.extend(non_export_decls);
     
     // 型宣言をパース
-    let (input, type_declarations) = many0(|i| parse_type_declaration(i, ctx))(input)?;
+    let (input, type_declarations) = many0(|i| parse_type_declaration(i, original_input))(input)?;
     
     // トレイト宣言をパース
-    let (input, trait_declarations) = many0(|i| parse_trait_declaration(i, ctx))(input)?;
+    let (input, trait_declarations) = many0(|i| parse_trait_declaration(i, original_input))(input)?;
     
     // 実装宣言をパース
-    let (input, impl_declarations) = many0(|i| parse_impl_declaration(i, ctx))(input)?;
+    let (input, impl_declarations) = many0(|i| parse_impl_declaration(i, original_input))(input)?;
     
     // 文をパース
     let (input, statements) = many0(
         preceded(
             ws_comments(char(';')),
-            |i| statement(i, ctx)
+            |i| statement(i, original_input)
         )
     )(input)?;
     
     let (input, _) = ws_comments(char('}'))(input)?;
     
-    let span = ctx.calculate_span(input);
-    
-    // モジュールスコープを終了
-    ctx.exit_scope();
-    
-    println!("Module path: {}, exports: {}, declarations: {}", path, exports.len(), declarations.len());
+    let span = calculate_span(original_input, input);
     
     Ok((input, Module {
         path,

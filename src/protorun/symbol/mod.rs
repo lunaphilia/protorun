@@ -5,7 +5,6 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::protorun::ast::{Span, Type};
 use crate::protorun::error::{Error, Result};
-use crate::protorun::parser::common::ParserContext;
 
 /// シンボルの種類
 #[derive(Debug, Clone, PartialEq)]
@@ -175,7 +174,7 @@ impl SymbolTable {
 
 /// 型定義のシンボル登録ヘルパー関数
 pub fn register_type_symbol(
-    ctx: &ParserContext,
+    symbol_table: &mut SymbolTable,
     name: &str,
     kind: TypeKind,
     type_parameters: Vec<String>,
@@ -198,7 +197,7 @@ pub fn register_type_symbol(
         is_used: false,
     };
     
-    ctx.add_symbol(symbol)
+    symbol_table.add_symbol(symbol)
 }
 
 #[cfg(test)]

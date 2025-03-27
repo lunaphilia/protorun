@@ -31,7 +31,7 @@ use nom::Finish;
 
 use super::ast::{Expr, Program, Type};
 use super::error::Result;
-use common::{ParserContext, to_syntax_error};
+use common::{to_syntax_error, calculate_span};
 
 /// パーサー
 pub struct Parser {
@@ -47,8 +47,7 @@ impl Parser {
 
     /// プログラム全体をパース
     pub fn parse_program(&mut self, input: &str) -> Result<Program> {
-        let mut ctx = ParserContext::new(input, self.filename.clone());
-        match statements::program(input, &mut ctx).finish() {
+        match statements::program(input, input).finish() {
             Ok((_, program)) => Ok(program),
             Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }
@@ -56,8 +55,7 @@ impl Parser {
 
     /// 式をパース
     pub fn parse_expression(&mut self, input: &str) -> Result<Expr> {
-        let mut ctx = ParserContext::new(input, self.filename.clone());
-        match expressions::expression(input, &mut ctx).finish() {
+        match expressions::expression(input, input).finish() {
             Ok((_, expr)) => Ok(expr),
             Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }
@@ -65,13 +63,13 @@ impl Parser {
     
     /// 型をパース
     pub fn parse_type(&mut self, input: &str) -> Result<Type> {
-        let mut ctx = ParserContext::new(input, self.filename.clone());
-        match types::parse_type(input, &mut ctx).finish() {
+        match types::parse_type(input, input).finish() {
             Ok((_, ty)) => Ok(ty),
             Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests_scope;

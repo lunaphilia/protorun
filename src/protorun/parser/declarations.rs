@@ -10,8 +10,7 @@ use nom::{
 };
 
 use crate::protorun::ast::{TypeDecl, EnumVariant, TraitDecl, ImplDecl, Type, Span, Decl};
-use crate::protorun::symbol::{TypeKind, ScopeKind};
-use super::common::{ParseResult, ParserContext, ws_comments, identifier_string, keyword};
+use super::common::{ParseResult, ws_comments, identifier_string, keyword, calculate_span};
 use super::types::parse_type;
 
 /// ジェネリックパラメータのパース
@@ -27,7 +26,7 @@ pub fn parse_generic_parameters<'a>(input: &'a str) -> ParseResult<'a, Vec<Strin
 }
 
 /// レコード型宣言のパース
-pub fn parse_record_type_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, TypeDecl> {
+pub fn parse_record_type_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, TypeDecl> {
     // type Identifier GenericParams? = { field1: Type, field2: Type, ... }
     let (input, _) = keyword("type")(input)?;
     let (input, name) = ws_comments(identifier_string)(input)?;
@@ -45,22 +44,13 @@ pub fn parse_record_type_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>
             ws_comments(char(',')),
             pair(
                 ws_comments(identifier_string),
-                preceded(ws_comments(char(':')), |i| parse_type(i, ctx))
+                preceded(ws_comments(char(':')), |i| parse_type(i, original_input))
             )
         ),
         cut(ws_comments(char('}')))
     )(input)?;
     
-    let span = ctx.calculate_span(input);
-    
-    // シンボルテーブルに型を登録
-    let _ = crate::protorun::symbol::register_type_symbol(
-        ctx,
-        &name,
-        TypeKind::Struct,
-        type_parameters.clone(),
-        span.clone()
-    );
+    let span = calculate_span(original_input, input);
     
     Ok((input, TypeDecl::Record {
         name,
@@ -71,7 +61,7 @@ pub fn parse_record_type_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>
 }
 
 /// enumバリアントのパース
-fn parse_enum_variant<'a, 'b>(ctx: &'b ParserContext<'a>) -> impl FnMut(&'a str) -> ParseResult<'a, EnumVariant> + 'b {
+fn parse_enum_variant<'a>(original_input: &'a str) -> impl FnMut(&'a str) -> ParseResult<'a, EnumVariant> + 'a {
     move |input: &'a str| {
         let (input, name) = ws_comments(identifier_string)(input)?;
         
@@ -80,13 +70,13 @@ fn parse_enum_variant<'a, 'b>(ctx: &'b ParserContext<'a>) -> impl FnMut(&'a str)
             ws_comments(char('(')),
             separated_list0(
                 ws_comments(char(',')),
-                |i| parse_type(i, ctx)
+                |i| parse_type(i, original_input)
             ),
             cut(ws_comments(char(')')))
         ))(input)?;
         
         let fields = fields.unwrap_or_else(Vec::new);
-        let span = ctx.calculate_span(input);
+        let span = calculate_span(original_input, input);
         
         Ok((input, EnumVariant {
             name,
@@ -97,7 +87,7 @@ fn parse_enum_variant<'a, 'b>(ctx: &'b ParserContext<'a>) -> impl FnMut(&'a str)
 }
 
 /// 代数的データ型（enum）宣言のパース
-pub fn parse_enum_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, TypeDecl> {
+pub fn parse_enum_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, TypeDecl> {
     // enum Identifier GenericParams? { Variant1, Variant2(Type), ... }
     let (input, _) = keyword("enum")(input)?;
     let (input, name) = ws_comments(identifier_string)(input)?;
@@ -111,21 +101,12 @@ pub fn parse_enum_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> Pa
         ws_comments(char('{')),
         separated_list0(
             ws_comments(char(',')),
-            parse_enum_variant(ctx)
+            parse_enum_variant(original_input)
         ),
         cut(ws_comments(char('}')))
     )(input)?;
     
-    let span = ctx.calculate_span(input);
-    
-    // シンボルテーブルに型を登録
-    let _ = crate::protorun::symbol::register_type_symbol(
-        ctx,
-        &name,
-        TypeKind::Enum,
-        type_parameters.clone(),
-        span.clone()
-    );
+    let span = calculate_span(original_input, input);
     
     Ok((input, TypeDecl::Enum {
         name,
@@ -136,7 +117,7 @@ pub fn parse_enum_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> Pa
 }
 
 /// 型エイリアスのパース
-pub fn parse_type_alias<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, TypeDecl> {
+pub fn parse_type_alias<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, TypeDecl> {
     // type Identifier GenericParams? = Type
     let (input, _) = keyword("type")(input)?;
     let (input, name) = ws_comments(identifier_string)(input)?;
@@ -148,18 +129,9 @@ pub fn parse_type_alias<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseRes
     let (input, _) = ws_comments(tag("="))(input)?;
     
     // エイリアスの型をパース
-    let (input, aliased_type) = parse_type(input, ctx)?;
+    let (input, aliased_type) = parse_type(input, original_input)?;
     
-    let span = ctx.calculate_span(input);
-    
-    // シンボルテーブルに型を登録
-    let _ = crate::protorun::symbol::register_type_symbol(
-        ctx,
-        &name,
-        TypeKind::TypeAlias,
-        type_parameters.clone(),
-        span.clone()
-    );
+    let span = calculate_span(original_input, input);
     
     Ok((input, TypeDecl::Alias {
         name,
@@ -170,7 +142,7 @@ pub fn parse_type_alias<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseRes
 }
 
 /// トレイト宣言のパース
-pub fn parse_trait_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, TraitDecl> {
+pub fn parse_trait_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, TraitDecl> {
     // trait Identifier GenericParams? : SuperTrait? { fn method(...) ... }
     let (input, _) = keyword("trait")(input)?;
     let (input, name) = ws_comments(identifier_string)(input)?;
@@ -182,7 +154,7 @@ pub fn parse_trait_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> P
     // 親トレイトのパース（オプション）
     let (input, super_trait) = opt(preceded(
         ws_comments(char(':')),
-        |i| parse_type(i, ctx)
+        |i| parse_type(i, original_input)
     ))(input)?;
     
     // トレイト本体のパース
@@ -196,16 +168,7 @@ pub fn parse_trait_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> P
     
     let methods = Vec::new(); // 空のメソッドリスト
     
-    let span = ctx.calculate_span(input);
-    
-    // シンボルテーブルに型を登録
-    let _ = crate::protorun::symbol::register_type_symbol(
-        ctx,
-        &name,
-        TypeKind::Trait,
-        type_parameters.clone(),
-        span.clone()
-    );
+    let span = calculate_span(original_input, input);
     
     Ok((input, TraitDecl {
         name,
@@ -217,7 +180,7 @@ pub fn parse_trait_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> P
 }
 
 /// トレイト実装のパース
-pub fn parse_impl_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, ImplDecl> {
+pub fn parse_impl_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, ImplDecl> {
     // impl GenericParams? Type : Trait { fn method(...) ... }
     let (input, _) = keyword("impl")(input)?;
     
@@ -226,11 +189,11 @@ pub fn parse_impl_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> Pa
     let type_parameters = type_parameters.unwrap_or_else(Vec::new);
     
     // 実装対象の型をパース
-    let (input, target_type) = parse_type(input, ctx)?;
+    let (input, target_type) = parse_type(input, original_input)?;
     
     // トレイト型をパース
     let (input, _) = ws_comments(char(':'))(input)?;
-    let (input, trait_type) = parse_type(input, ctx)?;
+    let (input, trait_type) = parse_type(input, original_input)?;
     
     // 実装本体のパース
     // 注意: 関数宣言のパースは現在のコンテキストでは実装できないため、空のベクターを返す
@@ -243,7 +206,7 @@ pub fn parse_impl_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> Pa
     
     let methods = Vec::new(); // 空のメソッドリスト
     
-    let span = ctx.calculate_span(input);
+    let span = calculate_span(original_input, input);
     
     Ok((input, ImplDecl {
         type_parameters,
@@ -255,10 +218,10 @@ pub fn parse_impl_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> Pa
 }
 
 /// 型宣言のパース（統合版）
-pub fn parse_type_declaration<'a>(input: &'a str, ctx: &ParserContext<'a>) -> ParseResult<'a, TypeDecl> {
+pub fn parse_type_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, TypeDecl> {
     alt((
-        |i| parse_record_type_declaration(i, ctx),
-        |i| parse_enum_declaration(i, ctx),
-        |i| parse_type_alias(i, ctx)
+        |i| parse_record_type_declaration(i, original_input),
+        |i| parse_enum_declaration(i, original_input),
+        |i| parse_type_alias(i, original_input)
     ))(input)
 }
