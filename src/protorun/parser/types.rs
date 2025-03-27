@@ -6,10 +6,10 @@ use nom::{
     character::complete::char,
     combinator::{cut, map, opt},
     multi::{many0, separated_list0},
-    sequence::{delimited, pair, preceded},
+    sequence::{delimited, preceded},
 };
 
-use crate::protorun::ast::{Type, Span};
+use crate::protorun::ast::Type;
 use super::common::{ParseResult, ws_comments, identifier_string, calculate_span};
 
 /// 単純型をパース

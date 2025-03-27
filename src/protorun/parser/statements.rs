@@ -5,10 +5,10 @@ use nom::{
     bytes::complete::tag,
     character::complete::char,
     combinator::{cut, map, opt},
-    sequence::{preceded, terminated},
+    sequence::preceded,
 };
 
-use crate::protorun::ast::{Stmt, Span, Parameter, Decl};
+use crate::protorun::ast::{Stmt, Parameter, Decl};
 use super::common::{ParseResult, ws_comments, identifier_string, with_context, calculate_span};
 use super::types::parse_type;
 use super::expressions::expression;

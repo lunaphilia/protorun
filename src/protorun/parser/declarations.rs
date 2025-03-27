@@ -4,12 +4,12 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::char,
-    combinator::{cut, map, opt},
+    combinator::{cut, opt},
     multi::{many0, separated_list0},
-    sequence::{delimited, pair, preceded, tuple},
+    sequence::{delimited, pair, preceded},
 };
 
-use crate::protorun::ast::{TypeDecl, EnumVariant, TraitDecl, ImplDecl, Type, Span, Decl};
+use crate::protorun::ast::{TypeDecl, EnumVariant, TraitDecl, ImplDecl};
 use super::common::{ParseResult, ws_comments, identifier_string, keyword, calculate_span};
 use super::types::parse_type;
 

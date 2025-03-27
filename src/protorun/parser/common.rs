@@ -3,19 +3,15 @@
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
-    character::complete::{alpha1, alphanumeric1, char, digit1, multispace0, multispace1, none_of},
-    combinator::{cut, map, map_res, opt, recognize, value},
+    character::complete::{alpha1, alphanumeric1, char, multispace1},
+    combinator::{cut, map, recognize, value},
     error::{context, ErrorKind, VerboseError},
     multi::{many0, separated_list0},
-    sequence::{delimited, pair, preceded, terminated, tuple},
-    Finish, IResult,
+    sequence::{delimited, pair, preceded, terminated}, IResult,
 };
 
-use std::rc::Rc;
-use std::cell::RefCell;
 use crate::protorun::ast::Span;
-use crate::protorun::error::{Error, Result};
-use crate::protorun::symbol::{Symbol, SymbolTable, ScopeKind, SymbolKind};
+use crate::protorun::error::Error;
 
 /// パーサーの結果型
 pub type ParseResult<'a, T> = IResult<&'a str, T, VerboseError<&'a str>>;

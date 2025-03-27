@@ -9,8 +9,8 @@ use nom::{
     sequence::{delimited, pair, preceded},
 };
 
-use crate::protorun::ast::{Pattern, Span, LiteralValue};
-use super::common::{ParseResult, ws_comments, identifier_string, delimited_list, calculate_span};
+use crate::protorun::ast::{Pattern, LiteralValue};
+use super::common::{ParseResult, ws_comments, identifier_string, calculate_span};
 use super::literals::{literal_pattern_value};
 
 /// パターンをパース

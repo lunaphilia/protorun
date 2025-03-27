@@ -2,7 +2,6 @@
 
 use super::*;
 use crate::protorun::ast::{Expr, Stmt};
-use crate::protorun::symbol::{ScopeKind, SymbolKind};
 
 #[test]
 fn test_block_scope_management() {

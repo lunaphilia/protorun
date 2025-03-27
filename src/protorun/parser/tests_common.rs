@@ -1,8 +1,6 @@
 // 共通ユーティリティのテスト
 
 use super::*;
-use crate::protorun::ast::{Expr, Span};
-use crate::protorun::error::Error;
 
 #[test]
 fn test_ws_comments() {

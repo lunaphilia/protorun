@@ -6,11 +6,10 @@ use nom::{
     character::complete::{char, digit1, none_of},
     combinator::{map, map_res, opt, value, recognize},
     multi::many0,
-    sequence::{delimited, pair, preceded, tuple},
-    IResult,
+    sequence::{delimited, pair, tuple},
 };
 
-use crate::protorun::ast::{Expr, Span, LiteralValue};
+use crate::protorun::ast::{Expr, LiteralValue};
 use super::common::{ParseResult, ws_comments, calculate_span};
 
 /// 整数リテラルをパース

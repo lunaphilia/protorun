@@ -1,7 +1,7 @@
 // 宣言パーサーのテスト
 
 use super::*;
-use crate::protorun::ast::{TypeDecl, EnumVariant, TraitDecl, ImplDecl, Type};
+use crate::protorun::ast::{TypeDecl, Type};
 
 #[test]
 fn test_parse_record_type_declaration() {

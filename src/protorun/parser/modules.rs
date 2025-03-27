@@ -3,14 +3,14 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{char, multispace0},
+    character::complete::char,
     combinator::{cut, map, opt},
     multi::many0,
     sequence::{delimited, preceded, terminated, tuple},
 };
 
-use crate::protorun::ast::{Module, ExportDecl, ImportDecl, ImportItem, Span, Decl};
-use super::common::{ParseResult, ws_comments, identifier_string, delimited_list, calculate_span};
+use crate::protorun::ast::{Module, ExportDecl, ImportDecl, ImportItem, Decl};
+use super::common::{ParseResult, ws_comments, identifier_string, calculate_span};
 use super::declarations::{parse_type_declaration, parse_trait_declaration, parse_impl_declaration};
 use super::statements::{statement, function_declaration};
 

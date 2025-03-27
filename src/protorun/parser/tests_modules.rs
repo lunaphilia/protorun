@@ -1,7 +1,7 @@
 // モジュールパーサーのテスト
 
 use super::*;
-use crate::protorun::ast::{Module, ExportDecl, ImportDecl};
+use crate::protorun::ast::{ExportDecl, ImportDecl};
 
 #[test]
 fn test_parse_module() {

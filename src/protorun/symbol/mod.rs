@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::protorun::ast::{Span, Type};
-use crate::protorun::error::{Error, Result};
 
 /// シンボルの種類
 #[derive(Debug, Clone, PartialEq)]

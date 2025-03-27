@@ -4,16 +4,16 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{char, multispace0},
-    combinator::{cut, map, opt, value, recognize},
-    error::{VerboseError, ParseError},
+    combinator::{cut, map, opt, value},
+    error::VerboseError,
     multi::{many0, separated_list0},
-    sequence::{delimited, pair, preceded, terminated, tuple},
+    sequence::{delimited, pair, preceded},
 };
 
-use crate::protorun::ast::{Expr, Span, BinaryOperator, UnaryOperator, HandlerSpec, ComprehensionKind};
-use super::common::{ParseResult, ws_comments, identifier_string, with_context, delimited_list, calculate_span};
+use crate::protorun::ast::{Expr, BinaryOperator, UnaryOperator, HandlerSpec, ComprehensionKind};
+use super::common::{ParseResult, ws_comments, identifier_string, delimited_list, calculate_span};
 use super::literals::{int_literal_expr, float_literal_expr, string_literal_expr, bool_literal_expr, unit_literal_expr};
-use super::patterns::{pattern, match_case};
+use super::patterns::pattern;
 use super::types::parse_type;
 
 /// 括弧式をパース
