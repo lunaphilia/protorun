@@ -85,11 +85,10 @@ Protorun言語の字句構造は、以下の原則に基づいて設計されて
 ## 2.2 キーワード
 
 ```
-fn       let      var      if       else     match    case
-return   for      while    in       trait    impl     type
-effect   try      catch    throw    with     enum     do
-module   import   pub      as       own      managed  cleanup
-handler  resume   noresume multiresume
+acquire   bind      effect    else      enum      export    fn
+for       handle    handler   if        impl      let       match
+mut       noresume  multiresume own       release   resource  resume
+return    scoped    trait     type      var       with
 ```
 
 Protorun言語のキーワードは、以下の原則に基づいて選択されています：
