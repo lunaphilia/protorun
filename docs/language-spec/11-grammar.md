@@ -125,7 +125,7 @@ IdentifierExpr ::= Identifier
 
 BlockExpr ::= "{" Statement* (Expression)? "}"
 
-IfExpr ::= "if" Expression BlockExpr ("else" (IfExpr | BlockExpr))?
+IfExpr ::= "if" Expression (BlockExpr | Expression) ("else" (IfExpr | BlockExpr | Expression))?
 
 MatchExpr ::= "match" Expression "{" (Pattern ("if" Expression)? "=>" Expression ",")* "}"
 
