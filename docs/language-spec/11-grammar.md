@@ -90,10 +90,10 @@ ResumeType ::= "(" (Type ("," Type)*)? ")" "->" ReturnType
 
 ReturnType ::= Type | "Unit"
 
-Statement ::= Expression ";"
-            | "let" Pattern (":" Type)? "=" Expression ";"
-            | "var" Identifier (":" Type)? "=" Expression ";"
-            | "return" Expression? ";"
+Statement ::= Expression
+            | "let" Pattern (":" Type)? "=" Expression
+            | "var" Identifier (":" Type)? "=" Expression
+            | "return" Expression?
 
 Expression ::= LiteralExpr
              | IdentifierExpr
@@ -138,7 +138,7 @@ MapComprehension ::= "{" Expression "->" Expression "for" Pattern "<-" Expressio
 
 SetComprehension ::= "#{" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
 
-BindExpr ::= "bind" "{" (Pattern "<-" Expression ";")* Expression "}"
+BindExpr ::= "bind" "{" (Pattern "<-" Expression)* Expression "}"
 
 LambdaExpr ::= ParamList "=>" Expression
 

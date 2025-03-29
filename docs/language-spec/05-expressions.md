@@ -158,11 +158,11 @@ xs.flatMap(x =>
 bind式は、モナド的な計算の連鎖を簡潔に表現するための構文です。Option、Result、Future、Eitherなどのモナド的な型の連鎖に最適化されています。
 
 ```
-// 基本形式
+// 基本形式 (各ステップは改行で区切ります)
 bind {
   pattern1 <- expression1
   pattern2 <- expression2
-  if condition
+  if condition // 条件もステップとして扱えます
   finalExpression
 }
 
@@ -178,15 +178,17 @@ bind {
 bind {
   data <- fetchData()
   parsed <- parseData(data)
-  if parsed.isValid
+  if parsed.isValid // ガード条件
   processData(parsed)
 }
 ```
 
+`bind` 式内の各ステップ (`pattern <- expression` や `if condition`) は、以前はセミコロンで区切られていましたが、現在は**改行**で区切られます。これにより、コードの見た目がよりすっきりします。
+
 bind式は、以下のような`flatMap`と`map`の連鎖に変換されます：
 
 ```
-// bind式
+// bind式 (セミコロンなし)
 bind {
   user <- findUser(userId)
   email <- getUserEmail(user)

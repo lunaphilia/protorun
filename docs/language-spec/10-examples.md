@@ -74,7 +74,7 @@ fn evaluate(expr: Expr): Result<Int, String> & Exception<String> = { // "with" �
   }
 }
 
-// runWithException ヘルパー関数 (05-algebraic-effects.md の例を参考)
+// runWithException ヘルパー関数 (07-algebraic-effects.md の例を参考)
 fn runWithException<T, E>(action: () -> T & Exception<E>): Result<T, E> = {
   handler ExceptionHandler: Exception<E> {
     fn raise<R>(error: E): noresume Result<R, E> = {
@@ -121,7 +121,7 @@ fn main(): Unit & Console = { // "with" を "&" に修正
 この例は、状態効果を使用したカウンターの実装を示しています。
 
 ```
-// 状態効果 (05-algebraic-effects.md より)
+// 状態効果 (07-algebraic-effects.md より)
 effect State<S> {
   fn get(): S
   fn set(newState: S): Unit
@@ -137,7 +137,7 @@ fn makeCounter(): () -> Int & State<Int> = { // initial は不要 (状態はハ�
   }
 }
 
-// runWithState ヘルパー関数 (05-algebraic-effects.md の例を参考)
+// runWithState ヘルパー関数 (07-algebraic-effects.md の例を参考)
 fn runWithState<S, T>(initialState: S, action: () -> T & State<S>): (T, S) = {
   var state = initialState
 
@@ -199,7 +199,7 @@ fn main(): Unit & Console = { // "with" を "&" に修正
 
 ## 8.4 ファイル処理（ライフサイクル管理効果を使用）
 
-この例は、ライフサイクル管理効果を使用したファイル処理の実装を示しています。ライフサイクル管理効果の詳細については、[5.4 ライフサイクル管理効果](05-algebraic-effects.md#54-ライフサイクル管理効果)を参照してください。
+この例は、ライフサイクル管理効果を使用したファイル処理の実装を示しています。ライフサイクル管理効果の詳細については、[7.4 ライフサイクル管理効果](07-algebraic-effects.md#74-ライフサイクル管理効果)を参照してください。
 
 ```
 // FileSystem 効果 (05-algebraic-effects.md より)
@@ -235,7 +235,7 @@ fn processFile(path: String): Result<String, IOError> & FileSystem = { // IOErro
 
 ## 8.5 暗黙的パラメータを使用したデータベース操作
 
-この例は、暗黙的パラメータと効果システムを使用したデータベース操作の実装を示しています。暗黙的パラメータの詳細については、[5.8 暗黙的パラメータと効果システム](05-algebraic-effects.md#58-暗黙的パラメータと効果システム)を参照してください。
+この例は、暗黙的パラメータと効果システムを使用したデータベース操作の実装を示しています。暗黙的パラメータの詳細については、[7.8 暗黙的パラメータと効果システム](07-algebraic-effects.md#78-暗黙的パラメータと効果システム)を参照してください。
 
 ```
 // ユーザーデータ型

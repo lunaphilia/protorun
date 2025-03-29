@@ -28,7 +28,7 @@
 - 将来の拡張に関する考察
 - 参考文献の整理
 - 言語仕様書の構造改善と内容の充実（宣言、文、式の分離）
-- 文法（EBNF）の改善と完全化
+- 文法（EBNF）の改善と完全化（文末セミコロン削除）
 - 文書記述のルールの確立と適用
 
 ### サンプルコード
@@ -188,6 +188,7 @@
   - 未定義の `try...catch` 構文を使用していた例を、`Result` 型と `noresume` ハンドラを使用する形に修正 (`07-algebraic-effects.md`, `10-examples.md`)。
   - その他、不完全な記述や重複部分を整理 (`07-algebraic-effects.md`)。
   - 言語仕様書の構成を宣言、文、式に分離 (`03-declarations.md`, `04-statements.md`, `05-expressions.md` を作成/更新)。
+  - 文末および `BindExpr` 内のセミコロンを不要とする仕様変更を反映 (`11-grammar.md`, `04-statements.md`, `05-expressions.md`, `10-examples.md`)。
 
 ## 次のマイルストーン
 1. **言語仕様の完成**（目標：2025年4月末）

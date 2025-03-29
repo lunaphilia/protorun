@@ -5,9 +5,15 @@
 - パーサーの機能拡張と安定化
 - シンボルテーブルの機能強化
 - 型チェッカーの設計準備
-- 言語仕様の詳細化と形式化
 
 ## 最近の変更
+- 言語仕様の更新（セミコロン不要化）:
+  - 文末および `BindExpr` 内のセミコロンを不要とする仕様に変更。
+  - 文法定義 (`11-grammar.md`) を更新。
+  - 文 (`04-statements.md`) および式 (`05-expressions.md`) の説明を更新。
+  - サンプルコード (`10-examples.md`) を更新。
+  - 改行が文および `BindExpr` のステップの区切りとなることを明記。
+
 - コードのクリーンアップ：
   - 未使用のインポートを削除：`cargo fix --allow-dirty`を使用して、プロジェクト全体から未使用のインポートを削除
   - 主な修正ファイル：`common.rs`（5箇所）、`modules.rs`（3箇所）、`expressions.rs`（4箇所）、`literals.rs`（2箇所）など
@@ -70,6 +76,14 @@
   - パーサー (`src/protorun/parser/types.rs`) から `tuple_type` 関数と関連コードを削除
   - テストコード (`src/protorun/parser/tests_types.rs`) からタプル型関連のテストを削除
   - 関連するヘルパー関数 (`src/main.rs` の `type_to_string`) を修正
+
+- 言語仕様書の構成変更：
+  - 文法カテゴリ（宣言、文、式）に基づいて仕様書を再構成。
+  - `03-declarations.md`、`04-statements.md` を新規作成。
+  - `03-expressions.md` を `05-expressions.md` にリネームし内容を整理。
+  - 以降のファイルの番号を更新。
+  - 関連ファイル内のリンクと目次を更新。
+  - メモリバンクファイル (`activeContext.md`, `progress.md`) を更新。
 
 - 言語仕様ドキュメントの整合性向上：
   - `docs/language-spec/` ディレクトリ内の全ドキュメントを確認し、矛盾や一貫性のない記述を修正
@@ -146,3 +160,4 @@
 - 可視性：モジュール要素の公開には `export` キーワードを使用。
 - ADT定義：代数的データ型は `enum` キーワードで定義。
 - 例外処理：`try...catch` は使用せず、`noresume` ハンドラと `Result` 型で処理。
+- 文末セミコロン：不要。改行が文の区切りとなる。
