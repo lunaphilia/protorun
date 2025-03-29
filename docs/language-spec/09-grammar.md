@@ -66,7 +66,6 @@ TypeConstraint ::= TypeRef (("&" | "|") TypeRef)*
 
 Type ::= TypeRef
        | FunctionType
-       | TupleType
        | ArrayType
 
 TypeRef ::= Identifier GenericArgs?
@@ -77,8 +76,6 @@ TypeRef ::= Identifier GenericArgs?
 GenericArgs ::= "<" (Type ("," Type)*)? ">"
 
 FunctionType ::= "(" (Type ("," Type)*)? ")" "->" Type ("&" EffectType)?
-
-TupleType ::= "(" Type ("," Type)+ ")"
 
 ArrayType ::= "[" Type "]"
 
@@ -201,7 +198,6 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 
 - **型参照（TypeRef）**: 型名とジェネリック引数で構成されます。所有権修飾子（`own`、`&`、`&mut`）を含むことができます。
 - **関数型（FunctionType）**: パラメータ型、戻り値の型、効果型で構成されます。
-- **タプル型（TupleType）**: 複数の型の組み合わせです。
 - **配列型（ArrayType）**: 要素型の配列です。
 - **効果型（EffectType）**: 関数が持つ可能性のある効果の型です。
 

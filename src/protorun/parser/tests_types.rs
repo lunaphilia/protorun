@@ -35,44 +35,6 @@ fn test_parse_array_type() {
 }
 
 #[test]
-fn test_parse_tuple_type() {
-    let input = "let pair: (Int, String) = 42;";
-    let mut parser = Parser::new(None);
-    let program = parser.parse_program(input).unwrap();
-    
-    assert_eq!(program.statements.len(), 1);
-    
-    match &program.statements[0] {
-        crate::protorun::ast::Stmt::Let { name, type_annotation, .. } => {
-            assert_eq!(name, "pair");
-            
-            match type_annotation {
-                Some(ty) => {
-                    match ty {
-                        Type::Tuple { element_types, .. } => {
-                            assert_eq!(element_types.len(), 2);
-                            
-                            match &element_types[0] {
-                                Type::Simple { name, .. } => assert_eq!(name, "Int"),
-                                _ => panic!("期待される単純型ではありません"),
-                            }
-                            
-                            match &element_types[1] {
-                                Type::Simple { name, .. } => assert_eq!(name, "String"),
-                                _ => panic!("期待される単純型ではありません"),
-                            }
-                        },
-                        _ => panic!("期待されるタプル型ではありません"),
-                    }
-                },
-                None => panic!("型注釈が期待されます"),
-            }
-        },
-        _ => panic!("期待されるlet文ではありません"),
-    }
-}
-
-#[test]
 fn test_parse_generic_type() {
     let input = "let opt: Option<Int> = None;";
     let mut parser = Parser::new(None);
@@ -194,7 +156,7 @@ fn type_name_of(ty: &crate::protorun::ast::Type) -> String {
     match ty {
         crate::protorun::ast::Type::Simple { name, .. } => format!("Simple({})", name),
         crate::protorun::ast::Type::Array { .. } => "Array".to_string(),
-        crate::protorun::ast::Type::Tuple { .. } => "Tuple".to_string(),
+        // crate::protorun::ast::Type::Tuple { .. } => "Tuple".to_string(), // タプル型を削除
         crate::protorun::ast::Type::Function { .. } => "Function".to_string(),
         crate::protorun::ast::Type::Generic { base_type, .. } => format!("Generic({})", base_type),
         crate::protorun::ast::Type::Reference { is_mutable, .. } => {
@@ -309,55 +271,4 @@ fn test_parse_owned_type() {
     }
 }
 
-#[test]
-fn test_parse_complex_type() {
-    let input = "let complex: Option<(Int, &mut String)> = 42;";
-    let mut parser = Parser::new(None);
-    let program = parser.parse_program(input).unwrap();
-    
-    assert_eq!(program.statements.len(), 1);
-    
-    match &program.statements[0] {
-        crate::protorun::ast::Stmt::Let { name, type_annotation, .. } => {
-            assert_eq!(name, "complex");
-            
-            match type_annotation {
-                Some(ty) => {
-                    match ty {
-                        Type::Generic { base_type, type_arguments, .. } => {
-                            assert_eq!(base_type, "Option");
-                            assert_eq!(type_arguments.len(), 1);
-                            
-                            match &type_arguments[0] {
-                                Type::Tuple { element_types, .. } => {
-                                    assert_eq!(element_types.len(), 2);
-                                    
-                                    match &element_types[0] {
-                                        Type::Simple { name, .. } => assert_eq!(name, "Int"),
-                                        _ => panic!("期待される単純型ではありません"),
-                                    }
-                                    
-                                    match &element_types[1] {
-                                        Type::Reference { is_mutable, referenced_type, .. } => {
-                                            assert_eq!(*is_mutable, true);
-                                            
-                                            match &**referenced_type {
-                                                Type::Simple { name, .. } => assert_eq!(name, "String"),
-                                                _ => panic!("期待される単純型ではありません"),
-                                            }
-                                        },
-                                        _ => panic!("期待される参照型ではありません"),
-                                    }
-                                },
-                                _ => panic!("期待されるタプル型ではありません"),
-                            }
-                        },
-                        _ => panic!("期待されるジェネリック型ではありません"),
-                    }
-                },
-                None => panic!("型注釈が期待されます"),
-            }
-        },
-        _ => panic!("期待されるlet文ではありません"),
-    }
-}
+// test_parse_complex_type はタプル型を含むため削除

@@ -57,7 +57,7 @@
   - with式（代数的効果のハンドラ）
 - 複合型の構文解析器の実装：
   - 配列型（`[Int]`）
-  - タプル型（`(Int, String)`）
+  // - タプル型（`(Int, String)`） // 廃止
   - ジェネリック型（`Option<Int>`）
   - 関数型（`(Int, Int) -> Int`）
   - 効果付き型（`(String) -> String & IO`）
@@ -168,6 +168,14 @@
   - 単体テストの追加（型シンボル登録、シンボル使用追跡、シンボル種類検索）
   - プロパティベーステストの追加（ランダムな入力に対するテスト）
   - proptestライブラリの導入
+
+- タプル型の廃止：
+  - 構文の曖昧さ（型のグループ化 `(T)` と単一要素タプル `(T,)` の区別）と、タプル型による可読性低下の懸念から、タプル型を言語仕様から削除
+  - 文法定義 (`docs/language-spec/09-grammar.md`) から `TupleType` を削除
+  - AST (`src/protorun/ast/mod.rs`) の `Type` enum から `Tuple` バリアントを削除
+  - パーサー (`src/protorun/parser/types.rs`) から `tuple_type` 関数と関連コードを削除
+  - テストコード (`src/protorun/parser/tests_types.rs`) からタプル型関連のテストを削除
+  - 関連するヘルパー関数 (`src/main.rs` の `type_to_string`) を修正
 
 ## 次のマイルストーン
 1. **言語仕様の完成**（目標：2025年4月末）

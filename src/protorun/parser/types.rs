@@ -71,44 +71,6 @@ pub fn array_type<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a
     }))
 }
 
-/// タプル型をパース
-pub fn tuple_type<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Type> {
-    let (input, _) = ws_comments(char('('))(input)?;
-    let (input, first_type) = parse_type(input, original_input)?;
-    
-    // カンマがある場合はタプル型、ない場合は括弧で囲まれた型
-    let (input, rest) = opt(
-        preceded(
-            ws_comments(char(',')),
-            separated_list0(
-                ws_comments(char(',')),
-                |i| parse_type(i, original_input)
-            )
-        )
-    )(input)?;
-    
-    let (input, _) = cut(ws_comments(char(')')))(input)?;
-    
-    match rest {
-        Some(mut types) => {
-            // タプル型
-            let span = calculate_span(original_input, input);
-            
-            let mut element_types = vec![first_type];
-            element_types.append(&mut types);
-            
-            Ok((input, Type::Tuple {
-                element_types,
-                span,
-            }))
-        },
-        None => {
-            // 括弧で囲まれた型
-            Ok((input, first_type))
-        }
-    }
-}
-
 /// 効果型をパース
 pub fn effect_type<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Type> {
     preceded(
@@ -206,7 +168,7 @@ pub fn parse_type<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a
         |i| reference_type(i, original_input),
         |i| function_type(i, original_input),
         |i| array_type(i, original_input),
-        |i| tuple_type(i, original_input),
+        // |i| tuple_type(i, original_input), // タプル型パーサーを削除
         |i| generic_type(i, original_input)
     ))(input)
 }

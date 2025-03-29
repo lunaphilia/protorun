@@ -368,13 +368,7 @@ fn type_to_string(typ: &protorun::ast::Type) -> String {
         protorun::ast::Type::Array { element_type, .. } => {
             format!("[{}]", type_to_string(element_type))
         },
-        protorun::ast::Type::Tuple { element_types, .. } => {
-            let types: Vec<String> = element_types.iter()
-                .map(type_to_string)
-                .collect();
-            
-            format!("({})", types.join(", "))
-        },
+        // protorun::ast::Type::Tuple の処理を削除
         protorun::ast::Type::Generic { base_type, type_arguments, .. } => {
             let args: Vec<String> = type_arguments.iter()
                 .map(type_to_string)

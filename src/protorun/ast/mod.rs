@@ -224,11 +224,6 @@ pub enum Type {
         element_type: Box<Type>,
         span: Span,
     },
-    /// タプル型
-    Tuple {
-        element_types: Vec<Type>,
-        span: Span,
-    },
     /// ジェネリック型
     Generic {
         base_type: String,
