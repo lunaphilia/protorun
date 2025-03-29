@@ -18,52 +18,58 @@
 
 ```
 // リスト
-sealed trait List<T>
-object List {
-  case class Cons<T>(head: T, tail: List<T>) extends List<T>
-  case object Nil extends List<Nothing>
-  
-  // リスト操作
-  pub fn empty<T>(): List<T> = Nil
-  pub fn cons<T>(head: T, tail: List<T>): List<T> = Cons(head, tail)
-  pub fn map<T, U>(list: List<T>, f: (T) -> U): List<U> = match list {
-    Nil => Nil,
-    Cons(head, tail) => Cons(f(head), map(tail, f))
-  }
-  pub fn filter<T>(list: List<T>, predicate: (T) -> Bool): List<T> = match list {
-    Nil => Nil,
-    Cons(head, tail) => if predicate(head) {
-      Cons(head, filter(tail, predicate))
-    } else {
-      filter(tail, predicate)
-    }
-  }
+enum List<T> {
+  Cons(head: T, tail: List<T>),
+  Nil
 }
 
-// マップ
+// List モジュール (コンパニオンオブジェクト的な役割)
+module List {
+  // リスト操作 (例)
+  // 注意: 以下の関数定義は例であり、実際の標準ライブラリの実装とは異なる場合があります。
+  // また、List<T> のメソッドとして実装される可能性もあります。
+  export fn empty<T>(): List<T> = List.Nil
+  export fn cons<T>(head: T, tail: List<T>): List<T> = List.Cons(head, tail)
+  // export fn append<T>(list1: List<T>, list2: List<T>): List<T> // 例: appendの実装は省略
+  // map や filter などの高階関数は、List<T> 型のメソッドとして
+  // または List モジュール内の関数として提供される可能性があります。
+}
+
+// マップ (トレイトとして定義 - 実装は標準ライブラリで提供)
 trait Map<K, V> {
   fn get(key: K): Option<V>
-  fn put(key: K, value: V): Map<K, V>
-  fn remove(key: K): Map<K, V>
+  fn put(key: K, value: V): Map<K, V> // Note: May need to be mutable or return new map
+  fn remove(key: K): Map<K, V>      // Note: May need to be mutable or return new map
   fn contains(key: K): Bool
   fn keys(): List<K>
   fn values(): List<V>
-  fn entries(): List<(K, V)>
+  fn entries(): List<(K, V)> // タプル値は維持
   fn isEmpty(): Bool
   fn size(): Int
 }
+// Map モジュール (コンパニオンオブジェクト的な役割)
+module Map {
+  // マップ構築関数など (例)
+  export fn empty<K, V>(): Map<K, V>
+}
 
-// セット
+
+// セット (トレイトとして定義 - 実装は標準ライブラリで提供)
 trait Set<T> {
   fn contains(value: T): Bool
-  fn add(value: T): Set<T>
-  fn remove(value: T): Set<T>
+  fn add(value: T): Set<T>      // Note: May need to be mutable or return new set
+  fn remove(value: T): Set<T>   // Note: May need to be mutable or return new set
   fn union(other: Set<T>): Set<T>
   fn intersection(other: Set<T>): Set<T>
   fn difference(other: Set<T>): Set<T>
   fn isEmpty(): Bool
   fn size(): Int
   fn toList(): List<T>
+}
+// Set モジュール (コンパニオンオブジェクト的な役割)
+module Set {
+  // セット構築関数など (例)
+  export fn empty<T>(): Set<T>
 }
 
 // オプション型
@@ -78,95 +84,94 @@ enum Result<T, E> {
   Err(E)
 }
 
-// Result型の拡張メソッド
+// Result型の拡張メソッド (implブロックを使用)
 impl<T, E> Result<T, E> {
   // 既存のメソッド
   fn map<U>(self, f: (T) -> U): Result<U, E> = match self {
     Result.Ok(value) => Result.Ok(f(value)),
     Result.Err(error) => Result.Err(error)
   }
-  
+
   fn flatMap<U>(self, f: (T) -> Result<U, E>): Result<U, E> = match self {
     Result.Ok(value) => f(value),
     Result.Err(error) => Result.Err(error)
   }
-  
+
   // 新しいユーティリティメソッド
   fn mapErr<F>(self, f: (E) -> F): Result<T, F> = match self {
     Result.Ok(value) => Result.Ok(value),
     Result.Err(error) => Result.Err(f(error))
   }
-  
+
   fn flatMapErr<F>(self, f: (E) -> Result<T, F>): Result<T, F> = match self {
     Result.Ok(value) => Result.Ok(value),
     Result.Err(error) => f(error)
   }
-  
+
+  // 注意: panic は言語のコア機能として別途定義される必要があります
   fn unwrap(self): T = match self {
     Result.Ok(value) => value,
     Result.Err(_) => panic("Result.unwrap called on an Err value")
   }
-  
+
   fn unwrapOr(self, default: T): T = match self {
     Result.Ok(value) => value,
     Result.Err(_) => default
   }
-  
+
   fn unwrapOrElse(self, f: (E) -> T): T = match self {
     Result.Ok(value) => value,
     Result.Err(error) => f(error)
   }
-  
+
   fn isOk(self): Bool = match self {
     Result.Ok(_) => true,
     Result.Err(_) => false
   }
-  
+
   fn isErr(self): Bool = match self {
     Result.Ok(_) => false,
     Result.Err(_) => true
   }
-  
+
+  // 注意: panic は言語のコア機能として別途定義される必要があります
   fn unwrapErr(self): E = match self {
     Result.Ok(_) => panic("Result.unwrapErr called on an Ok value"),
     Result.Err(error) => error
   }
 }
 
-// Result型のユーティリティ関数
+// Result モジュール (ユーティリティ関数)
 module Result {
-  // 複数のResultを結合する
-  fn all<T, E>(results: List<Result<T, E>>): Result<List<T>, E> = {
-    let values = List.empty<T>()
-    
-    for result in results {
-      match result {
-        Result.Ok(value) => values = List.append(values, List.of(value)),
-        Result.Err(error) => return Result.Err(error)
-      }
-    }
-    
-    Result.Ok(values)
-  }
-  
-  // 最初に成功したResultを返す
-  fn any<T, E>(results: List<Result<T, E>>): Result<T, List<E>> = {
-    let errors = List.empty<E>()
-    
-    for result in results {
-      match result {
-        Result.Ok(value) => return Result.Ok(value),
-        Result.Err(error) => errors = List.append(errors, List.of(error))
-      }
-    }
-    
-    Result.Err(errors)
-  }
+  // 複数のResultを結合する (実装は List の機能に依存するため、シグネチャのみ示す)
+  export fn all<T, E>(results: List<Result<T, E>>): Result<List<T>, E>
+  // {
+  //   // 実装例 (List.fold, List.reverse, List.cons が必要)
+  //   results.fold(Result.Ok(List.empty<T>()), (accResult, currentResult) => {
+  //     bind {
+  //       acc <- accResult
+  //       current <- currentResult
+  //       Result.Ok(List.cons(current, acc)) // 逆順になるので最後に reverse が必要
+  //     }
+  //   }).map(list => list.reverse()) // List.reverse が必要
+  // }
+
+  // 最初に成功したResultを返す (実装は List の機能に依存するため、シグネチャのみ示す)
+  export fn any<T, E>(results: List<Result<T, E>>): Result<T, List<E>>
+  // {
+  //   // 実装例 (List.fold, List.reverse, List.cons が必要)
+  //   results.fold(Result.Err(List.empty<E>()), (accResult, currentResult) => {
+  //     match (accResult, currentResult) {
+  //       (Result.Ok(v), _) => Result.Ok(v), // 既に成功が見つかっていればそれを返す
+  //       (_, Result.Ok(v)) => Result.Ok(v), // 現在のものが成功ならそれを返す
+  //       (Result.Err(errs), Result.Err(err)) => Result.Err(List.cons(err, errs)), // 両方エラーならエラーリストに追加 (逆順)
+  //     }
+  //   }).mapErr(errs => errs.reverse()) // List.reverse が必要
+  // }
 }
 ```
 
-これらのコアデータ構造は、型安全で効率的なプログラミングを可能にします。各データ構造は、関連する操作と共に提供され、関数型プログラミングのパターンをサポートします。
-
+```
 ## 7.3 I/O操作
 
 標準ライブラリは、ファイルシステムやコンソールとの対話など、I/O操作のための効果を提供します。
@@ -179,42 +184,42 @@ effect IO {
   fn writeFile(path: String, content: String): Result<Unit, IOError>
   fn fileExists(path: String): Bool
   fn deleteFile(path: String): Result<Unit, IOError>
-  
+
   // コンソール操作
   fn println(message: String): Unit
   fn print(message: String): Unit
   fn readLine(): String
-  
+
   // 環境変数
   fn getEnv(name: String): Option<String>
   fn setEnv(name: String, value: String): Result<Unit, IOError>
 }
 
 // I/O効果のハンドラ
-handler IOHandler for IO {
+handler IOHandler: IO { // "for" を ":" に修正
   // ファイル操作の実装
   fn readFile(path: String): Result<String, IOError> = {
     // プラットフォーム固有の実装
   }
-  
+
   fn writeFile(path: String, content: String): Result<Unit, IOError> = {
     // プラットフォーム固有の実装
   }
-  
+
   // コンソール操作の実装
   fn println(message: String): Unit = {
     // プラットフォーム固有の実装
   }
-  
+
   fn readLine(): String = {
     // プラットフォーム固有の実装
   }
-  
+
   // 他のI/O操作の実装...
 }
 
 // 使用例
-fn processFile(path: String): Result<String, IOError> with IO = {
+fn processFile(path: String): Result<String, IOError> & IO = { // "with" を "&" に修正 (効果の宣言)
   if IO.fileExists(path) {
     let content = IO.readFile(path)?
     let processed = processContent(content)
@@ -228,8 +233,6 @@ fn processFile(path: String): Result<String, IOError> with IO = {
 }
 ```
 
-I/O操作は代数的効果として実装され、型安全な方法で副作用を制御できます。これにより、純粋な関数と副作用を持つコードを明確に分離できます。
-
 ## 7.4 並行処理
 
 標準ライブラリは、並行処理と非同期プログラミングのためのサポートを提供します。
@@ -241,7 +244,7 @@ effect Async {
   fn spawn<T>(task: () -> T): Task<T>
   fn await<T>(task: Task<T>): T
   fn sleep(duration: Duration): Unit
-  
+
   // 並行制御
   fn withTimeout<T>(duration: Duration, task: () -> T): Result<T, TimeoutError>
   fn race<T>(tasks: List<() -> T>): T
@@ -249,31 +252,31 @@ effect Async {
 }
 
 // 非同期効果のハンドラ
-handler AsyncHandler for Async {
+handler AsyncHandler: Async { // "for" を ":" に修正
   // タスク管理の実装
   fn spawn<T>(task: () -> T, resume: (Task<T>) -> Unit): Unit = {
     // プラットフォーム固有の実装
     let taskHandle = createTask(task)
     resume(taskHandle)
   }
-  
+
   fn await<T>(task: Task<T>, resume: (T) -> Unit): Unit = {
     // プラットフォーム固有の実装
     task.onComplete(result => resume(result))
   }
-  
+
   // 他の非同期操作の実装...
 }
 
 // 使用例
-fn fetchData(url: String): Result<String, NetworkError> with Async & IO = {
+fn fetchData(url: String): Result<String, NetworkError> & Async & IO = { // "with" を "&" に修正
   IO.println(s"データを取得中: $url")
-  
+
   let task = Async.spawn(() => {
     // ネットワークリクエストの実行
     networkRequest(url)
   })
-  
+
   // タイムアウト付きで結果を待機
   Async.withTimeout(Duration.ofSeconds(10), () => {
     let result = Async.await(task)?
@@ -299,54 +302,54 @@ fn fetchData(url: String): Result<String, NetworkError> with Async & IO = {
 // リスト操作
 module List {
   // 変換操作
-  pub fn map<T, U>(list: List<T>, f: (T) -> U): List<U>
-  pub fn flatMap<T, U>(list: List<T>, f: (T) -> List<U>): List<U>
-  pub fn filter<T>(list: List<T>, predicate: (T) -> Bool): List<T>
-  
+  export fn map<T, U>(list: List<T>, f: (T) -> U): List<U>
+  export fn flatMap<T, U>(list: List<T>, f: (T) -> List<U>): List<U>
+  export fn filter<T>(list: List<T>, predicate: (T) -> Bool): List<T>
+
   // 集約操作
-  pub fn fold<T, U>(list: List<T>, initial: U, f: (U, T) -> U): U
-  pub fn reduce<T>(list: List<T>, f: (T, T) -> T): Option<T>
-  pub fn sum<T: Num>(list: List<T>): T
-  
+  export fn fold<T, U>(list: List<T>, initial: U, f: (U, T) -> U): U
+  export fn reduce<T>(list: List<T>, f: (T, T) -> T): Option<T>
+  export fn sum<T: Num>(list: List<T>): T // Num トレイトが必要
+
   // 検索操作
-  pub fn find<T>(list: List<T>, predicate: (T) -> Bool): Option<T>
-  pub fn contains<T: Eq>(list: List<T>, value: T): Bool
-  pub fn indexOf<T: Eq>(list: List<T>, value: T): Option<Int>
-  
+  export fn find<T>(list: List<T>, predicate: (T) -> Bool): Option<T>
+  export fn contains<T: Eq>(list: List<T>, value: T): Bool // Eq トレイトが必要
+  export fn indexOf<T: Eq>(list: List<T>, value: T): Option<Int> // Eq トレイトが必要
+
   // 構造操作
-  pub fn append<T>(list1: List<T>, list2: List<T>): List<T>
-  pub fn reverse<T>(list: List<T>): List<T>
-  pub fn take<T>(list: List<T>, n: Int): List<T>
-  pub fn drop<T>(list: List<T>, n: Int): List<T>
+  export fn append<T>(list1: List<T>, list2: List<T>): List<T>
+  export fn reverse<T>(list: List<T>): List<T>
+  export fn take<T>(list: List<T>, n: Int): List<T>
+  export fn drop<T>(list: List<T>, n: Int): List<T>
 }
 
 // マップ操作
 module Map {
   // 変換操作
-  pub fn mapValues<K, V, W>(map: Map<K, V>, f: (V) -> W): Map<K, W>
-  pub fn filterKeys<K, V>(map: Map<K, V>, predicate: (K) -> Bool): Map<K, V>
-  pub fn filterValues<K, V>(map: Map<K, V>, predicate: (V) -> Bool): Map<K, V>
-  
+  export fn mapValues<K, V, W>(map: Map<K, V>, f: (V) -> W): Map<K, W>
+  export fn filterKeys<K, V>(map: Map<K, V>, predicate: (K) -> Bool): Map<K, V>
+  export fn filterValues<K, V>(map: Map<K, V>, predicate: (V) -> Bool): Map<K, V>
+
   // 集約操作
-  pub fn foldEntries<K, V, U>(map: Map<K, V>, initial: U, f: (U, K, V) -> U): U
-  
+  export fn foldEntries<K, V, U>(map: Map<K, V>, initial: U, f: (U, K, V) -> U): U
+
   // 構造操作
-  pub fn merge<K, V>(map1: Map<K, V>, map2: Map<K, V>): Map<K, V>
-  pub fn withDefault<K, V>(map: Map<K, V>, defaultValue: V): (K) -> V
+  export fn merge<K, V>(map1: Map<K, V>, map2: Map<K, V>): Map<K, V> // 衝突解決戦略が必要な場合がある
+  export fn withDefault<K, V>(map: Map<K, V>, defaultValue: V): (K) -> V
 }
 
 // セット操作
 module Set {
   // 集合演算
-  pub fn union<T>(set1: Set<T>, set2: Set<T>): Set<T>
-  pub fn intersection<T>(set1: Set<T>, set2: Set<T>): Set<T>
-  pub fn difference<T>(set1: Set<T>, set2: Set<T>): Set<T>
-  pub fn symmetricDifference<T>(set1: Set<T>, set2: Set<T>): Set<T>
-  
+  export fn union<T>(set1: Set<T>, set2: Set<T>): Set<T>
+  export fn intersection<T>(set1: Set<T>, set2: Set<T>): Set<T>
+  export fn difference<T>(set1: Set<T>, set2: Set<T>): Set<T>
+  export fn symmetricDifference<T>(set1: Set<T>, set2: Set<T>): Set<T>
+
   // 検査操作
-  pub fn isSubset<T>(set1: Set<T>, set2: Set<T>): Bool
-  pub fn isSuperset<T>(set1: Set<T>, set2: Set<T>): Bool
-  pub fn isDisjoint<T>(set1: Set<T>, set2: Set<T>): Bool
+  export fn isSubset<T>(set1: Set<T>, set2: Set<T>): Bool
+  export fn isSuperset<T>(set1: Set<T>, set2: Set<T>): Bool
+  export fn isDisjoint<T>(set1: Set<T>, set2: Set<T>): Bool
 }
 ```
 
@@ -372,30 +375,30 @@ trait Num<T> {
 // 数学関数
 module Math {
   // 定数
-  pub const PI: Float = 3.14159265358979323846
-  pub const E: Float = 2.71828182845904523536
-  
+  export const PI: Float = 3.14159265358979323846
+  export const E: Float = 2.71828182845904523536
+
   // 基本関数
-  pub fn sqrt(x: Float): Float
-  pub fn pow(x: Float, y: Float): Float
-  pub fn exp(x: Float): Float
-  pub fn log(x: Float): Float
-  pub fn log10(x: Float): Float
-  
+  export fn sqrt(x: Float): Float
+  export fn pow(x: Float, y: Float): Float
+  export fn exp(x: Float): Float
+  export fn log(x: Float): Float
+  export fn log10(x: Float): Float
+
   // 三角関数
-  pub fn sin(x: Float): Float
-  pub fn cos(x: Float): Float
-  pub fn tan(x: Float): Float
-  pub fn asin(x: Float): Float
-  pub fn acos(x: Float): Float
-  pub fn atan(x: Float): Float
-  pub fn atan2(y: Float, x: Float): Float
-  
+  export fn sin(x: Float): Float
+  export fn cos(x: Float): Float
+  export fn tan(x: Float): Float
+  export fn asin(x: Float): Float
+  export fn acos(x: Float): Float
+  export fn atan(x: Float): Float
+  export fn atan2(y: Float, x: Float): Float
+
   // 丸め関数
-  pub fn floor(x: Float): Float
-  pub fn ceil(x: Float): Float
-  pub fn round(x: Float): Float
-  pub fn truncate(x: Float): Float
+  export fn floor(x: Float): Float
+  export fn ceil(x: Float): Float
+  export fn round(x: Float): Float
+  export fn truncate(x: Float): Float
 }
 ```
 
@@ -409,30 +412,30 @@ module Math {
 // 文字列操作
 module String {
   // 基本操作
-  pub fn length(s: String): Int
-  pub fn isEmpty(s: String): Bool
-  pub fn charAt(s: String, index: Int): Option<Char>
-  pub fn substring(s: String, start: Int, end: Int): String
-  
+  export fn length(s: String): Int
+  export fn isEmpty(s: String): Bool
+  export fn charAt(s: String, index: Int): Option<Char>
+  export fn substring(s: String, start: Int, end: Int): String
+
   // 変換操作
-  pub fn toUpperCase(s: String): String
-  pub fn toLowerCase(s: String): String
-  pub fn trim(s: String): String
-  pub fn replace(s: String, oldStr: String, newStr: String): String
-  
+  export fn toUpperCase(s: String): String
+  export fn toLowerCase(s: String): String
+  export fn trim(s: String): String
+  export fn replace(s: String, oldStr: String, newStr: String): String
+
   // 検索操作
-  pub fn contains(s: String, substr: String): Bool
-  pub fn startsWith(s: String, prefix: String): Bool
-  pub fn endsWith(s: String, suffix: String): Bool
-  pub fn indexOf(s: String, substr: String): Option<Int>
-  pub fn lastIndexOf(s: String, substr: String): Option<Int>
-  
+  export fn contains(s: String, substr: String): Bool
+  export fn startsWith(s: String, prefix: String): Bool
+  export fn endsWith(s: String, suffix: String): Bool
+  export fn indexOf(s: String, substr: String): Option<Int>
+  export fn lastIndexOf(s: String, substr: String): Option<Int>
+
   // 分割と結合
-  pub fn split(s: String, delimiter: String): List<String>
-  pub fn join(strings: List<String>, delimiter: String): String
-  
-  // 文字列補間
-  pub fn format(template: String, args: Map<String, String>): String
+  export fn split(s: String, delimiter: String): List<String>
+  export fn join(strings: List<String>, delimiter: String): String
+
+  // 文字列補間 (言語機能として提供される可能性あり)
+  // export fn format(template: String, args: Map<String, String>): String
 }
 ```
 

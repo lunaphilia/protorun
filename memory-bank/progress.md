@@ -177,6 +177,17 @@
   - テストコード (`src/protorun/parser/tests_types.rs`) からタプル型関連のテストを削除
   - 関連するヘルパー関数 (`src/main.rs` の `type_to_string`) を修正
 
+- 言語仕様ドキュメントの整合性向上：
+  - `docs/language-spec/` ディレクトリ内の全ドキュメントを確認し、矛盾や一貫性のない記述を修正。
+  - 文法定義 (`09-grammar.md`) を更新し、`export` キーワードと `enum` キーワードのルールを追加。
+  - 廃止されたタプル*型*に関する記述を削除 (`02-type-system.md`)。
+  - メンバーアクセス式 (`.`) の説明を追加 (`03-expressions.md`)。
+  - 可視性キーワードを `pub` から `export` に統一 (`06-modules.md`, `07-standard-library.md`)。
+  - `List` の定義を `enum` 構文に統一 (`07-standard-library.md`)。
+  - 効果ハンドラの定義・適用構文を `:` を使う形式に統一 (`07-standard-library.md`, `08-examples.md`)。
+  - 未定義の `try...catch` 構文を使用していた例を、`Result` 型と `noresume` ハンドラを使用する形に修正 (`05-algebraic-effects.md`, `08-examples.md`)。
+  - その他、不完全な記述や重複部分を整理 (`05-algebraic-effects.md`)。
+
 ## 次のマイルストーン
 1. **言語仕様の完成**（目標：2025年4月末）
    - 言語仕様書の完成

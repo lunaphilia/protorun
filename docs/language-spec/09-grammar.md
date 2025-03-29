@@ -17,13 +17,12 @@ Protorun言語の文法は、言語の構文を形式的に定義するための
 ```ebnf
 Program ::= (Declaration | Statement)*
 
-Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl
+Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl | ExportDecl | EnumDecl
 
 FunctionDecl ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("&" EffectType)? "=" Expression
                | "fn" Identifier GenericParams? ParamList ImplicitParamList? (":" Type)? ("&" EffectType)? "=" Expression
 
 TypeDecl ::= "type" Identifier GenericParams? "=" (RecordType | Type)
-           | "sealed" "trait" Identifier GenericParams? ("{" TraitMember* "}")? (":" TypeRef)?
 
 TraitDecl ::= "trait" Identifier GenericParams? ("{" TraitMember* "}")? (":" TypeRef)?
 
@@ -32,6 +31,12 @@ ImplDecl ::= "impl" GenericParams? TypeRef ":" TypeRef "{" ImplMember* "}"
 EffectDecl ::= "effect" Identifier GenericParams? (":" TypeRef)? "{" EffectOperation* "}"
 
 HandlerDecl ::= "handler" Identifier GenericParams? ":" TypeRef "{" HandlerMember* "}"
+
+ExportDecl ::= "export" (FunctionDecl | TypeDecl | TraitDecl | EffectDecl | HandlerDecl | ExportList)
+ExportList ::= "{" (Identifier ("," Identifier)*)? "}"
+
+EnumDecl ::= "enum" Identifier GenericParams? "{" (EnumVariant ("," EnumVariant)*)? "}"
+EnumVariant ::= Identifier ("(" Type ("," Type)* ")")?
 
 RecordType ::= "{" (Identifier ":" Type ("," Identifier ":" Type)*)? "}"
 

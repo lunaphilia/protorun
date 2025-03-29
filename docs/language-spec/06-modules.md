@@ -19,26 +19,26 @@
 ```
 module Math {
   // 公開関数（外部からアクセス可能）
-  pub fn add(a: Int, b: Int): Int = a + b
-  pub fn subtract(a: Int, b: Int): Int = a - b
+  export fn add(a: Int, b: Int): Int = a + b
+  export fn subtract(a: Int, b: Int): Int = a - b
   
   // 非公開関数（モジュール内でのみアクセス可能）
   fn helper(): Int = 42
   
   // 公開型
-  pub type Point = {
+  export type Point = {
     x: Float,
     y: Float
   }
   
   // 公開定数
-  pub const PI: Float = 3.14159
+  export const PI: Float = 3.14159
 }
 ```
 
 モジュール定義には以下の特徴があります：
 
-1. **公開/非公開**: `pub`キーワードを使用して、モジュール外からアクセス可能な要素を指定します。
+1. **公開/非公開**: `export`キーワードを使用して、モジュール外からアクセス可能な要素を指定します。
 2. **スコープ**: モジュール内で定義された要素は、そのモジュールのスコープ内に存在します。
 3. **ネスト**: モジュールは他のモジュール内にネストすることができます。
 
@@ -56,8 +56,8 @@ import Math.add
 // 複数の要素のインポート
 import Math.{add, subtract}
 
-// モジュールのすべての公開要素のインポート
-import Math.*
+// モジュールのすべての公開要素のインポート（注意：ワイルドカードインポートは推奨されない場合がある）
+// import Math.* // 文法的には可能だが、名前空間の汚染を避けるため、通常は明示的なインポートが推奨される
 
 // 別名を付けてインポート
 import Math as M
@@ -67,7 +67,7 @@ import Math.add as addition
 インポートには以下の特徴があります：
 
 1. **選択的インポート**: 必要な要素のみをインポートできます。
-2. **ワイルドカードインポート**: モジュールのすべての公開要素をインポートできます。
+2. **ワイルドカードインポート**: モジュールのすべての公開要素をインポートできますが、名前空間の衝突を避けるために注意が必要です。
 3. **別名**: インポートした要素に別名を付けることができます。
 4. **可視性**: インポートした要素は、インポートしたスコープ内でのみ使用できます。
 
@@ -78,22 +78,22 @@ import Math.add as addition
 ```
 module Graphics {
   // 共通の型や関数
-  pub type Color = {
+  export type Color = {
     r: Int,
     g: Int,
     b: Int
   }
   
   // 2Dグラフィックスのサブモジュール
-  pub module TwoD {
-    pub fn drawRect(x: Int, y: Int, width: Int, height: Int, color: Color): Unit = {
+  export module TwoD {
+    export fn drawRect(x: Int, y: Int, width: Int, height: Int, color: Color): Unit = {
       // 実装
     }
   }
   
   // 3Dグラフィックスのサブモジュール
-  pub module ThreeD {
-    pub fn drawCube(x: Int, y: Int, z: Int, size: Int, color: Color): Unit = {
+  export module ThreeD {
+    export fn drawCube(x: Int, y: Int, z: Int, size: Int, color: Color): Unit = {
       // 実装
     }
   }
@@ -111,7 +111,7 @@ import Graphics.{TwoD, ThreeD}
 
 1. **名前空間の整理**: 関連する機能をさらに細かく整理できます。
 2. **選択的インポート**: 必要なサブモジュールのみをインポートできます。
-3. **可視性の制御**: サブモジュールの可視性も制御できます。
+3. **可視性の制御**: サブモジュールの可視性も`export`キーワードで制御できます。
 
 ## 6.5 モジュールとファイルシステム
 
@@ -150,7 +150,7 @@ fn main(): Unit = {
 1. **凝集度**: モジュールは関連する機能をグループ化し、高い凝集度を持つべきです。
 2. **インターフェース**: モジュールは明確で一貫したインターフェースを提供すべきです。
 3. **依存関係**: モジュール間の依存関係は最小限に抑え、循環依存を避けるべきです。
-4. **可視性**: 必要な要素のみを公開し、実装の詳細は隠蔽すべきです。
+4. **可視性**: 必要な要素のみを`export`し、実装の詳細は隠蔽すべきです。
 5. **命名規則**: モジュールと要素の命名は一貫性を持ち、意図を明確に表現すべきです。
 
 モジュールシステムは、大規模なプログラムの開発において、コードの整理と保守性の向上に不可欠な役割を果たします。適切なモジュール設計により、コードの再利用性、可読性、保守性が向上します。
