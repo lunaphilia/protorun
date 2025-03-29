@@ -21,20 +21,37 @@ Protorun言語の仕様は以下のセクションに分かれています。各
    - 管理型の暗黙的な使用
    - リソースパターン型クラス
 
-3. [式と文](language-spec/03-expressions.md)
+3. [宣言](language-spec/03-declarations.md)
    - 変数宣言
    - 関数定義
-   - 制御構造
+   - 型宣言（レコード、enumなど）
+   - トレイト宣言
+   - 実装宣言
+   - 効果宣言
+   - ハンドラ宣言
+
+4. [文](language-spec/04-statements.md)
+   - 式文
+   - let文
+   - var文
+   - return文
+   - ブロック
+
+5. [式](language-spec/05-expressions.md)
+   - 制御構造 (if, match, bind, with)
    - パターンマッチング
    - 関数合成
+   - メンバーアクセス
+   - リテラル
+   - 演算子
 
-4. [所有権システム](language-spec/04-ownership.md)
+6. [所有権システム](language-spec/06-ownership.md)
    - 所有権
    - 借用
    - ライフタイム
    - リソース管理
 
-5. [代数的効果](language-spec/05-algebraic-effects.md)
+7. [代数的効果](language-spec/07-algebraic-effects.md)
    - 効果の定義
    - 効果ハンドラの定義
    - ライフサイクル管理を持つ効果
@@ -43,25 +60,26 @@ Protorun言語の仕様は以下のセクションに分かれています。各
    - 効果の合成
    - 管理型の暗黙的な使用と代数的効果の関係
 
-6. [モジュールシステム](language-spec/06-modules.md)
+8. [モジュールシステム](language-spec/08-modules.md)
    - モジュール定義
    - インポート
+   - エクスポート
 
-7. [標準ライブラリ](language-spec/07-standard-library.md)
+9. [標準ライブラリ](language-spec/09-standard-library.md)
    - コアデータ構造
    - I/O操作
    - 並行処理
 
-8. [サンプルプログラム](language-spec/08-examples.md)
-   - 簡単な計算機
-   - 状態を持つカウンター
-   - ファイル処理（ライフサイクル管理効果を使用）
+10. [サンプルプログラム](language-spec/10-examples.md)
+    - 簡単な計算機
+    - 状態を持つカウンター
+    - ファイル処理（ライフサイクル管理効果を使用）
 
-9. [文法（EBNF）](language-spec/09-grammar.md)
+11. [文法（EBNF）](language-spec/11-grammar.md)
 
-10. [今後の展望](language-spec/10-future.md)
+12. [今後の展望](language-spec/12-future.md)
 
-11. [参考文献](language-spec/11-references.md)
+13. [参考文献](language-spec/13-references.md)
 
 ## 更新履歴
 

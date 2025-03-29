@@ -237,8 +237,8 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 
 以下の特殊な構文要素の詳細については、対応する言語仕様の章を参照してください：
 
-- **効果ハンドラ**: [5. 代数的効果](05-algebraic-effects.md)
-- **ライフサイクル管理効果**: [5.4 ライフサイクル管理効果](05-algebraic-effects.md#54-ライフサイクル管理効果)
-- **暗黙的パラメータ**: [5.8 暗黙的パラメータと効果システム](05-algebraic-effects.md#58-暗黙的パラメータと効果システム)
-- **コレクション内包表記**: [4.4.1 コレクションリテラル内包表記](03-expressions.md#441-コレクションリテラル内包表記)
-- **バインド式**: [4.4.2 バインド式](03-expressions.md#442-バインド式)
+- **効果ハンドラ**: [7. 代数的効果](07-algebraic-effects.md)
+- **ライフサイクル管理効果**: [7.4 ライフサイクル管理効果](07-algebraic-effects.md#74-ライフサイクル管理効果) <!-- Note: Assuming section numbers in 07-algebraic-effects.md will also be updated later if needed -->
+- **暗黙的パラメータ**: [7.8 暗黙的パラメータと効果システム](07-algebraic-effects.md#78-暗黙的パラメータと効果システム) <!-- Note: Assuming section numbers in 07-algebraic-effects.md will also be updated later if needed -->
+- **コレクション内包表記**: [5.2.1 コレクションリテラル内包表記](05-expressions.md#521-コレクションリテラル内包表記)
+- **バインド式**: [5.2.2 バインド式](05-expressions.md#522-バインド式)
