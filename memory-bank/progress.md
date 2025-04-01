@@ -30,6 +30,10 @@
 - 言語仕様書の構造改善と内容の充実（宣言、文、式の分離）
 - 文法（EBNF）の改善と完全化（文末セミコロン削除、IfExpr更新）
 - 文書記述のルールの確立と適用（ブロック式の説明移動と明確化）
+- 宣言 (`03-declarations.md`) と文 (`04-statements.md`) の仕様を更新・詳細化。
+  - `let`/`var` を宣言として `03-declarations.md` に記述。
+  - 式文と `return` 文を `04-statements.md` に記述。
+  - `return` 文は維持する方針を決定。
 
 ### サンプルコード
 - 電卓アプリケーション（calculator.pr）
@@ -191,6 +195,10 @@
   - 文末および `BindExpr` 内のセミコロンを不要とする仕様変更を反映 (`11-grammar.md`, `04-statements.md`, `05-expressions.md`, `10-examples.md`)。
   - ブロック式の役割を明確化し、`IfExpr` で単一式を許容するように文法と説明を更新 (`11-grammar.md`, `04-statements.md`, `05-expressions.md`)。
   - ブロック式の説明を `04-statements.md` から `05-expressions.md` に移動。
+- 宣言と文に関するドキュメントの整理:
+  - `03-declarations.md` に `let` と `var` の詳細説明を追加。
+  - `04-statements.md` に式文と `return` 文の詳細説明を追加。
+  - 仕様書の構成を整理し、`let`/`var` を宣言、式文/`return` を文として分類。
 
 ## 次のマイルストーン
 1. **言語仕様の完成**（目標：2025年4月末）

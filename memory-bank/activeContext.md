@@ -103,6 +103,12 @@
   - 未定義の `try...catch` 構文を使用していた例を、`Result` 型と `noresume` ハンドラを使用する形に修正 (`07-algebraic-effects.md`, `10-examples.md`)
   - その他、不完全な記述や重複部分を整理 (`07-algebraic-effects.md`)
 
+- 言語仕様書の構成と内容の更新:
+  - `04-statements.md` を更新し、式文と `return` 文の詳細な説明を追加。
+  - `03-declarations.md` を更新し、`let` 文と `var` 文の詳細な説明を追加。
+  - `let`/`var` を宣言として `03-declarations.md` で扱い、式文/`return` 文を `04-statements.md` で扱う構成を採用。
+  - `return` 文は廃止せず、言語機能として維持することを決定。
+
 ## 次のステップ
 - 型チェッカーの設計と実装：
   - 基本的な型チェック機能の設計
@@ -168,3 +174,5 @@
 - ADT定義：代数的データ型は `enum` キーワードで定義。
 - 例外処理：`try...catch` は使用せず、`noresume` ハンドラと `Result` 型で処理。
 - 文末セミコロン：不要。改行が文の区切りとなる。
+- 宣言と文の分類：`let`/`var` は宣言 (`03-declarations.md`)、式文/`return` は文 (`04-statements.md`) として分類。
+- `return` 文：早期リターンのための構文として維持する（代数的効果 `Exit` での完全置換は見送り）。
