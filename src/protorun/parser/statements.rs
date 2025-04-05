@@ -4,86 +4,26 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::char,
-    combinator::{cut, map, opt},
+    combinator::{map, opt}, // cut を削除し、重複を解消
     sequence::preceded,
 };
 
-use crate::protorun::ast::{Stmt, Parameter, Decl};
-use super::common::{ParseResult, ws_comments, identifier_string, with_context, calculate_span};
-use super::types::parse_type;
+// Stmt, Expr をインポート
+use crate::protorun::ast::{Stmt, Expr};
+use super::common::{ParseResult, ws_comments, calculate_span};
+// use super::types::parse_type; // 不要になった
 use super::expressions::expression;
+// use super::common::{identifier_string, with_context}; // 不要になった
+// use crate::protorun::ast::{Parameter, Decl}; // 不要になった
 
-/// 文をパース
+/// 文（現在は Return のみ）をパース
 pub fn statement<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Stmt> {
-    alt((
-        |i| let_statement(i, original_input),
-        |i| var_statement(i, original_input),
-        |i| return_statement(i, original_input),
-        map(
-            |i| expression(i, original_input),
-            move |expr| {
-                let span = calculate_span(original_input, input);
-                Stmt::Expr { expr, span }
-            }
-        )
-    ))(input)
+    // alt から expression のパースを削除
+    return_statement(input, original_input)
 }
 
-/// let文をパース
-pub fn let_statement<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Stmt> {
-    let (input, _) = ws_comments(tag("let"))(input)?;
-    let (input, name) = ws_comments(identifier_string)(input)?;
-    let (input, type_annotation) = opt(
-        preceded(
-            ws_comments(char(':')),
-            |i| parse_type(i, original_input)
-        )
-    )(input)?;
-    let (input, _) = ws_comments(char('='))(input)?;
-    
-    // 式をパース
-    let (input, value) = with_context(
-        "式の解析中にエラーが発生しました",
-        cut(|i| expression(i, original_input))
-    )(input)?;
-    
-    let span = calculate_span(original_input, input);
-    
-    Ok((input, Stmt::Let {
-        name,
-        type_annotation,
-        value,
-        span,
-    }))
-}
-
-/// var文をパース
-pub fn var_statement<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Stmt> {
-    let (input, _) = ws_comments(tag("var"))(input)?;
-    let (input, name) = ws_comments(identifier_string)(input)?;
-    let (input, type_annotation) = opt(
-        preceded(
-            ws_comments(char(':')),
-            |i| parse_type(i, original_input)
-        )
-    )(input)?;
-    let (input, _) = ws_comments(char('='))(input)?;
-    
-    // 式をパース
-    let (input, value) = with_context(
-        "式の解析中にエラーが発生しました",
-        cut(|i| expression(i, original_input))
-    )(input)?;
-    
-    let span = calculate_span(original_input, input);
-    
-    Ok((input, Stmt::Var {
-        name,
-        type_annotation,
-        value,
-        span,
-    }))
-}
+// let_statement 関数を削除
+// var_statement 関数を削除
 
 /// return文をパース
 pub fn return_statement<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Stmt> {
@@ -100,134 +40,76 @@ pub fn return_statement<'a>(input: &'a str, original_input: &'a str) -> ParseRes
     }))
 }
 
-/// 関数宣言をパース
-pub fn function_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Decl> {
-    let (input, _) = ws_comments(tag("fn"))(input)?;
-    let (input, name) = ws_comments(identifier_string)(input)?;
-    
-    // パラメータをパース
-    let (input, parameters) = super::common::delimited_list(
-        '(',
-        |i| parameter(i, original_input),
-        ',',
-        ')'
-    )(input)?;
-    
-    // 戻り値の型（オプション）
-    let (input, return_type) = opt(
-        preceded(
-            ws_comments(char(':')),
-            |i| parse_type(i, original_input)
-        )
-    )(input)?;
-    
-    // 関数本体
-    let (input, _) = ws_comments(char('='))(input)?;
-    let (input, body) = cut(|i| expression(i, original_input))(input)?;
-    let (input, _) = opt(ws_comments(char(';')))(input)?;
-    
-    let span = calculate_span(original_input, input);
-    
-    Ok((input, Decl::Function {
-        name,
-        parameters,
-        return_type,
-        body,
-        span,
-    }))
+// function_declaration 関数を declarations.rs に移動したので削除
+// parameter 関数を declarations.rs に移動したので削除
+
+/// トップレベル要素（宣言または式）
+#[derive(Debug, Clone, PartialEq)]
+enum TopLevelItem {
+    Declaration(crate::protorun::ast::Decl),
+    TypeDeclaration(crate::protorun::ast::TypeDecl),
+    TraitDeclaration(crate::protorun::ast::TraitDecl),
+    ImplDeclaration(crate::protorun::ast::ImplDecl),
+    Module(crate::protorun::ast::Module),
+    Expression(Expr),
 }
 
-/// パラメータをパース
-pub fn parameter<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Parameter> {
-    let (input, name) = ws_comments(identifier_string)(input)?;
-    let (input, type_annotation) = opt(
-        preceded(
-            ws_comments(char(':')),
-            |i| parse_type(i, original_input)
-        )
-    )(input)?;
-    
-    let span = calculate_span(original_input, input);
-    
-    Ok((input, Parameter {
-        name,
-        type_annotation,
-        span,
-    }))
-}
-
-/// プログラム全体をパース
+/// プログラム全体をパース (Program ::= (Declaration | Expression)*)
 pub fn program<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, crate::protorun::ast::Program> {
     use nom::character::complete::multispace0;
     use nom::multi::many0;
     use nom::sequence::terminated;
-    
+    use super::declarations::{parse_declaration, parse_type_declaration, parse_trait_declaration, parse_impl_declaration};
+    use super::modules::parse_module;
+
     let (input, _) = multispace0(input)?;
-    
-    // モジュール宣言をパース
-    let (input, modules) = many0(terminated(
-        |i| {
-            let (i, _) = multispace0(i)?;
-            super::modules::parse_module(i, original_input)
-        },
+
+    // トップレベル要素（宣言または式）をパース
+    let (input, items) = many0(terminated(
+        alt((
+            // 各種宣言パーサー
+            map(|i| parse_declaration(i, original_input), TopLevelItem::Declaration),
+            map(|i| parse_type_declaration(i, original_input), TopLevelItem::TypeDeclaration),
+            map(|i| parse_trait_declaration(i, original_input), TopLevelItem::TraitDeclaration),
+            map(|i| parse_impl_declaration(i, original_input), TopLevelItem::ImplDeclaration),
+            map(|i| parse_module(i, original_input), TopLevelItem::Module),
+            // 式パーサー
+            map(|i| expression(i, original_input), TopLevelItem::Expression),
+        )),
+        // 各トップレベル要素の後には空白が続くことを想定。
+        // Protorun では文の区切りにセミコロンは不要で、改行や空白で区切られるため、
+        // terminated(..., multispace0) で要素間の区切りを処理する。
         multispace0
     ))(input)?;
-    
-    // 関数宣言をパース
-    let (input, declarations) = many0(terminated(
-        |i| {
-            let (i, _) = multispace0(i)?;
-            function_declaration(i, original_input)
-        },
-        multispace0
-    ))(input)?;
-    
-    // 型宣言をパース
-    let (input, type_declarations) = many0(terminated(
-        |i| {
-            let (i, _) = multispace0(i)?;
-            super::declarations::parse_type_declaration(i, original_input)
-        },
-        multispace0
-    ))(input)?;
-    
-    // トレイト宣言をパース
-    let (input, trait_declarations) = many0(terminated(
-        |i| {
-            let (i, _) = multispace0(i)?;
-            super::declarations::parse_trait_declaration(i, original_input)
-        },
-        multispace0
-    ))(input)?;
-    
-    // 実装宣言をパース
-    let (input, impl_declarations) = many0(terminated(
-        |i| {
-            let (i, _) = multispace0(i)?;
-            super::declarations::parse_impl_declaration(i, original_input)
-        },
-        multispace0
-    ))(input)?;
-    
-    // 文をパース
-    let (input, statements) = many0(
-        terminated(
-            |i| {
-                let (i, _) = multispace0(i)?;
-                statement(i, original_input)
-            },
-            ws_comments(char(';'))
-        )
-    )(input)?;
-    
-    let (input, _) = multispace0(input)?;
-    
+
+    let (input, _) = multispace0(input)?; // 末尾の空白
+
+    // パース結果を Program 構造体に振り分ける
+    let mut modules = Vec::new();
+    let mut declarations = Vec::new();
+    let mut type_declarations = Vec::new();
+    let mut trait_declarations = Vec::new();
+    let mut impl_declarations = Vec::new();
+    // let mut statements = Vec::new(); // 削除
+    let mut expressions = Vec::new(); // 追加
+
+    for item in items {
+        match item {
+            TopLevelItem::Declaration(decl) => declarations.push(decl),
+            TopLevelItem::TypeDeclaration(decl) => type_declarations.push(decl),
+            TopLevelItem::TraitDeclaration(decl) => trait_declarations.push(decl),
+            TopLevelItem::ImplDeclaration(decl) => impl_declarations.push(decl),
+            TopLevelItem::Module(module) => modules.push(module),
+            TopLevelItem::Expression(expr) => expressions.push(expr), // expressions に追加
+        }
+    }
+
     Ok((input, crate::protorun::ast::Program {
         modules,
         declarations,
         type_declarations,
         trait_declarations,
         impl_declarations,
-        statements,
+        expressions, // statements を expressions に変更
     }))
 }

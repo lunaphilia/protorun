@@ -30,22 +30,47 @@ fn test_nested_block_scope_management() {
     // ネストされたブロックでのスコープ管理を確認
     let input = "
     {
-        let x = 10;
+        let x = 10 
         {
-            let y = 20;
+            let y = 20 
             x + y  // 外側のスコープのxにアクセス可能
         }
         // yはここではアクセスできない
     }
-    ";
+    "; // セミコロンを削除
     
     let mut parser = Parser::new(None);
     let expr = parser.parse_expression(input).unwrap();
     
-    // 式が正しくパースされることを確認
+    // 式 (BlockExpr) が正しくパースされることを確認
+    // BlockExpr { items: [Let x], final_expr: Some(BlockExpr { items: [Let y], final_expr: Some(BinaryOp) }) }
     match expr {
-        Expr::BinaryOp { .. } => (), // x + y の式
-        _ => panic!("期待される二項演算ではありません"),
+         Expr::BlockExpr { items: outer_items, .. } => { // final_expr を削除
+            // 最後の要素がネストされたブロック式であることを確認
+            assert!(outer_items.len() > 0); // let x と内側ブロックがあるはず
+            match outer_items.last().unwrap() {
+                crate::protorun::ast::BlockItem::Expression(outer_final_expr) => {
+                    match outer_final_expr {
+                         Expr::BlockExpr { items: inner_items, .. } => { // final_expr を削除
+                            // 内側ブロックの最後の要素が二項演算であることを確認
+                            assert!(inner_items.len() > 0); // let y と x + y があるはず
+                            match inner_items.last().unwrap() {
+                                crate::protorun::ast::BlockItem::Expression(inner_final_expr) => {
+                                     match inner_final_expr {
+                                         Expr::BinaryOp { operator, .. } => assert_eq!(*operator, crate::protorun::ast::BinaryOperator::Add), // x + y
+                                         _ => panic!("Inner block final item is not BinaryOp"),
+                                     }
+                                },
+                                _ => panic!("Inner block final item is not Expression"),
+                            }
+                        },
+                        _ => panic!("Outer block final item is not BlockExpr"),
+                    }
+                },
+                 _ => panic!("Outer block final item is not Expression"),
+            }
+        },
+        _ => panic!("Expected outer BlockExpr"),
     }
 }
 
@@ -54,10 +79,10 @@ fn test_function_scope_management() {
     // 関数スコープの管理を確認
     let input = "
     fn add(a, b) = {
-        let result = a + b;
+        let result = a + b 
         result
     }
-    ";
+    "; // セミコロンを削除
     
     let mut parser = Parser::new(None);
     let program = parser.parse_program(input).unwrap();
@@ -80,29 +105,38 @@ fn test_function_scope_management() {
 fn test_variable_shadowing() {
     // 変数のシャドーイングを確認
     let input = "
-    let x = 10;
+    let x = 10 
     {
-        let x = 20;  // 外側のxをシャドーイング
+        let x = 20 
         x  // 内側のxを参照
     }
     x  // 外側のxを参照
-    ";
+    "; // セミコロンを削除
     
     let mut parser = Parser::new(None);
     let program = parser.parse_program(input).unwrap();
     
-    // 現在の実装では、プログラムは1つの文（let x = 10;）として解析される
-    assert_eq!(program.statements.len(), 1);
+    // プログラムはトップレベルの let 宣言と、ブロック式、識別子で構成されるはず
+    // declarations に let x = 10 が、expressions に { ... } と x が入る
+    assert_eq!(program.declarations.len(), 1);
+    assert_eq!(program.expressions.len(), 2); // statements -> expressions
     
-    // let文が正しくパースされていることを確認
-    match &program.statements[0] {
-        Stmt::Let { name, value, .. } => {
-            assert_eq!(name, "x");
+    // トップレベルの let 宣言が正しくパースされていることを確認
+    match &program.declarations[0] {
+        crate::protorun::ast::Decl::Let { pattern, value, .. } => {
+            // パターンのチェック
+            match pattern {
+                crate::protorun::ast::Pattern::Identifier(name, _) => assert_eq!(name, "x"),
+                _ => panic!("期待される識別子パターンではありません"),
+            }
+            // 値のチェック
             match value {
-                Expr::IntLiteral(value, _) => assert_eq!(*value, 10),
+                Expr::IntLiteral(val, _) => assert_eq!(*val, 10),
                 _ => panic!("期待される整数リテラルではありません"),
             }
         },
-        _ => panic!("期待されるlet文ではありません"),
+        _ => panic!("期待されるlet宣言ではありません"),
     }
+    
+    // ブロック式と最後の式のチェックは省略（ここではスコープのパースが通るかを確認）
 }

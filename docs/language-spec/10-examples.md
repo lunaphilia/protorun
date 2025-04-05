@@ -32,19 +32,17 @@ effect Exception<E> {
 }
 
 // 例外ハンドラ
-handler ExceptionHandler<E>: Exception<E> { // "for" を ":" に修正
-  fn raise<T>(error: E): noresume Result<T, E> = { // 戻り値型を Result に修正
-    Result.Err(error)
-  }
+handler ExceptionHandler<E>: Exception<E> {
+  fn raise<T>(error: E): noresume Result<T, E> = Result.Err(error)
 }
 
 // 式の評価
-fn evaluate(expr: Expr): Result<Int, String> & Exception<String> = { // "with" を "&" に修正
+fn evaluate(expr: Expr): Result<Int, String> & Exception<String> = {
   match expr {
     Expr.Number(value) => Result.Ok(value),
 
     Expr.Add(left, right) => {
-      let l = evaluate(left)? // ?演算子は Exception 効果を伝播させる (ハンドラで Result.Err に変換される)
+      let l = evaluate(left)?
       let r = evaluate(right)?
       Result.Ok(l + r)
     },
@@ -66,7 +64,7 @@ fn evaluate(expr: Expr): Result<Int, String> & Exception<String> = { // "with" �
       let r = evaluate(right)?
 
       if r == 0 {
-        Exception.raise("ゼロ除算エラー") // ハンドラによって Result.Err に変換される
+        Exception.raise("ゼロ除算エラー")
       } else {
         Result.Ok(l / r)
       }
@@ -76,19 +74,19 @@ fn evaluate(expr: Expr): Result<Int, String> & Exception<String> = { // "with" �
 
 // runWithException ヘルパー関数 (07-algebraic-effects.md の例を参考)
 fn runWithException<T, E>(action: () -> T & Exception<E>): Result<T, E> = {
-  handler ExceptionHandler: Exception<E> {
-    fn raise<R>(error: E): noresume Result<R, E> = {
-      Result.Err(error)
-    }
+  // ハンドラをインラインで定義
+  let handler = handler: Exception<E> {
+    fn raise<R>(error: E): noresume Result<R, E> = Result.Err(error)
   }
-  with ExceptionHandler: Exception<E> {
-    Result.Ok(action()) // action() が raise を呼ぶと Err(error) が返る
+  // with 式でハンドラを適用
+  with handler { // ハンドラは式として渡す, 効果型指定は省略可能
+    Result.Ok(action())
   }
 }
 
 
 // 使用例
-fn main(): Unit & Console = { // "with" を "&" に修正
+fn main(): Unit & Console = {
   let expr = Expr.Add(
     Expr.Number(10),
     Expr.Multiply(
@@ -141,13 +139,15 @@ fn makeCounter(): () -> Int & State<Int> = { // initial は不要 (状態はハ�
 fn runWithState<S, T>(initialState: S, action: () -> T & State<S>): (T, S) = {
   var state = initialState
 
-  handler StateHandler: State<S> {
+  // ハンドラをインラインで定義
+  let handler = handler: State<S> {
     fn get(): S = state
     fn set(newState: S): Unit = { state = newState }
     fn modify(f: (S) -> S): Unit = { state = f(state) }
   }
 
-  let result = with StateHandler: State<S> {
+  // with 式でハンドラを適用
+  let result = with handler { // ハンドラは式として渡す
     action()
   }
   (result, state) // 最終的な状態も返す
@@ -155,7 +155,7 @@ fn runWithState<S, T>(initialState: S, action: () -> T & State<S>): (T, S) = {
 
 
 // 使用例
-fn main(): Unit & Console = { // "with" を "&" に修正
+fn main(): Unit & Console = {
   let counter = makeCounter()
 
   // runWithState を使ってカウンターを実行し、最終状態は無視
@@ -211,19 +211,19 @@ effect FileSystem: LifecycleEffect<File> { // File 型は別途定義が必要
 }
 
 // ファイル処理の実装（ライフサイクル管理効果を使用）
-fn processFile(path: String): Result<String, IOError> & FileSystem = { // IOError 型は別途定義が必要
+fn processFile(path: String): Result<String, IOError> & FileSystem = {
   // ファイルを開く（スコープ終了時に自動的に閉じられる）
-  let file = FileSystem.acquire() // acquire は File を返す (ハンドラで実装)
+  let file = FileSystem.acquire()
 
-  // ファイルから読み込む (read は FileSystem 効果の操作)
-  let content = FileSystem.read() // read は String を返す (ハンドラで実装)
+  // ファイルから読み込む
+  let content = FileSystem.read()
 
-  // 処理された内容を別のファイルに書き込む (write は FileSystem 効果の操作)
+  // 処理された内容を別のファイルに書き込む
   let processed = content.toUpperCase()
-  FileSystem.write(processed) // write は Unit を返す (ハンドラで実装)
+  FileSystem.write(processed)
 
   Result.Ok(processed)
-} // file は自動的に解放される（FileSystem.release(file) が呼び出される）
+} // file は自動的に解放される
 ```
 
 この例では、以下の言語機能を示しています：
@@ -276,9 +276,9 @@ fn updateUser(user: User)(with db: Database): Result<Unit, DbError> = {
 }
 
 // 使用例 (ハンドラ定義は省略)
-// handler DatabaseHandler: Database { ... }
+// let dbHandler = handler: Database { ... }
 // fn main(): Unit & Console = {
-//   with DatabaseHandler: Database {
+//   with dbHandler { // ハンドラ式を使用
 //     let userResult = getUserById("user123")
 //     match userResult {
 //       Result.Ok(user) => {
@@ -343,55 +343,47 @@ fn processUserData(userId: String): Result<UserData, Error> & DbAccess & Logging
 
 // 暗黙的パラメータを使用して効果を実装するヘルパー関数
 fn runWithDbAndLogger<T>(action: () -> T & DbAccess & Logging)(with db: Database, logger: Logger): Result<T, Error> = {
-  // 効果ハンドラを定義
-  handler DbHandler: DbAccess {
-    fn query(sql: String): Result<QueryResult, DbError> = {
-      db.query(sql) // 暗黙的に渡された db を使用
-    }
-
-    fn execute(sql: String): Result<Unit, DbError> = {
-      db.execute(sql) // 暗黙的に渡された db を使用
-    }
+  // 効果ハンドラを定義 (インライン)
+  let dbHandler = handler: DbAccess {
+    fn query(sql: String): Result<QueryResult, DbError> = db.query(sql)
+    fn execute(sql: String): Result<Unit, DbError> = db.execute(sql)
   }
 
-  handler LogHandler: Logging {
-    fn log(level: LogLevel, message: String): Unit = {
-      logger.log(level, message) // 暗黙的に渡された logger を使用
-    }
+  let logHandler = handler: Logging {
+    fn log(level: LogLevel, message: String): Unit = logger.log(level, message)
   }
 
   // 効果ハンドラを適用
-  with DbHandler: DbAccess {
-    with LogHandler: Logging {
-      // action() を実行し、結果を Result.Ok でラップ
+  with dbHandler {
+    with logHandler {
+      // action()を実行し、結果を Result.Ok でラップ
       // action() 内で発生した効果 (DbAccess, Logging) はここでハンドルされる
       // action() が Result.Err を返した場合、それがそのままこの with 式の結果となる
-      // (try/catch は不要)
       Result.Ok(action())
     }
   }
 }
 
 // 使用例
-fn main(): Unit & Console = { // 効果を Console に変更
+fn main(): Unit & Console = {
   // データベースハンドラとロガーハンドラを定義 (実際の接続やファイル設定など)
-  handler DatabaseHandler: Database { /* 実装... */ }
-  handler LoggerHandler: Logger { /* 実装... */ }
+  let dbHandler = handler: Database { /* 実装... */ }
+  let loggerHandler = handler: Logger { /* 実装... */ }
 
   // ハンドラを適用して、暗黙的パラメータを提供
-  with DatabaseHandler: Database {
-    with LoggerHandler: Logger {
+  with dbHandler {
+    with loggerHandler {
       // runWithDbAndLogger を呼び出し、暗黙的に db と logger を渡す
       runWithDbAndLogger(() => {
         processUserData("user123") // DbAccess と Logging 効果を使用
       }) match {
-        Result.Ok(userDataResult) => { // runWithDbAndLogger は Result<Result<UserData, Error>, Error> を返す可能性があるので注意
+        Result.Ok(userDataResult) => {
              match userDataResult {
                  Result.Ok(userData) => Console.log(s"ユーザーデータ: $userData"),
                  Result.Err(processError) => Console.log(s"処理エラー: $processError")
              }
         },
-        Result.Err(handlerError) => Console.log(s"ハンドラエラー: $handlerError") // runWithDbAndLogger 自体のエラー (通常は発生しないはず)
+        Result.Err(handlerError) => Console.log(s"ハンドラエラー: $handlerError")
       }
     }
   }

@@ -41,9 +41,10 @@ fn main() {
     
     println!("解析成功！");
     println!("宣言数: {}", program.declarations.len());
-    println!("文数: {}", program.statements.len());
+    // println!("文数: {}", program.statements.len()); // 削除
+    println!("トップレベル式数: {}", program.expressions.len()); // 追加
     
-    println!("\n関数宣言:");
+    println!("\n宣言:"); // タイトル変更
     for (i, decl) in program.declarations.iter().enumerate() {
         match decl {
             Decl::Function { name, parameters, return_type, .. } => {
@@ -74,7 +75,36 @@ fn main() {
                 };
                 
                 println!("  関数 #{}: fn {}({}){}", i + 1, name, params.join(", "), ret_type);
-            }
+            },
+            Decl::Let { pattern, type_annotation, .. } => {
+                // パターンと型注釈（あれば）を表示
+                let type_str = if let Some(t) = type_annotation {
+                    match t {
+                        Type::Simple { name, .. } => format!(": {}", name),
+                        _ => ": <複合型>".to_string(),
+                    }
+                } else {
+                    String::new()
+                };
+                // パターンを単純化して表示（ここでは識別子のみ想定）
+                let pattern_str = match pattern {
+                    protorun::ast::Pattern::Identifier(name, _) => name.clone(),
+                    _ => "<パターン>".to_string(),
+                };
+                println!("  Let宣言 #{}: let {}{}", i + 1, pattern_str, type_str);
+            },
+            Decl::Var { name, type_annotation, .. } => {
+                // 変数名と型注釈（あれば）を表示
+                 let type_str = if let Some(t) = type_annotation {
+                    match t {
+                        Type::Simple { name, .. } => format!(": {}", name),
+                        _ => ": <複合型>".to_string(),
+                    }
+                } else {
+                    String::new()
+                };
+                println!("  Var宣言 #{}: var {}{}", i + 1, name, type_str);
+            },
         }
     }
     

@@ -15,9 +15,9 @@ Protorun言語の文法は、言語の構文を形式的に定義するための
 ## 10.2 EBNF文法
 
 ```ebnf
-Program ::= (Declaration | Statement)*
+Program ::= (Declaration | Expression)*
 
-Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl | ExportDecl | EnumDecl
+Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl | ExportDecl | EnumDecl | LetDecl | VarDecl
 
 FunctionDecl ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("&" EffectType)? "=" Expression
                | "fn" Identifier GenericParams? ParamList ImplicitParamList? (":" Type)? ("&" EffectType)? "=" Expression
@@ -90,10 +90,11 @@ ResumeType ::= "(" (Type ("," Type)*)? ")" "->" ReturnType
 
 ReturnType ::= Type | "Unit"
 
-Statement ::= Expression
-            | "let" Pattern (":" Type)? "=" Expression
-            | "var" Identifier (":" Type)? "=" Expression
-            | "return" Expression?
+LetDecl ::= "let" Pattern (":" Type)? "=" Expression
+VarDecl ::= "var" Identifier (":" Type)? "=" Expression
+
+Statement ::= Expression | ReturnStatement
+ReturnStatement ::= "return" Expression?
 
 Expression ::= LiteralExpr
              | IdentifierExpr
@@ -188,7 +189,7 @@ Operator ::= "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">="
 
 ### 10.3.1 プログラム構造
 
-Protorun言語のプログラムは、宣言（Declaration）と文（Statement）の集合で構成されます。宣言には関数、型、トレイト、実装、効果、ハンドラの定義が含まれます。
+Protorun言語のプログラムは、トップレベルに配置できる宣言（Declaration）と式（Expression）の集合で構成されます。宣言には関数、型、トレイト、実装、効果、ハンドラ、変数束縛（`let`, `var`）の定義が含まれます。
 
 ### 10.3.2 宣言
 
@@ -198,6 +199,7 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 - **実装宣言（ImplDecl）**: トレイトの実装を定義します。
 - **効果宣言（EffectDecl）**: 代数的効果を定義します。効果は他の効果（例：`LifecycleEffect<R>`）を継承することができます。
 - **ハンドラ宣言（HandlerDecl）**: 効果ハンドラを定義します。
+- **変数束縛宣言（LetDecl, VarDecl）**: `let` または `var` キーワードを使用して、イミュータブルまたはミュータブルな変数を宣言し、初期値を束縛します。
 
 ### 10.3.3 型システム
 
@@ -206,7 +208,13 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 - **配列型（ArrayType）**: 要素型の配列です。
 - **効果型（EffectType）**: 関数が持つ可能性のある効果の型です。
 
-### 10.3.4 式
+### 10.3.4 文 (Statement)
+
+文は主に副作用を引き起こすか、制御フローを変更するために使用されます。関数本体など、特定のコンテキストで使用されます。
+- **式文 (Expression)**: 式を評価し、結果を破棄します。
+- **return文 (ReturnStatement)**: 現在の関数から値を返します。
+
+### 10.3.5 式 (Expression)
 
 - **リテラル式（LiteralExpr）**: 整数、浮動小数点数、文字列、真偽値、ユニットのリテラル、およびコレクションリテラル（リスト、マップ、セット）です。
 - **識別子式（IdentifierExpr）**: 変数や関数の名前です。
@@ -225,7 +233,7 @@ Protorun言語のプログラムは、宣言（Declaration）と文（Statement�
 - **スコープ付き効果式（ScopedEffectExpr）**: 効果のスコープを定義します。
 - **範囲式（RangeExpr）**: 範囲を表現します。
 
-### 10.3.5 パターン
+### 10.3.6 パターン (Pattern)
 
 - **リテラルパターン（LiteralPattern）**: リテラル値とのマッチングです。
 - **識別子パターン（IdentifierPattern）**: 変数束縛です。

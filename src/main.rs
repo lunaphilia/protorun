@@ -91,9 +91,13 @@ fn print_program(program: &Program) {
         println!("宣言 #{}: {}", i + 1, decl_to_string(decl));
     }
 
-    println!("文数: {}", program.statements.len());
-    for (i, stmt) in program.statements.iter().enumerate() {
-        println!("文 #{}: {}", i + 1, stmt_to_string(stmt));
+    // println!("文数: {}", program.statements.len()); // 削除
+    // for (i, stmt) in program.statements.iter().enumerate() { // 削除
+    //     println!("文 #{}: {}", i + 1, stmt_to_string(stmt)); // 削除
+    // }
+    println!("トップレベル式数: {}", program.expressions.len()); // 追加
+    for (i, expr) in program.expressions.iter().enumerate() { // 追加
+        println!("式 #{}: {}", i + 1, expr_to_string(expr)); // 追加
     }
 }
 
@@ -118,31 +122,30 @@ fn decl_to_string(decl: &Decl) -> String {
             };
             
             format!("fn {}({}){}", name, params.join(", "), ret_type)
-        }
+        },
+        Decl::Let { pattern, type_annotation, value, .. } => {
+            let type_str = if let Some(t) = type_annotation {
+                format!(": {}", type_to_string(t))
+            } else {
+                String::new()
+            };
+            format!("let {}{} = {}", pattern_to_string(pattern), type_str, expr_to_string(value))
+        },
+        Decl::Var { name, type_annotation, value, .. } => {
+            let type_str = if let Some(t) = type_annotation {
+                format!(": {}", type_to_string(t))
+            } else {
+                String::new()
+            };
+            format!("var {}{} = {}", name, type_str, expr_to_string(value))
+        },
+        // TODO: 他の Decl バリアントも追加する必要があるかもしれない
     }
 }
 
-// 文を文字列に変換
+// 文を文字列に変換 (Return のみ)
 fn stmt_to_string(stmt: &Stmt) -> String {
     match stmt {
-        Stmt::Let { name, type_annotation, value, .. } => {
-            let type_str = if let Some(t) = type_annotation {
-                format!(": {}", type_to_string(t))
-            } else {
-                String::new()
-            };
-            
-            format!("let {}{} = {}", name, type_str, expr_to_string(value))
-        }
-        Stmt::Var { name, type_annotation, value, .. } => {
-            let type_str = if let Some(t) = type_annotation {
-                format!(": {}", type_to_string(t))
-            } else {
-                String::new()
-            };
-            
-            format!("var {}{} = {}", name, type_str, expr_to_string(value))
-        }
         Stmt::Return { value, .. } => {
             if let Some(expr) = value {
                 format!("return {}", expr_to_string(expr))
@@ -150,9 +153,7 @@ fn stmt_to_string(stmt: &Stmt) -> String {
                 "return".to_string()
             }
         }
-        Stmt::Expr { expr, .. } => {
-            expr_to_string(expr)
-        }
+        // Stmt::Expr のアームを削除
     }
 }
 
@@ -315,11 +316,9 @@ fn expr_to_string(expr: &Expr) -> String {
             )
         },
         Expr::WithExpr { handler, effect_type, body, .. } => {
-            let handler_str = match handler {
-                protorun::ast::HandlerSpec::Expr(expr) => expr_to_string(expr),
-                protorun::ast::HandlerSpec::Type(typ) => type_to_string(typ),
-            };
-            
+            // handler は Box<Expr> なので直接 expr_to_string を呼ぶ
+            let handler_str = expr_to_string(handler);
+
             let effect_str = if let Some(effect) = effect_type {
                 format!(": {}", type_to_string(effect))
             } else {
@@ -347,6 +346,18 @@ fn expr_to_string(expr: &Expr) -> String {
                 params.join(", "),
                 expr_to_string(body)
             )
+        },
+        Expr::BlockExpr { items, .. } => {
+            // ブロックの内容を簡易的に表示
+            let items_str: Vec<String> = items.iter().map(|item| {
+                match item {
+                    protorun::ast::BlockItem::Declaration(decl) => decl_to_string(decl),
+                    protorun::ast::BlockItem::Statement(stmt) => stmt_to_string(stmt),
+                    protorun::ast::BlockItem::Expression(expr) => expr_to_string(expr), // Expression を追加
+                }
+            }).collect();
+            // final_expr はないので、items を結合するだけ
+            format!("{{ {} }}", items_str.join(" ")) // 区切りは空白にする
         },
     }
 }

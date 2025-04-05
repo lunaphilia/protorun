@@ -9,11 +9,15 @@ fn test_parse_array_type() {
     let mut parser = Parser::new(None);
     let program = parser.parse_program(input).unwrap();
     
-    assert_eq!(program.statements.len(), 1);
+    assert_eq!(program.declarations.len(), 1); // statements -> declarations
     
-    match &program.statements[0] {
-        crate::protorun::ast::Stmt::Let { name, type_annotation, .. } => {
-            assert_eq!(name, "arr");
+    match &program.declarations[0] { // statements -> declarations
+        crate::protorun::ast::Decl::Let { pattern, type_annotation, .. } => { // Stmt -> Decl, name -> pattern
+            // パターンのチェックを追加
+            match pattern {
+                crate::protorun::ast::Pattern::Identifier(name, _) => assert_eq!(name, "arr"),
+                _ => panic!("期待される識別子パターンではありません"),
+            }
             
             match type_annotation {
                 Some(ty) => {
@@ -30,7 +34,7 @@ fn test_parse_array_type() {
                 None => panic!("型注釈が期待されます"),
             }
         },
-        _ => panic!("期待されるlet文ではありません"),
+        _ => panic!("期待されるlet宣言ではありません"), // メッセージ変更
     }
 }
 
@@ -40,11 +44,15 @@ fn test_parse_generic_type() {
     let mut parser = Parser::new(None);
     let program = parser.parse_program(input).unwrap();
     
-    assert_eq!(program.statements.len(), 1);
+    assert_eq!(program.declarations.len(), 1); // statements -> declarations
     
-    match &program.statements[0] {
-        crate::protorun::ast::Stmt::Let { name, type_annotation, .. } => {
-            assert_eq!(name, "opt");
+    match &program.declarations[0] { // statements -> declarations
+        crate::protorun::ast::Decl::Let { pattern, type_annotation, .. } => { // Stmt -> Decl, name -> pattern
+             // パターンのチェックを追加
+            match pattern {
+                crate::protorun::ast::Pattern::Identifier(name, _) => assert_eq!(name, "opt"),
+                _ => panic!("期待される識別子パターンではありません"),
+            }
             
             match type_annotation {
                 Some(ty) => {
@@ -64,7 +72,7 @@ fn test_parse_generic_type() {
                 None => panic!("型注釈が期待されます"),
             }
         },
-        _ => panic!("期待されるlet文ではありません"),
+        _ => panic!("期待されるlet宣言ではありません"), // メッセージ変更
     }
 }
 
@@ -179,11 +187,15 @@ fn test_parse_reference_type() {
         let mut parser = Parser::new(None);
         let program = parser.parse_program(input).unwrap();
         
-        assert_eq!(program.statements.len(), 1);
+        assert_eq!(program.declarations.len(), 1); // statements -> declarations
         
-        match &program.statements[0] {
-            crate::protorun::ast::Stmt::Let { name, type_annotation, .. } => {
-                assert_eq!(name, "ref");
+        match &program.declarations[0] { // statements -> declarations
+            crate::protorun::ast::Decl::Let { pattern, type_annotation, .. } => { // Stmt -> Decl, name -> pattern
+                 // パターンのチェックを追加
+                match pattern {
+                    crate::protorun::ast::Pattern::Identifier(name, _) => assert_eq!(name, "ref"),
+                    _ => panic!("期待される識別子パターンではありません"),
+                }
                 
                 match type_annotation {
                     Some(ty) => {
@@ -202,7 +214,7 @@ fn test_parse_reference_type() {
                     None => panic!("型注釈が期待されます"),
                 }
             },
-            _ => panic!("期待されるlet文ではありません"),
+            _ => panic!("期待されるlet宣言ではありません"), // メッセージ変更
         }
     }
     
@@ -212,11 +224,15 @@ fn test_parse_reference_type() {
         let mut parser = Parser::new(None);
         let program = parser.parse_program(input).unwrap();
         
-        assert_eq!(program.statements.len(), 1);
+        assert_eq!(program.declarations.len(), 1); // statements -> declarations
         
-        match &program.statements[0] {
-            crate::protorun::ast::Stmt::Let { name, type_annotation, .. } => {
-                assert_eq!(name, "mut_ref");
+        match &program.declarations[0] { // statements -> declarations
+            crate::protorun::ast::Decl::Let { pattern, type_annotation, .. } => { // Stmt -> Decl, name -> pattern
+                 // パターンのチェックを追加
+                match pattern {
+                    crate::protorun::ast::Pattern::Identifier(name, _) => assert_eq!(name, "mut_ref"),
+                    _ => panic!("期待される識別子パターンではありません"),
+                }
                 
                 match type_annotation {
                     Some(ty) => {
@@ -235,7 +251,7 @@ fn test_parse_reference_type() {
                     None => panic!("型注釈が期待されます"),
                 }
             },
-            _ => panic!("期待されるlet文ではありません"),
+            _ => panic!("期待されるlet宣言ではありません"), // メッセージ変更
         }
     }
 }
@@ -246,11 +262,15 @@ fn test_parse_owned_type() {
     let mut parser = Parser::new(None);
     let program = parser.parse_program(input).unwrap();
     
-    assert_eq!(program.statements.len(), 1);
+    assert_eq!(program.declarations.len(), 1); // statements -> declarations
     
-    match &program.statements[0] {
-        crate::protorun::ast::Stmt::Let { name, type_annotation, .. } => {
-            assert_eq!(name, "owned");
+    match &program.declarations[0] { // statements -> declarations
+        crate::protorun::ast::Decl::Let { pattern, type_annotation, .. } => { // Stmt -> Decl, name -> pattern
+             // パターンのチェックを追加
+            match pattern {
+                crate::protorun::ast::Pattern::Identifier(name, _) => assert_eq!(name, "owned"),
+                _ => panic!("期待される識別子パターンではありません"),
+            }
             
             match type_annotation {
                 Some(ty) => {
@@ -267,7 +287,7 @@ fn test_parse_owned_type() {
                 None => panic!("型注釈が期待されます"),
             }
         },
-        _ => panic!("期待されるlet文ではありません"),
+        _ => panic!("期待されるlet宣言ではありません"), // メッセージ変更
     }
 }
 

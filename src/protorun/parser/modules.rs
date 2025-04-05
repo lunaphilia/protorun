@@ -11,8 +11,9 @@ use nom::{
 
 use crate::protorun::ast::{Module, ExportDecl, ImportDecl, ImportItem, Decl};
 use super::common::{ParseResult, ws_comments, identifier_string, calculate_span};
-use super::declarations::{parse_type_declaration, parse_trait_declaration, parse_impl_declaration};
-use super::statements::{statement, function_declaration};
+// function_declaration を declarations からインポート
+use super::declarations::{parse_type_declaration, parse_trait_declaration, parse_impl_declaration, parse_function_declaration};
+use super::statements::statement; // statement は statements から
 
 /// インポート種別
 enum ImportType {
@@ -25,7 +26,7 @@ pub fn parse_export<'a>(input: &'a str, original_input: &'a str) -> ParseResult<
     let (input, _) = ws_comments(tag("export"))(input)?;
     
     // 関数宣言のエクスポート
-    let (input, decl) = opt(|i| function_declaration(i, original_input))(input)?;
+    let (input, decl) = opt(|i| parse_function_declaration(i, original_input))(input)?; // 関数名を修正
     
     if let Some(decl) = decl {
         let span = calculate_span(original_input, input);
@@ -191,7 +192,7 @@ pub fn parse_module<'a>(input: &'a str, original_input: &'a str) -> ParseResult<
     let (input, imports) = many0(|i| parse_import(i, original_input))(input)?;
     
     // 非エクスポート関数宣言をパース
-    let (input, non_export_decls) = many0(|i| function_declaration(i, original_input))(input)?;
+    let (input, non_export_decls) = many0(|i| parse_function_declaration(i, original_input))(input)?; // 関数名を修正
     
     // 非エクスポート関数宣言を追加
     declarations.extend(non_export_decls);
@@ -225,7 +226,8 @@ pub fn parse_module<'a>(input: &'a str, original_input: &'a str) -> ParseResult<
         type_declarations,
         trait_declarations,
         impl_declarations,
-        statements,
+        // statements: statements, // 削除
+        expressions: Vec::new(), // モジュール内にトップレベル式はないはずなので空で初期化
         span,
     }))
 }

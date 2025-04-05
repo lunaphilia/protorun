@@ -46,14 +46,7 @@ pub enum ComprehensionKind {
     Set,
 }
 
-/// ハンドラ指定
-#[derive(Debug, Clone, PartialEq)]
-pub enum HandlerSpec {
-    /// 式としてのハンドラ
-    Expr(Box<Expr>),
-    /// 型としてのハンドラ
-    Type(Type),
-}
+// HandlerSpec enum を削除
 
 /// 式のAST
 #[derive(Debug, Clone, PartialEq)]
@@ -148,40 +141,37 @@ pub enum Expr {
     },
     /// with式
     WithExpr {
-        handler: HandlerSpec,
+        handler: Box<Expr>, // HandlerSpec から Box<Expr> に変更
         effect_type: Option<Type>,
         body: Box<Expr>,
         span: Span,
     },
+    /// ブロック式
+    BlockExpr {
+        items: Vec<BlockItem>, // 宣言、文、または式のリスト
+        // final_expr フィールドを削除
+        span: Span,
+    },
+}
+
+/// ブロック内の要素（宣言、文、または式）
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlockItem {
+    Declaration(Decl),
+    Statement(Stmt), // Stmt は Return のみ
+    Expression(Expr),  // Expression バリアントを追加
 }
 
 /// 文のAST
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
-    /// let宣言文
-    Let {
-        name: String,
-        type_annotation: Option<Type>,
-        value: Expr,
-        span: Span,
-    },
-    /// var宣言文（可変変数）
-    Var {
-        name: String,
-        type_annotation: Option<Type>,
-        value: Expr,
-        span: Span,
-    },
+    // Let と Var は Decl に移動
     /// return文
     Return {
         value: Option<Expr>,
         span: Span,
     },
-    /// 式文
-    Expr {
-        expr: Expr,
-        span: Span,
-    },
+    // Expr バリアントを削除
 }
 
 /// 宣言のAST
@@ -192,9 +182,26 @@ pub enum Decl {
         name: String,
         parameters: Vec<Parameter>,
         return_type: Option<Type>,
-        body: Expr,
+        body: Expr, // 関数本体は式
         span: Span,
     },
+    /// let宣言 (不変束縛)
+    Let {
+        pattern: Pattern, // name: String から Pattern に変更
+        type_annotation: Option<Type>,
+        value: Expr,
+        span: Span,
+    },
+    /// var宣言 (可変変数)
+    Var {
+        name: String, // var は Identifier のみなので String のまま
+        type_annotation: Option<Type>,
+        value: Expr,
+        span: Span,
+    },
+    // TODO: 他の宣言タイプ (Type, Trait, Impl, Effect, Handler, Export, Enum) も
+    // ここに追加するか、Program 構造体で別々に管理するか検討が必要。
+    // 今回はまず Let/Var の移動に集中する。
 }
 
 /// 関数パラメータ
@@ -383,7 +390,8 @@ pub struct Module {
     pub type_declarations: Vec<TypeDecl>,
     pub trait_declarations: Vec<TraitDecl>,
     pub impl_declarations: Vec<ImplDecl>,
-    pub statements: Vec<Stmt>,
+    // pub statements: Vec<Stmt>, // 削除
+    pub expressions: Vec<Expr>, // 追加
     pub span: Span,
 }
 
@@ -391,11 +399,15 @@ pub struct Module {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
     pub modules: Vec<Module>,
+    // declarations には Function, Let, Var が入るようになる
     pub declarations: Vec<Decl>,
-    pub type_declarations: Vec<TypeDecl>,
-    pub trait_declarations: Vec<TraitDecl>,
-    pub impl_declarations: Vec<ImplDecl>,
-    pub statements: Vec<Stmt>,
+    pub type_declarations: Vec<TypeDecl>, // TypeDecl は Decl に含めず分離したままにする
+    pub trait_declarations: Vec<TraitDecl>, // TraitDecl も分離
+    pub impl_declarations: Vec<ImplDecl>,   // ImplDecl も分離
+    // statements には Return のみが含まれるはずだが、トップレベルには書けない
+    // pub statements: Vec<Stmt>, // 削除
+    // トップレベルの式を保持するフィールドを追加
+    pub expressions: Vec<Expr>,
 }
 
 #[cfg(test)]

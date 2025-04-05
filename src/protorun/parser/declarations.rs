@@ -4,14 +4,18 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::char,
-    combinator::{cut, opt},
+    combinator::{cut, opt, map}, // map を追加
     multi::{many0, separated_list0},
-    sequence::{delimited, pair, preceded},
+    sequence::{delimited, pair, preceded, tuple}, // tuple を追加
 };
 
-use crate::protorun::ast::{TypeDecl, EnumVariant, TraitDecl, ImplDecl};
+// Decl, Pattern, Expr, Type, Span をインポート
+use crate::protorun::ast::{Decl, Pattern, Expr, Type, Span, TypeDecl, EnumVariant, TraitDecl, ImplDecl};
 use super::common::{ParseResult, ws_comments, identifier_string, keyword, calculate_span};
 use super::types::parse_type;
+use super::patterns::pattern as parse_pattern; // パターンパーサーをインポート
+use super::expressions::expression; // 式パーサーをインポート
+use crate::protorun::ast::Parameter; // Parameter をインポート
 
 /// ジェネリックパラメータのパース
 pub fn parse_generic_parameters<'a>(input: &'a str) -> ParseResult<'a, Vec<String>> {
@@ -223,5 +227,126 @@ pub fn parse_type_declaration<'a>(input: &'a str, original_input: &'a str) -> Pa
         |i| parse_record_type_declaration(i, original_input),
         |i| parse_enum_declaration(i, original_input),
         |i| parse_type_alias(i, original_input)
+    ))(input)
+}
+
+/// let宣言のパース
+pub fn parse_let_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Decl> {
+    map(
+        tuple((
+            keyword("let"),
+            ws_comments(|i| parse_pattern(i, original_input)), // パターンをパース (関数名を修正)
+            opt(preceded(
+                ws_comments(char(':')),
+                |i| parse_type(i, original_input), // 型注釈（オプション）
+            )),
+            ws_comments(char('=')),
+            ws_comments(|i| expression(i, original_input)), // 式をパース
+        )),
+        move |(_, pattern, type_annotation, _, value)| {
+            // Span の計算: 開始は "let" の直前、終了は value の直後
+            // calculate_span は input の残りを使うので、開始位置を別途記録するか、
+            // あるいは nom-locate などを使うのがより正確だが、ここでは近似的な方法を取る。
+            // より正確には、入力全体と残りの入力からスパンを計算するヘルパーを使う。
+            // calculate_span がその役割を果たすと仮定する。
+            let span = calculate_span(original_input, input); // input はタプルの後の残り
+            Decl::Let {
+                pattern,
+                type_annotation,
+                value,
+                span,
+            }
+        }
+    )(input)
+}
+
+/// var宣言のパース
+pub fn parse_var_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Decl> {
+    map(
+        tuple((
+            keyword("var"),
+            ws_comments(identifier_string), // var は識別子のみ
+            opt(preceded(
+                ws_comments(char(':')),
+                |i| parse_type(i, original_input), // 型注釈（オプション）
+            )),
+            ws_comments(char('=')),
+            ws_comments(|i| expression(i, original_input)), // 式をパース
+        )),
+        move |(_, name, type_annotation, _, value)| {
+            let span = calculate_span(original_input, input); // input はタプルの後の残り
+            Decl::Var {
+                name,
+                type_annotation,
+                value,
+                span,
+            }
+        }
+    )(input)
+}
+
+/// パラメータをパース
+pub fn parameter<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Parameter> {
+    let (input, name) = ws_comments(identifier_string)(input)?;
+    let (input, type_annotation) = opt(
+        preceded(
+            ws_comments(char(':')),
+            |i| parse_type(i, original_input)
+        )
+    )(input)?;
+
+    let span = calculate_span(original_input, input);
+
+    Ok((input, Parameter {
+        name,
+        type_annotation,
+        span,
+    }))
+}
+
+/// 関数宣言をパース
+pub fn parse_function_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Decl> {
+    let (input, _) = ws_comments(tag("fn"))(input)?;
+    let (input, name) = ws_comments(identifier_string)(input)?;
+
+    // パラメータをパース
+    let (input, parameters) = super::common::delimited_list(
+        '(',
+        |i| parameter(i, original_input),
+        ',',
+        ')'
+    )(input)?;
+
+    // 戻り値の型（オプション）
+    let (input, return_type) = opt(
+        preceded(
+            ws_comments(char(':')),
+            |i| parse_type(i, original_input)
+        )
+    )(input)?;
+
+    // 関数本体
+    let (input, _) = ws_comments(char('='))(input)?;
+    let (input, body) = cut(|i| expression(i, original_input))(input)?;
+    // let (input, _) = opt(ws_comments(char(';')))(input)?; // セミコロンは不要のはず
+
+    let span = calculate_span(original_input, input);
+
+    Ok((input, Decl::Function {
+        name,
+        parameters,
+        return_type,
+        body,
+        span,
+    }))
+}
+
+
+/// 宣言（Function, Let, Var）のパース
+pub fn parse_declaration<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Decl> {
+    alt((
+        |i| parse_function_declaration(i, original_input),
+        |i| parse_let_declaration(i, original_input),
+        |i| parse_var_declaration(i, original_input),
     ))(input)
 }

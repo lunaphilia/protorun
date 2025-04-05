@@ -268,7 +268,7 @@ fn test_expr_function_call() {
 }
 
 #[test]
-fn test_stmt_let() {
+fn test_decl_let() { // 関数名を変更
     let span_let = Span {
         start: 0,
         end: 10,
@@ -283,29 +283,75 @@ fn test_stmt_let() {
         column: 7,
     };
     
-    let value = Expr::IntLiteral(42, span_expr);
-    
-    let stmt = Stmt::Let {
-        name: "x".to_string(),
+    let value = Expr::IntLiteral(42, span_expr.clone());
+    let pattern = Pattern::Identifier("x".to_string(), span_expr); // name を Pattern に変更
+
+    let decl = Decl::Let { // Stmt を Decl に変更
+        pattern,
         type_annotation: None,
         value,
         span: span_let.clone(),
     };
-    
-    match stmt {
-        Stmt::Let { name, type_annotation, value, span } => {
-            assert_eq!(name, "x");
+
+    match decl {
+        Decl::Let { pattern, type_annotation, value, span } => { // Stmt を Decl に変更
+            // パターンのチェックを追加
+            match pattern {
+                Pattern::Identifier(name, _) => assert_eq!(name, "x"),
+                _ => panic!("期待される識別子パターンではありません"),
+            }
             assert_eq!(type_annotation, None);
             assert_eq!(span, span_let);
-            
+
             match value {
                 Expr::IntLiteral(val, _) => assert_eq!(val, 42),
                 _ => panic!("期待される整数リテラルではありません"),
             }
         }
-        _ => panic!("期待されるlet文ではありません"),
+        _ => panic!("期待されるlet宣言ではありません"), // メッセージ変更
     }
 }
+
+#[test]
+fn test_decl_var() { // var宣言のテストを追加
+    let span_var = Span {
+        start: 0,
+        end: 10,
+        line: 1,
+        column: 1,
+    };
+
+    let span_expr = Span {
+        start: 6,
+        end: 8,
+        line: 1,
+        column: 7,
+    };
+
+    let value = Expr::IntLiteral(0, span_expr);
+
+    let decl = Decl::Var {
+        name: "count".to_string(),
+        type_annotation: None,
+        value,
+        span: span_var.clone(),
+    };
+
+    match decl {
+        Decl::Var { name, type_annotation, value, span } => {
+            assert_eq!(name, "count");
+            assert_eq!(type_annotation, None);
+            assert_eq!(span, span_var);
+
+            match value {
+                Expr::IntLiteral(val, _) => assert_eq!(val, 0),
+                _ => panic!("期待される整数リテラルではありません"),
+            }
+        }
+        _ => panic!("期待されるvar宣言ではありません"),
+    }
+}
+
 
 #[test]
 fn test_decl_function() {
@@ -359,7 +405,10 @@ fn test_decl_function() {
                 Expr::Identifier(name, _) => assert_eq!(name, "x"),
                 _ => panic!("期待される識別子ではありません"),
             }
-        }
+        },
+        // match を網羅的にする
+        Decl::Let { .. } => panic!("期待される関数宣言ではありません (Let)"),
+        Decl::Var { .. } => panic!("期待される関数宣言ではありません (Var)"),
     }
 }
 
@@ -488,7 +537,8 @@ fn test_module() {
         type_declarations: Vec::new(),
         trait_declarations: Vec::new(),
         impl_declarations: Vec::new(),
-        statements: Vec::new(),
+        // statements: Vec::new(), // 削除
+        expressions: Vec::new(), // 追加
         span: span.clone(),
     };
 
@@ -519,7 +569,8 @@ fn test_program() {
         type_declarations: Vec::new(),
         trait_declarations: Vec::new(),
         impl_declarations: Vec::new(),
-        statements: Vec::new(),
+        // statements: Vec::new(), // 削除
+        expressions: Vec::new(), // 追加
         span: span.clone(),
     };
 
@@ -529,7 +580,8 @@ fn test_program() {
         type_declarations: Vec::new(),
         trait_declarations: Vec::new(),
         impl_declarations: Vec::new(),
-        statements: Vec::new(),
+        // statements: Vec::new(), // 削除
+        expressions: Vec::new(), // 追加
     };
 
     assert_eq!(program.modules.len(), 1);

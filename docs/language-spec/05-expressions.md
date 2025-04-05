@@ -13,17 +13,20 @@ Protorun言語は、式ベースの言語設計を採用しています。これ
 
 ## 5.2 ブロック式
 
-ブロック式は、0個以上の文のシーケンスと、オプションで最後に評価される式を中括弧 `{}` で囲んだものです。文法上は式の一種として扱われます。
+ブロック式は、0個以上の宣言、文 (`return`)、または式を中括弧 `{}` で囲んだものです。文法上は式の一種として扱われます。
 
 ```ebnf
-BlockExpr ::= "{" Statement* (Expression)? "}"
+BlockExpr ::= "{" (Declaration | Statement | Expression)* "}"
+BlockItem ::= Declaration | Statement | Expression // AST上の表現
+Statement ::= ReturnStatement // 現在の仕様では Return のみ
 ```
+(Declaration, ReturnStatement, Expression の詳細は他の章を参照)
 
 ブロック式は主に以下の目的で使用されます：
 
-1.  **文のグループ化**: 複数の文を構文的に一つの単位としてまとめます。これは `if` 式の `then`/`else` 節や、`match` 式のケース、関数本体など、複数のステップを実行する必要がある場所で特に重要です。
+1.  **要素のグループ化**: 複数の宣言、文、式を構文的に一つの単位としてまとめます。これは `if` 式の `then`/`else` 節や、`match` 式のケース、関数本体などで使用されます。
 2.  **スコープの導入**: ブロック内で宣言された変数 (`let` または `var`) は、そのブロック内でのみ有効なローカルスコープを持ちます。
-3.  **式の評価**: ブロック内の最後の式が存在する場合、その式の評価結果がブロック式全体の値となります。最後の式がない場合、ブロック式の値は `Unit` となります。
+3.  **式の評価と値**: ブロック内の最後の要素が式 (`Expression`) である場合、その式の評価結果がブロック式全体の値となります。最後の要素が宣言や `return` 文である場合、またはブロックが空である場合、ブロック式の値は `Unit` となります。副作用のためだけに記述された式（最後の要素ではない式）の値は破棄されます。
 
 ```protorun
 // 例1: if式でのブロック使用
@@ -48,12 +51,18 @@ println(b) // 25
 // 例3: Unitを返すブロック
 {
   let temp = calculate()
-  logResult(temp)
-  // 最後の式がないため、このブロックは Unit を返す
+  logResult(temp) // 副作用のための式
+  // 最後の要素が式ではないため、このブロックは Unit を返す
+}
+
+// 例4: 最後の要素が宣言の場合 (Unit を返す)
+{
+  let x = 10
+  let y = 20 // この宣言が最後なので Unit
 }
 ```
 
-セミコロンが不要になったことで、`if` や `match` などで複数の文を実行したい場合には、これらの文をブロック `{}` で囲むことが必須となります。
+ブロック内の要素は改行で区切られます。セミコロンは不要です。
 
 ## 5.3 制御構造
 
@@ -62,14 +71,17 @@ println(b) // 25
 if condition
   expression1 // 単一式
 else {
-  statement1  // 複数文の場合はブロックが必要
-  expression2
+  statement1  // return 文
+  expression2 // 最後の式
 }
 
 // match式
 match value {
-  pattern1 => expression1,
-  pattern2 if guard => expression2,
+  pattern1 => expression1, // 単一式
+  pattern2 if guard => { // ブロック式
+     let temp = calculate(pattern2)
+     temp + 1 // 最後の式
+  },
   _ => defaultExpression
 }
 
@@ -91,22 +103,18 @@ with Console {
   Console.log("このスコープ内でConsole効果を使用可能")
 }
 
-// with式（効果ハンドラを指定）
-with ConsoleHandler: Console {
-  Console.log("このスコープ内のConsole効果はConsoleHandlerでハンドル")
+// with式（ハンドラは常に式）
+with consoleHandler { // consoleHandler はハンドラオブジェクトを持つ変数や式
+  Console.log("このスコープ内のConsole効果は consoleHandler でハンドル")
 }
 
-// with式（効果の暗黙的な提供）
-with DatabaseHandler: Database {
-  // Database効果が暗黙的に利用可能になる
-  processUserData("user123")
-}
+// with式（効果の暗黙的な提供 - これはハンドラの実装に依存）
+// with DatabaseHandler { // DatabaseHandler が Database 効果を提供する式である必要がある
+//   processUserData("user123")
+// }
 
-// with式（複数の効果の暗黙的な提供）
-with DatabaseHandler: Database, LoggerHandler: Logger {
-  // Database効果とLogger効果が暗黙的に利用可能になる
-  processUserOrder("user123", "order456")
-}
+// with式（複数のハンドラ式を提供 - カンマ区切りは現在サポートされていない）
+// with databaseHandler, loggerHandler { ... }
 
 // 効果のスコープ化
 with scoped Logger {
@@ -139,7 +147,7 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 
 - **bind式**: モナド的な連鎖を表現するための構文です。Option、Result、Futureなどのモナド的な型の連鎖に最適化されています。Haskellのdoノーテーションからインスピレーションを得ていますが、より明示的な名前を使用しています。
 
-- **with式**: 効果のスコープとハンドラを制御するための構文です。これにより、効果の影響範囲を明示的に制限し、効果の実装を提供することができます。これは、代数的効果システムの中核となる機能です。with式はブロック内の最後の式の評価結果を返します。
+- **with式**: 効果ハンドラ（式として評価される）を適用するスコープを定義します。`with handlerExpr { bodyExpr }` の形式を取ります。`handlerExpr` は効果ハンドラを提供する式である必要があります。オプションで `: EffectType` を指定して、ハンドルする効果の型を明示することもできます。`with` 式全体の値は `bodyExpr` の評価結果となります。
 
 - **効果のスコープ化**: 効果の実装を局所的に提供するための構文です。これにより、効果の実装を必要な場所に限定し、グローバルな状態の変更を避けることができます。これは、効果システムの柔軟性と安全性を向上させるための設計決定です。
 
@@ -296,11 +304,54 @@ let process = (input: String) => {
 
 ラムダ式の本体 (`=>` の右辺) は単一の `Expression` です。これにはリテラル、変数、関数呼び出し、演算、そしてブロック式 `{...}` など、任意の式を含めることができます。複数の文を実行したい場合は、ブロック式を使用する必要があります。
 
-### 5.3.4 with式の返り値と用途
+### 5.3.4 ラムダ式 (Lambda Expressions)
 
-with式は式として設計されており、ブロック内の最後の式の評価結果を返します。この返り値は他の式と同様に使用できます：
+ラムダ式（無名関数）は、関数をその場で定義するための簡潔な構文です。`=>` 演算子を使用して、パラメータリストと関数本体を区切ります。
 
-### 5.3.5 暗黙的パラメータ
+```protorun
+// 基本形
+(param1: Type1, param2: Type2) => expression
+
+// 型推論が可能な場合
+let add = (a, b) => a + b
+
+// 単一パラメータの場合 (カッコは省略可能)
+let square = x => x * x
+
+// 複数文を実行する場合 (ブロック式を使用)
+let process = (input: String) => {
+  let trimmed = input.trim()
+  println(s"Processing: $trimmed") // 副作用のための式
+  trimmed.toUpperCase() // ブロックの最後の式が返り値
+}
+```
+
+ラムダ式の本体 (`=>` の右辺) は単一の `Expression` です。これにはリテラル、変数、関数呼び出し、演算、そしてブロック式 `{...}` など、任意の式を含めることができます。複数の宣言や文を実行したい場合は、ブロック式を使用する必要があります。
+
+### 5.3.5 with式の用途と返り値
+
+`with` 式は、特定のスコープ内で効果ハンドラを適用するために使用されます。`with handlerExpr { bodyExpr }` の形式を取り、`bodyExpr` の評価結果を返します。
+
+```protorun
+// with式の返り値を変数に代入
+let result = with consoleHandler { // consoleHandler はハンドラを提供する式
+  Console.log("計算を開始します")
+  let x = complexCalculation()
+  Console.log("計算結果: " + x.toString())
+  x  // この値がブロックの値となり、with式の返り値となる
+}
+
+// with式の返り値を関数の引数として使用
+processResult(with stateHandler(0) { // stateHandler(0) がハンドラを提供する式
+  let current = State.get()
+  State.modify(c => c.increment())
+  current.value * 2  // この値がブロックの値となり、with式の返り値となる
+})
+```
+
+`with` 式が値を返す式として設計されていることは、Protorunの式ベースの設計原則に沿っており、言語全体の一貫性と表現力を向上させます。これにより、効果の制御と計算の結果を自然に組み合わせることができ、より簡潔で読みやすいコードを書くことが可能になります。
+
+### 5.3.6 暗黙的パラメータ
 
 Protorun言語は、暗黙的パラメータをサポートしています。これにより、スコープ内で利用可能な値を明示的に渡すことなく、関数に提供することができます。
 

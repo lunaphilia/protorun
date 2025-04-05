@@ -7,14 +7,18 @@ use nom::{
     combinator::{cut, map, opt, value},
     error::VerboseError,
     multi::{many0, separated_list0},
-    sequence::{delimited, pair, preceded},
+    sequence::{delimited, pair, preceded, terminated}, // terminated を追加
 };
 
-use crate::protorun::ast::{Expr, BinaryOperator, UnaryOperator, HandlerSpec, ComprehensionKind};
+// BlockItem をインポート, HandlerSpec を削除
+use crate::protorun::ast::{Expr, BinaryOperator, UnaryOperator, ComprehensionKind, BlockItem};
 use super::common::{ParseResult, ws_comments, identifier_string, delimited_list, calculate_span};
 use super::literals::{int_literal_expr, float_literal_expr, string_literal_expr, bool_literal_expr, unit_literal_expr};
 use super::patterns::pattern;
 use super::types::parse_type;
+// statement と parse_declaration をインポート
+use super::statements::statement;
+use super::declarations::parse_declaration;
 
 /// 括弧式をパース
 pub fn paren_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
@@ -72,95 +76,40 @@ pub fn primary<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, E
     result
 }
 
-/// ブロック式をパース
+/// ブロック式をパース: { (Declaration | Statement | Expression)* }
+/// ブロックの値は、意味解析/実行時に最後の要素が式ならその値、そうでなければ Unit となる。
 pub fn block_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+    // let start_pos = input.as_ptr() as usize - original_input.as_ptr() as usize; // Span計算用
+
     let (input, _) = ws_comments(char('{'))(input)?;
-    
-    // 空のブロック -> ユニットリテラル
-    if let Ok((input, _)) = ws_comments(char('}'))(input) {
-        let span = calculate_span(original_input, input);
+
+    // ブロック内の要素（宣言、文、または式）をパース
+    let (input, items) = many0(
+        // 各要素の後には空白が続くことを想定 (改行含む)
+        terminated(
+            alt((
+                map(|i| parse_declaration(i, original_input), BlockItem::Declaration),
+                map(|i| statement(i, original_input), BlockItem::Statement), // statement は Return のみ
+                map(|i| expression(i, original_input), BlockItem::Expression), // 副作用のための式もパース
+            )),
+            multispace0 // 要素間の空白を消費
+        )
+    )(input)?;
+
+    // 閉じ括弧 '}' をパース
+    let (input, _) = cut(ws_comments(char('}')))(input)?;
+
+    let span = calculate_span(original_input, input); // TODO: Span 計算の正確性を確認・修正する。
+
+    // 空のブロック {} は UnitLiteral として扱う (意味的には BlockExpr{ items: [] } でも良いが、簡潔化のため)
+    if items.is_empty() {
         return Ok((input, Expr::UnitLiteral(span)));
     }
-    
-    // 文のリストをパース
-    let (mut current_input, mut stmts) = (input, vec![]);
-    
-    // 文をパースし続ける
-    loop {
-        // 次のトークンが'}'ならループを抜ける
-        if let Ok((_, _)) = ws_comments(char('}'))(current_input) {
-            break;
-        }
-        
-        // 文をパース
-        match super::statements::statement(current_input, original_input) {
-            Ok((new_input, stmt)) => {
-                stmts.push(stmt);
-                
-                // セミコロンをパース
-                match ws_comments(char(';'))(new_input) {
-                    Ok((after_semicolon, _)) => {
-                        current_input = after_semicolon;
-                    },
-                    Err(_) => {
-                        // セミコロンがない場合は、最後の式として扱う
-                        current_input = new_input;
-                        break;
-                    }
-                }
-            },
-            Err(_) => {
-                // 文のパースに失敗したら、最後の式をパース
-                break;
-            }
-        }
-    }
-    
-    // 最後の式をパース（オプション）
-    let (input, last_expr) = match expression(current_input, original_input) {
-        Ok((new_input, expr)) => {
-            (new_input, Some(expr))
-        },
-        Err(_) => {
-            (current_input, None)
-        }
-    };
-    
-    // 閉じ括弧をパース
-    match cut(ws_comments(char('}')))(input) {
-        Ok((input, _)) => {
-            let span = calculate_span(original_input, input);
-            
-            // 文がなく、最後の式もない場合はユニットリテラルを返す
-            if stmts.is_empty() && last_expr.is_none() {
-                return Ok((input, Expr::UnitLiteral(span)));
-            }
-            
-            // 最後の式がある場合は、それを返す
-            // 最後の式がない場合は、最後の文を式として扱う
-            let result = if let Some(expr) = last_expr {
-                expr
-            } else if !stmts.is_empty() {
-                // 最後の文を取り出す
-                let last_stmt = stmts.pop().unwrap();
-                match last_stmt {
-                    crate::protorun::ast::Stmt::Expr { expr, .. } => expr,
-                    _ => {
-                        // 最後の文が式文でない場合はユニットリテラルを返す
-                        Expr::UnitLiteral(span)
-                    }
-                }
-            } else {
-                // ここには到達しないはず
-                Expr::UnitLiteral(span)
-            };
-            
-            Ok((input, result))
-        },
-        Err(e) => {
-            Err(e)
-        }
-    }
+
+    Ok((input, Expr::BlockExpr {
+        items, // final_expr は削除
+        span,
+    }))
 }
 
 /// 後置式（関数呼び出しとメンバーアクセス）をパース
@@ -585,15 +534,11 @@ pub fn bind_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a,
 /// with式をパース
 pub fn with_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
     let (input, _) = ws_comments(tag("with"))(input)?;
-    
-    // ハンドラ指定（式または型）
-    let (input, handler) = alt((
-        // 型としてのハンドラ
-        map(|i| parse_type(i, original_input), HandlerSpec::Type),
-        // 式としてのハンドラ
-        map(|i| logical_or(i, original_input), |expr| HandlerSpec::Expr(Box::new(expr)))
-    ))(input)?;
-    
+
+    // ハンドラ式をパース (alt と HandlerSpec を削除)
+    let (input, handler_expr) = logical_or(input, original_input)?;
+    let handler = Box::new(handler_expr);
+
     // オプションの効果型
     let (input, effect_type) = opt(
         preceded(
