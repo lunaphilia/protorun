@@ -93,7 +93,7 @@ ReturnType ::= Type | "Unit"
 LetDecl ::= "let" Pattern (":" Type)? "=" Expression
 VarDecl ::= "var" Identifier (":" Type)? "=" Expression
 
-Statement ::= Expression | ReturnStatement
+Statement ::= ReturnStatement
 ReturnStatement ::= "return" Expression?
 
 Expression ::= LiteralExpr
@@ -124,7 +124,7 @@ SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
 
 IdentifierExpr ::= Identifier
 
-BlockExpr ::= "{" Statement* (Expression)? "}"
+BlockExpr ::= "{" (Declaration | Statement | Expression)* "}"
 
 IfExpr ::= "if" Expression (BlockExpr | Expression) ("else" (IfExpr | BlockExpr | Expression))?
 
@@ -210,9 +210,11 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 
 ### 10.3.4 文 (Statement)
 
-文は主に副作用を引き起こすか、制御フローを変更するために使用されます。関数本体など、特定のコンテキストで使用されます。
-- **式文 (Expression)**: 式を評価し、結果を破棄します。
+文は制御フローを変更するために使用されます。現在のProtorun言語の仕様では、文として分類されるのは **`return` 文のみ**です。関数本体やブロック式 `{...}` の内部など、特定のコンテキストで使用されます。
+
 - **return文 (ReturnStatement)**: 現在の関数から値を返します。
+
+式を副作用のためだけに実行する場合（例: `println("Hello")`）、それは文ではなく、ブロック式 `{...}` 内の要素 (`BlockItem::Expression`) として扱われます。詳細は [5. 式](05-expressions.md) の章を参照してください。
 
 ### 10.3.5 式 (Expression)
 
