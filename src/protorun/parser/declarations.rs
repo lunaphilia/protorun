@@ -10,7 +10,7 @@ use nom::{
 };
 
 // Decl, Pattern, Expr, Type, Span をインポート
-use crate::protorun::ast::{Decl, Pattern, Expr, Type, Span, TypeDecl, EnumVariant, TraitDecl, ImplDecl};
+use crate::protorun::ast::{Decl, TypeDecl, EnumVariant, TraitDecl, ImplDecl};
 use super::common::{ParseResult, ws_comments, identifier_string, keyword, calculate_span};
 use super::types::parse_type;
 use super::patterns::pattern as parse_pattern; // パターンパーサーをインポート
