@@ -656,13 +656,13 @@ pub fn lambda_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'
     if input.starts_with('(') {
         // 先読みでラムダ式かどうかを確認
         let (params_input, _) = char('(')(input)?;
-        
+
         let params_result = separated_list0(
             ws_comments(char(',')),
             |i| parameter(i, original_input)
         )(params_input);
-        
-        if let Ok((params_rest, params)) = params_result {
+
+        if let Ok((params_rest, _params)) = params_result { // params -> _params
             let close_paren_result = ws_comments(char(')'))(params_rest);
             if let Ok((after_paren, _)) = close_paren_result {
                 let arrow_result = ws_comments(tag("=>"))(after_paren);

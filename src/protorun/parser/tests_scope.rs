@@ -1,7 +1,7 @@
 // スコープ管理のテスト
 
 use super::*;
-use crate::protorun::ast::{Expr, Stmt};
+use crate::protorun::ast::Expr;
 
 #[test]
 fn test_block_scope_management() {

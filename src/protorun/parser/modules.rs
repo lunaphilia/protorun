@@ -205,15 +205,9 @@ pub fn parse_module<'a>(input: &'a str, original_input: &'a str) -> ParseResult<
     
     // 実装宣言をパース
     let (input, impl_declarations) = many0(|i| parse_impl_declaration(i, original_input))(input)?;
-    
-    // 文をパース
-    let (input, statements) = many0(
-        preceded(
-            ws_comments(char(';')),
-            |i| statement(i, original_input)
-        )
-    )(input)?;
-    
+
+    // 文のパース処理を削除
+
     let (input, _) = ws_comments(char('}'))(input)?;
     
     let span = calculate_span(original_input, input);

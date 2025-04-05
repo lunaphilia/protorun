@@ -115,7 +115,7 @@ pub fn unit_literal_expr<'a>(input: &'a str, original_input: &'a str) -> ParseRe
 }
 
 /// リテラルパターン値をパース
-pub fn literal_pattern_value<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, LiteralValue> {
+pub fn literal_pattern_value<'a>(input: &'a str, _original_input: &'a str) -> ParseResult<'a, LiteralValue> { // original_input を _original_input に変更
     alt((
         map(int_literal, LiteralValue::Int),
         map(float_literal, LiteralValue::Float),

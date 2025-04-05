@@ -819,61 +819,8 @@ fn test_parse_with_expr() {
             _ => panic!("期待されるwith式ではありません"),
         }
     }
-
-    // 型としてのハンドラと効果型 (この構文は廃止されたのでコメントアウト)
-    // {
-    //     let input = "with Logger: IO { \n log(\"Hello\") \n 42 \n }"; // セミコロン削除、改行追加
-    //     let mut parser = Parser::new(None);
-    //     let expr = parser.parse_expression(input).unwrap();
-
-    //     match expr {
-    //         Expr::WithExpr { handler, effect_type, body, .. } => {
-    //             // ハンドラが式 (Identifier("Logger")) としてパースされることを確認 (alt順序変更のため)
-    //             match *handler {
-    //                  Expr::Identifier(name, _) => assert_eq!(name, "Logger"),
-    //                  _ => panic!("Handler expression is not Identifier"),
-    //             }
-
-    //             assert!(effect_type.is_some());
-    //             match effect_type.unwrap() {
-    //                 crate::protorun::ast::Type::Simple { name, .. } => assert_eq!(name, "IO"),
-    //                 _ => panic!("期待される単純型ではありません"),
-    //             }
-
-    //             // body が BlockExpr { items: [Expression(FunctionCall), Expression(IntLiteral)] } であることを確認
-    //             match *body {
-    //                  Expr::BlockExpr { items, .. } => { // final_expr を削除
-    //                      assert_eq!(items.len(), 2); // log("Hello") と 42
-    //                      match &items[0] {
-    //                          BlockItem::Expression(expr) => {
-    //                              match expr {
-    //                                  Expr::FunctionCall{ function, .. } => {
-    //                                      match &**function {
-    //                                          Expr::Identifier(name, _) => assert_eq!(name, "log"),
-    //                                          _ => panic!("Expected log function call"),
-    //                                      }
-    //                                  },
-    //                                  _ => panic!("First item is not FunctionCall"),
-    //                              }
-    //                          },
-    //                          _ => panic!("First item is not Expression"),
-    //                      }
-    //                      match &items[1] {
-    //                          BlockItem::Expression(expr) => {
-    //                              match expr {
-    //                                  Expr::IntLiteral(v, _) => assert_eq!(*v, 42),
-    //                                  _ => panic!("Second item is not IntLiteral(42)"),
-    //                              }
-    //                          },
-    //                          _ => panic!("Second item is not Expression"),
-    //                      }
-    //                  },
-    //                 _ => panic!("Body is not BlockExpr"),
-    //             }
-    //         },
-    //         _ => panic!("期待されるwith式ではありません"),
-    //     }
-    // }
+    
+    // 型としてのハンドラと効果型のテストケースを削除 (構文廃止のため)
 }
 
 #[test]
