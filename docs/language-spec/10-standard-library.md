@@ -177,6 +177,7 @@ module Result {
 標準ライブラリは、ファイルシステムやコンソールとの対話など、I/O操作のための効果を提供します。
 
 ```
+
 // I/O効果
 effect IO {
   // ファイル操作
@@ -231,6 +232,7 @@ fn processFile(path: String): Result<String, IOError> & IO = { // "with" を "&"
     Result.Err(IOError.FileNotFound(path))
   }
 }
+
 ```
 
 ## 10.4 並行処理
@@ -238,6 +240,7 @@ fn processFile(path: String): Result<String, IOError> & IO = { // "with" を "&"
 標準ライブラリは、並行処理と非同期プログラミングのためのサポートを提供します。
 
 ```
+
 // 非同期効果
 effect Async {
   // タスク管理
@@ -290,6 +293,7 @@ fn fetchData(url: String): Result<String, NetworkError> & Async & IO = { // "wit
     }
   }
 }
+
 ```
 
 並行処理は代数的効果として実装され、非同期プログラミングを型安全かつ直感的に行うことができます。これにより、コールバックの複雑さを避けつつ、効率的な並行処理を実現できます。
@@ -299,6 +303,7 @@ fn fetchData(url: String): Result<String, NetworkError> & Async & IO = { // "wit
 標準ライブラリは、コレクションに対する豊富な操作を提供します。
 
 ```
+
 // リスト操作
 module List {
   // 変換操作
@@ -351,6 +356,7 @@ module Set {
   export fn isSuperset<T>(set1: Set<T>, set2: Set<T>): Bool
   export fn isDisjoint<T>(set1: Set<T>, set2: Set<T>): Bool
 }
+
 ```
 
 これらのコレクション操作は、関数型プログラミングのパターンに基づいており、データの変換と操作を簡潔かつ表現力豊かに行うことができます。
@@ -360,6 +366,7 @@ module Set {
 標準ライブラリは、数値計算のための機能を提供します。
 
 ```
+
 // 数値型クラス
 trait Num<T> {
   fn add(self, other: T): T
@@ -400,6 +407,7 @@ module Math {
   export fn round(x: Float): Float
   export fn truncate(x: Float): Float
 }
+
 ```
 
 数値計算機能は、科学計算や数学的操作を効率的に行うための基盤を提供します。
@@ -409,6 +417,7 @@ module Math {
 標準ライブラリは、文字列操作のための豊富な機能を提供します。
 
 ```
+
 // 文字列操作
 module String {
   // 基本操作
@@ -437,6 +446,7 @@ module String {
   // 文字列補間 (言語機能として提供される可能性あり)
   // export fn format(template: String, args: Map<String, String>): String
 }
+
 ```
 
 文字列操作機能は、テキスト処理やユーザーインターフェースの構築に不可欠です。
