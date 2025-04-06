@@ -113,9 +113,10 @@ pub enum Expr {
     ParenExpr(Box<Expr>, Span),
     /// if式
     IfExpr {
-        condition: Box<Expr>,
-        then_branch: Box<Expr>,
-        else_branch: Option<Box<Expr>>,
+        condition: Box<Expr>, // if の条件
+        then_branch: Box<Expr>, // if の本体 (BlockExpr)
+        elif_branches: Vec<(Expr, Expr)>, // elif の (条件, 本体 BlockExpr) のリスト
+        else_branch: Option<Box<Expr>>, // else の本体 (BlockExpr, オプショナル)
         span: Span,
     },
     /// match式

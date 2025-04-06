@@ -420,141 +420,266 @@ fn test_parse_complex_expression() {
 
 #[test]
 fn test_parse_if_expr() {
-    // 基本的なif式
+    // 基本的な if ... else ...
     {
         let input = "if x > 0 { 42 } else { -42 }";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
-        
+
         match expr {
-            Expr::IfExpr { condition, then_branch, else_branch, .. } => {
+            Expr::IfExpr { condition, then_branch, elif_branches, else_branch, .. } => {
+                // if 条件
                 match *condition {
                     Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gt),
-                    _ => panic!("期待される二項演算ではありません"),
+                    _ => panic!("if condition is not BinaryOp"),
                 }
-
-                // then_branch が BlockExpr { items: [Expression(IntLiteral(42))] } であることを確認
+                // then 本体
                 match *then_branch {
-                    Expr::BlockExpr{ items, .. } => { // final_expr を削除
+                    Expr::BlockExpr{ items, .. } => {
                         assert_eq!(items.len(), 1);
                         match &items[0] {
-                            BlockItem::Expression(expr) => {
-                                match expr {
-                                    Expr::IntLiteral(v, _) => assert_eq!(*v, 42),
-                                    _ => panic!("then_branch の item が IntLiteral(42) ではありません"),
-                                }
-                            },
-                            _ => panic!("then_branch の item が Expression ではありません"),
+                            BlockItem::Expression(Expr::IntLiteral(v, _)) => assert_eq!(*v, 42),
+                            _ => panic!("then_branch item is not IntLiteral(42)"),
                         }
                     },
-                    _ => panic!("then_branch が BlockExpr ではありません"),
+                    _ => panic!("then_branch is not BlockExpr"),
                 }
-
-                // else_branch が Some(BlockExpr { items: [Expression(UnaryOp { op: Neg, expr: IntLiteral(42) })] }) であることを確認
+                // elif なし
+                assert!(elif_branches.is_empty());
+                // else 本体
                 assert!(else_branch.is_some());
                 match *else_branch.unwrap() {
-                    Expr::BlockExpr{ items, .. } => { // final_expr を削除
+                    Expr::BlockExpr{ items, .. } => {
                          assert_eq!(items.len(), 1);
                          match &items[0] {
-                             BlockItem::Expression(expr) => {
-                                 match expr {
-                                     Expr::UnaryOp{ operator, expr: inner_expr, .. } => {
-                                         assert_eq!(*operator, UnaryOperator::Neg);
-                                         match &**inner_expr { // Box なので参照外し
-                                             Expr::IntLiteral(v, _) => assert_eq!(*v, 42),
-                                             _ => panic!("else_branch の UnaryOp の内部が IntLiteral(42) ではありません"),
-                                         }
-                                     },
-                                     _ => panic!("else_branch の item が UnaryOp ではありません"),
+                             BlockItem::Expression(Expr::UnaryOp{ operator, expr: inner_expr, .. }) => {
+                                 assert_eq!(*operator, UnaryOperator::Neg);
+                                 match &**inner_expr {
+                                     Expr::IntLiteral(v, _) => assert_eq!(*v, 42),
+                                     _ => panic!("else_branch UnaryOp inner is not IntLiteral(42)"),
                                  }
                              },
-                             _ => panic!("else_branch の item が Expression ではありません"),
+                             _ => panic!("else_branch item is not UnaryOp"),
                          }
                     },
-                    _ => panic!("else_branch が BlockExpr ではありません"),
+                    _ => panic!("else_branch is not BlockExpr"),
                 }
             },
-            _ => panic!("期待されるif式ではありません"),
+            _ => panic!("Expected IfExpr"),
         }
     }
-    
-    // else部がないif式
+
+    // if のみ (else なし)
     {
         let input = "if x > 0 { 42 }";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
         match expr {
-            Expr::IfExpr { condition, then_branch, else_branch, .. } => {
+            Expr::IfExpr { condition, then_branch, elif_branches, else_branch, .. } => {
                 match *condition {
                     Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gt),
-                    _ => panic!("期待される二項演算ではありません"),
+                    _ => panic!("if condition is not BinaryOp"),
                 }
-
-                // then_branch が BlockExpr { items: [Expression(IntLiteral(42))] } であることを確認
                 match *then_branch {
-                     Expr::BlockExpr{ items, .. } => { // final_expr を削除
+                     Expr::BlockExpr{ items, .. } => {
                         assert_eq!(items.len(), 1);
                         match &items[0] {
-                            BlockItem::Expression(expr) => {
-                                match expr {
-                                    Expr::IntLiteral(v, _) => assert_eq!(*v, 42),
-                                    _ => panic!("then_branch の item が IntLiteral(42) ではありません"),
-                                }
-                            },
-                            _ => panic!("then_branch の item が Expression ではありません"),
+                            BlockItem::Expression(Expr::IntLiteral(v, _)) => assert_eq!(*v, 42),
+                            _ => panic!("then_branch item is not IntLiteral(42)"),
                         }
                     },
-                    _ => panic!("then_branch が BlockExpr ではありません"),
+                    _ => panic!("then_branch is not BlockExpr"),
                 }
-
+                assert!(elif_branches.is_empty());
                 assert!(else_branch.is_none());
             },
-            _ => panic!("期待されるif式ではありません"),
+            _ => panic!("Expected IfExpr"),
         }
     }
-    
-    // ネストされたif式
+
+    // if ... elif ... else ...
     {
-        let input = "if x > 0 { 42 } else if x < 0 { -42 } else { 0 }";
+        let input = "if x > 0 { 1 } elif x < 0 { -1 } else { 0 }";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
         match expr {
-            Expr::IfExpr { condition, then_branch, else_branch, .. } => {
+            Expr::IfExpr { condition, then_branch, elif_branches, else_branch, .. } => {
+                // if 条件
                 match *condition {
                     Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gt),
-                    _ => panic!("期待される二項演算ではありません"),
+                    _ => panic!("if condition is not BinaryOp"),
                 }
-
-                // then_branch が BlockExpr { items: [Expression(IntLiteral(42))] } であることを確認
+                // then 本体
                 match *then_branch {
-                     Expr::BlockExpr{ items, .. } => { // final_expr を削除
+                     Expr::BlockExpr{ items, .. } => {
                         assert_eq!(items.len(), 1);
                         match &items[0] {
-                            BlockItem::Expression(expr) => {
-                                match expr {
-                                    Expr::IntLiteral(v, _) => assert_eq!(*v, 42),
-                                    _ => panic!("then_branch の item が IntLiteral(42) ではありません"),
+                            BlockItem::Expression(Expr::IntLiteral(v, _)) => assert_eq!(*v, 1),
+                            _ => panic!("then_branch item is not IntLiteral(1)"),
+                        }
+                    },
+                    _ => panic!("then_branch is not BlockExpr"),
+                }
+                // elif
+                assert_eq!(elif_branches.len(), 1);
+                let (elif_cond, elif_body) = &elif_branches[0];
+                // elif 条件
+                match elif_cond {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(*operator, BinaryOperator::Lt),
+                    _ => panic!("elif condition is not BinaryOp"),
+                }
+                // elif 本体
+                match elif_body {
+                     Expr::BlockExpr{ items, .. } => {
+                        assert_eq!(items.len(), 1);
+                        match &items[0] {
+                            BlockItem::Expression(Expr::UnaryOp{ operator, expr: inner_expr, .. }) => {
+                                assert_eq!(*operator, UnaryOperator::Neg);
+                                match &**inner_expr {
+                                    Expr::IntLiteral(v, _) => assert_eq!(*v, 1),
+                                    _ => panic!("elif_branch UnaryOp inner is not IntLiteral(1)"),
                                 }
                             },
-                            _ => panic!("then_branch の item が Expression ではありません"),
+                            _ => panic!("elif_branch item is not UnaryOp"),
                         }
                     },
-                    _ => panic!("then_branch が BlockExpr ではありません"),
+                    _ => panic!("elif_branch is not BlockExpr"),
                 }
-
-                match else_branch {
-                    Some(else_expr) => {
-                        match *else_expr {
-                            Expr::IfExpr { .. } => (), // ネストされたif式, 中身のチェックは省略
-                            _ => panic!("期待されるif式ではありません"),
-                        }
+                // else 本体
+                assert!(else_branch.is_some());
+                match *else_branch.unwrap() {
+                    Expr::BlockExpr{ items, .. } => {
+                         assert_eq!(items.len(), 1);
+                         match &items[0] {
+                             BlockItem::Expression(Expr::IntLiteral(v, _)) => assert_eq!(*v, 0),
+                             _ => panic!("else_branch item is not IntLiteral(0)"),
+                         }
                     },
-                    None => panic!("else部が期待されます"),
+                    _ => panic!("else_branch is not BlockExpr"),
                 }
             },
-            _ => panic!("期待されるif式ではありません"),
+            _ => panic!("Expected IfExpr"),
+        }
+    }
+
+    // if ... elif ... elif ... else ...
+    {
+        let input = "if code == 200 { \"OK\" } elif code == 404 { \"Not Found\" } elif code == 500 { \"Server Error\" } else { \"Unknown\" }";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+
+        match expr {
+            Expr::IfExpr { condition, then_branch, elif_branches, else_branch, .. } => {
+                // if 条件
+                match *condition {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Eq),
+                    _ => panic!("if condition is not BinaryOp"),
+                }
+                // then 本体
+                match *then_branch {
+                     Expr::BlockExpr{ items, .. } => {
+                        assert_eq!(items.len(), 1);
+                        match &items[0] {
+                            BlockItem::Expression(Expr::StringLiteral(s, _)) => assert_eq!(s, "OK"),
+                            _ => panic!("then_branch item is not StringLiteral(\"OK\")"),
+                        }
+                    },
+                    _ => panic!("then_branch is not BlockExpr"),
+                }
+                // elif
+                assert_eq!(elif_branches.len(), 2);
+                // elif 1
+                let (elif1_cond, elif1_body) = &elif_branches[0];
+                match elif1_cond {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(*operator, BinaryOperator::Eq),
+                    _ => panic!("elif1 condition is not BinaryOp"),
+                }
+                match elif1_body {
+                     Expr::BlockExpr{ items, .. } => {
+                        assert_eq!(items.len(), 1);
+                        match &items[0] {
+                            BlockItem::Expression(Expr::StringLiteral(s, _)) => assert_eq!(s, "Not Found"),
+                            _ => panic!("elif1_branch item is not StringLiteral(\"Not Found\")"),
+                        }
+                    },
+                    _ => panic!("elif1_branch is not BlockExpr"),
+                }
+                // elif 2
+                let (elif2_cond, elif2_body) = &elif_branches[1];
+                match elif2_cond {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(*operator, BinaryOperator::Eq),
+                    _ => panic!("elif2 condition is not BinaryOp"),
+                }
+                match elif2_body {
+                     Expr::BlockExpr{ items, .. } => {
+                        assert_eq!(items.len(), 1);
+                        match &items[0] {
+                            BlockItem::Expression(Expr::StringLiteral(s, _)) => assert_eq!(s, "Server Error"),
+                            _ => panic!("elif2_branch item is not StringLiteral(\"Server Error\")"),
+                        }
+                    },
+                    _ => panic!("elif2_branch is not BlockExpr"),
+                }
+                // else 本体
+                assert!(else_branch.is_some());
+                match *else_branch.unwrap() {
+                    Expr::BlockExpr{ items, .. } => {
+                         assert_eq!(items.len(), 1);
+                         match &items[0] {
+                             BlockItem::Expression(Expr::StringLiteral(s, _)) => assert_eq!(s, "Unknown"),
+                             _ => panic!("else_branch item is not StringLiteral(\"Unknown\")"),
+                         }
+                    },
+                    _ => panic!("else_branch is not BlockExpr"),
+                }
+            },
+            _ => panic!("Expected IfExpr"),
+        }
+    }
+
+    // if ... elif ... (else なし)
+    {
+        let input = "if x > 10 { 1 } elif x > 5 { 2 }";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+
+        match expr {
+            Expr::IfExpr { condition, then_branch, elif_branches, else_branch, .. } => {
+                match *condition {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Gt),
+                    _ => panic!("if condition is not BinaryOp"),
+                }
+                match *then_branch {
+                     Expr::BlockExpr{ items, .. } => {
+                        assert_eq!(items.len(), 1);
+                        match &items[0] {
+                            BlockItem::Expression(Expr::IntLiteral(v, _)) => assert_eq!(*v, 1),
+                            _ => panic!("then_branch item is not IntLiteral(1)"),
+                        }
+                    },
+                    _ => panic!("then_branch is not BlockExpr"),
+                }
+                assert_eq!(elif_branches.len(), 1);
+                let (elif_cond, elif_body) = &elif_branches[0];
+                match elif_cond {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(*operator, BinaryOperator::Gt),
+                    _ => panic!("elif condition is not BinaryOp"),
+                }
+                match elif_body {
+                     Expr::BlockExpr{ items, .. } => {
+                        assert_eq!(items.len(), 1);
+                        match &items[0] {
+                            BlockItem::Expression(Expr::IntLiteral(v, _)) => assert_eq!(*v, 2),
+                            _ => panic!("elif_branch item is not IntLiteral(2)"),
+                        }
+                    },
+                    _ => panic!("elif_branch is not BlockExpr"),
+                }
+                assert!(else_branch.is_none());
+            },
+            _ => panic!("Expected IfExpr"),
         }
     }
 }

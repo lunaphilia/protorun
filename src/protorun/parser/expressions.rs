@@ -348,26 +348,42 @@ pub fn logical_or<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a
     Ok((input, result))
 }
 
-/// if式をパース
+/// if式をパース: if condition { then_branch } [elif condition { elif_branch }]* [else { else_branch }]?
+/// すべての分岐本体はブロック式である必要がある
 pub fn if_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+    let start_pos = input.as_ptr() as usize - original_input.as_ptr() as usize; // Span計算用
+
+    // "if" condition { then_branch }
     let (input, _) = ws_comments(tag("if"))(input)?;
     let (input, condition) = expression(input, original_input)?;
-    let (input, then_branch) = block_expr(input, original_input)?;
+    let (input, then_branch) = block_expr(input, original_input)?; // then節はブロック式必須
+
+    // "[elif condition { elif_branch }]*"
+    let (input, elif_branches) = many0(
+        preceded(
+            ws_comments(tag("elif")),
+            pair(
+                |i| expression(i, original_input), // elif の条件
+                |i| block_expr(i, original_input)  // elif の本体 (ブロック式必須)
+            )
+        )
+    )(input)?;
+
+    // "[else { else_branch }]?"
     let (input, else_branch) = opt(
         preceded(
             ws_comments(tag("else")),
-            alt((
-                |i| if_expr(i, original_input),
-                |i| block_expr(i, original_input)
-            ))
+            |i| block_expr(i, original_input) // else節もブロック式必須
         )
     )(input)?;
-    
-    let span = calculate_span(original_input, input);
-    
+
+    let end_pos = input.as_ptr() as usize - original_input.as_ptr() as usize; // Span計算用
+    let span = calculate_span(original_input, &original_input[start_pos..end_pos]);
+
     Ok((input, Expr::IfExpr {
         condition: Box::new(condition),
         then_branch: Box::new(then_branch),
+        elif_branches, // パースした Vec<(Expr, Expr)> をそのまま渡す
         else_branch: else_branch.map(Box::new),
         span,
     }))
