@@ -1,6 +1,6 @@
-# 8. 例：サンプルプログラム
+# 11. 例：サンプルプログラム
 
-## 8.1 サンプルプログラムの目的と概要
+## 11.1 サンプルプログラムの目的と概要
 
 サンプルプログラムは、Protorun言語の機能と使用パターンを実際のコード例を通じて示すことを目的としています。これらの例は以下の役割を果たします：
 
@@ -12,7 +12,7 @@
 
 以下のサンプルプログラムは、Protorun言語の様々な側面を示すために選ばれています。
 
-## 8.2 簡単な計算機
+## 11.2 簡単な計算機
 
 この例は、代数的データ型、パターンマッチング、代数的効果（例外処理）を使用した簡単な計算機の実装を示しています。
 
@@ -72,7 +72,7 @@ fn evaluate(expr: Expr): Result<Int, String> & Exception<String> = {
   }
 }
 
-// runWithException ヘルパー関数 (07-algebraic-effects.md の例を参考)
+// runWithException ヘルパー関数 (08-algebraic-effects.md の例を参考)
 fn runWithException<T, E>(action: () -> T & Exception<E>): Result<T, E> = {
   // ハンドラをインラインで定義
   let handler = handler: Exception<E> {
@@ -114,12 +114,12 @@ fn main(): Unit & Console = {
 4. **特殊な継続制御**: `noresume`キーワードを使用した継続を呼び出さない効果ハンドラ
 5. **エラー処理**: `Result`型と`?`演算子を使用したエラー伝播（効果ハンドラとの連携）
 
-## 8.3 状態を持つカウンター
+## 11.3 状態を持つカウンター
 
 この例は、状態効果を使用したカウンターの実装を示しています。
 
 ```
-// 状態効果 (07-algebraic-effects.md より)
+// 状態効果 (08-algebraic-effects.md より)
 effect State<S> {
   fn get(): S
   fn set(newState: S): Unit
@@ -135,7 +135,7 @@ fn makeCounter(): () -> Int & State<Int> = { // initial は不要 (状態はハ�
   }
 }
 
-// runWithState ヘルパー関数 (07-algebraic-effects.md の例を参考)
+// runWithState ヘルパー関数 (08-algebraic-effects.md の例を参考)
 fn runWithState<S, T>(initialState: S, action: () -> T & State<S>): (T, S) = {
   var state = initialState
 
@@ -197,12 +197,12 @@ fn main(): Unit & Console = {
 4. **ジェネリクス**: 型パラメータを使用した汎用的な状態ハンドラ
 5. **効果スコープ**: `with`式を使用した効果の局所的な適用
 
-## 8.4 ファイル処理（ライフサイクル管理効果を使用）
+## 11.4 ファイル処理（ライフサイクル管理効果を使用）
 
-この例は、ライフサイクル管理効果を使用したファイル処理の実装を示しています。ライフサイクル管理効果の詳細については、[7.4 ライフサイクル管理効果](07-algebraic-effects.md#74-ライフサイクル管理効果)を参照してください。
+この例は、ライフサイクル管理効果を使用したファイル処理の実装を示しています。ライフサイクル管理効果の詳細については、[8.4 ライフサイクル管理効果](08-algebraic-effects.md#84-ライフサイクル管理効果)を参照してください。
 
 ```
-// FileSystem 効果 (05-algebraic-effects.md より)
+// FileSystem 効果 (08-algebraic-effects.md より)
 effect FileSystem: LifecycleEffect<File> { // File 型は別途定義が必要
   fn acquire(): File // LifecycleEffect から継承
   fn release(resource: File): Unit // LifecycleEffect から継承
@@ -233,9 +233,9 @@ fn processFile(path: String): Result<String, IOError> & FileSystem = {
 3. **エラー処理**: `Result`型を使用したエラー表現（IOErrorなど）
 4. **効果シグネチャ**: 関数が `FileSystem` 効果を持つことを示す
 
-## 8.5 暗黙的パラメータを使用したデータベース操作
+## 11.5 暗黙的パラメータを使用したデータベース操作
 
-この例は、暗黙的パラメータと効果システムを使用したデータベース操作の実装を示しています。暗黙的パラメータの詳細については、[7.8 暗黙的パラメータと効果システム](07-algebraic-effects.md#78-暗黙的パラメータと効果システム)を参照してください。
+この例は、暗黙的パラメータと効果システムを使用したデータベース操作の実装を示しています。暗黙的パラメータの詳細については、[8.8 暗黙的パラメータと効果システム](08-algebraic-effects.md#88-暗黙的パラメータと効果システム)を参照してください。
 
 ```
 // ユーザーデータ型
@@ -245,7 +245,7 @@ type User = {
   email: String
 }
 
-// Database 効果 (05-algebraic-effects.md より)
+// Database 効果 (08-algebraic-effects.md より)
 effect Database: LifecycleEffect<Connection> { // Connection 型は別途定義が必要
   fn acquire(): Connection
   fn release(resource: Connection): Unit
@@ -304,7 +304,7 @@ fn updateUser(user: User)(with db: Database): Result<Unit, DbError> = {
 4. **エラー処理**: `Result` 型によるデータベースエラーの処理
 5. **文字列補間**: SQL文の構築
 
-## 8.6 代数的効果と暗黙的パラメータの連携
+## 11.6 代数的効果と暗黙的パラメータの連携
 
 この例は、代数的効果と暗黙的パラメータがどのように連携できるかを示しています。
 

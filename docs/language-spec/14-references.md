@@ -1,10 +1,10 @@
-# 11. 参考文献
+# 14. 参考文献
 
-## 11.1 参考文献の目的
+## 14.1 参考文献の目的
 
 この章では、Protorun言語の設計と実装に影響を与えた主要な文献、論文、言語仕様を紹介します。これらの参考文献は、言語の理論的基盤を理解し、設計決定の背景を把握するのに役立ちます。また、言語の特定の側面についてさらに学びたい開発者にとっても有用なリソースとなります。
 
-## 11.2 プログラミング言語仕様
+## 14.2 プログラミング言語仕様
 
 - **Scala言語仕様**
   - Protorun言語の型システムと関数型プログラミングの側面に影響を与えました。特に、トレイトシステムと型推論の設計に参考にしました。
@@ -15,7 +15,7 @@
 - **Rust言語リファレンス**
   - 所有権システムとメモリ安全性の設計に大きな影響を与えました。Protorunの所有権モデルはRustの所有権システムを基にしています。
 
-## 11.3 書籍
+## 14.3 書籍
 
 - **"Types and Programming Languages" by Benjamin C. Pierce**
   - 型システムの理論的基盤を提供し、Protorunの型システム設計に影響を与えました。
@@ -29,7 +29,7 @@
 - **"Compilers: Principles, Techniques, and Tools" by Alfred V. Aho, Monica S. Lam, Ravi Sethi, and Jeffrey D. Ullman**
   - コンパイラの設計と実装に関する基本的な参考書です。
 
-## 11.4 代数的効果と効果ハンドラに関する論文
+## 14.4 代数的効果と効果ハンドラに関する論文
 
 - **"Programming with Algebraic Effects and Handlers" by Andrej Bauer and Matija Pretnar**
   - 代数的効果と効果ハンドラの基本的な概念と実装を紹介しています。Protorunの効果システムの主要な参考文献です。
@@ -43,7 +43,7 @@
 - **"Effekt: Capability-passing style for type- and effect-safe, extensible effect handlers in Scala" by Jonathan Immanuel Brachthäuser and Philipp Schuster**
   - 型安全で拡張可能な効果ハンドラの実装に関する論文です。Protorunの効果型システムの設計に影響を与えました。
 
-## 11.5 所有権とリソース管理に関する論文
+## 14.5 所有権とリソース管理に関する論文
 
 - **"Ownership Types for Safe Programming: Preventing Data Races and Deadlocks" by Chandrasekhar Boyapati, Robert Lee, and Martin Rinard**
   - 所有権型の基本的な概念と安全性保証に関する論文です。
@@ -54,7 +54,7 @@
 - **"Linear Types Can Change the World!" by Philip Wadler**
   - 線形型の基本的な概念と応用に関する論文です。Protorunの将来の線形型拡張の参考文献です。
 
-## 11.6 型システムに関する論文
+## 14.6 型システムに関する論文
 
 - **"A Theory of Type Polymorphism in Programming" by Robin Milner**
   - 多相型システムの理論的基盤を提供する論文です。Protorunの型推論システムの設計に影響を与えました。
@@ -65,7 +65,7 @@
 - **"Dependent Types in Practical Programming" by Hongwei Xi and Frank Pfenning**
   - 実用的なプログラミングにおける依存型の応用に関する論文です。Protorunの将来の依存型拡張の参考文献です。
 
-## 11.7 その他の参考文献
+## 14.7 その他の参考文献
 
 - **"The Implementation of Functional Programming Languages" by Simon Peyton Jones**
   - 関数型プログラミング言語の実装に関する包括的な参考書です。

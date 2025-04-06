@@ -4,15 +4,17 @@ Protorun言語の仕様は以下のセクションに分かれています。各
 
 ## 目次
 
-1. [序論と字句構造](language-spec/01-introduction.md)
+1. [序論](language-spec/01-introduction.md)
    - 設計理念
    - コア機能の優先順位
+
+2. [字句構造](language-spec/02-lexical-structure.md)
    - キーワード
    - 演算子
    - リテラル
    - コメント
 
-2. [型システム](language-spec/02-type-system.md)
+3. [型システム](language-spec/03-type-system.md)
    - 基本型
    - 複合型
    - 型定義
@@ -21,7 +23,7 @@ Protorun言語の仕様は以下のセクションに分かれています。各
    - 管理型の暗黙的な使用
    - リソースパターン型クラス
 
-3. [宣言](language-spec/03-declarations.md)
+4. [宣言](language-spec/04-declarations.md)
    - 変数宣言
    - 関数定義
    - 型宣言（レコード、enumなど）
@@ -30,14 +32,14 @@ Protorun言語の仕様は以下のセクションに分かれています。各
    - 効果宣言
    - ハンドラ宣言
 
-4. [文](language-spec/04-statements.md)
+5. [文](language-spec/05-statements.md)
    - 式文
    - let文
    - var文
    - return文
    - ブロック
 
-5. [式](language-spec/05-expressions.md)
+6. [式](language-spec/06-expressions.md)
    - 制御構造 (if, match, bind, with)
    - パターンマッチング
    - 関数合成
@@ -45,13 +47,13 @@ Protorun言語の仕様は以下のセクションに分かれています。各
    - リテラル
    - 演算子
 
-6. [所有権システム](language-spec/06-ownership.md)
+7. [所有権システム](language-spec/07-ownership.md)
    - 所有権
    - 借用
    - ライフタイム
    - リソース管理
 
-7. [代数的効果](language-spec/07-algebraic-effects.md)
+8. [代数的効果](language-spec/08-algebraic-effects.md)
    - 効果の定義
    - 効果ハンドラの定義
    - ライフサイクル管理を持つ効果
@@ -60,26 +62,26 @@ Protorun言語の仕様は以下のセクションに分かれています。各
    - 効果の合成
    - 管理型の暗黙的な使用と代数的効果の関係
 
-8. [モジュールシステム](language-spec/08-modules.md)
+9. [モジュールシステム](language-spec/09-modules.md)
    - モジュール定義
    - インポート
    - エクスポート
 
-9. [標準ライブラリ](language-spec/09-standard-library.md)
-   - コアデータ構造
-   - I/O操作
-   - 並行処理
+10. [標準ライブラリ](language-spec/10-standard-library.md)
+    - コアデータ構造
+    - I/O操作
+    - 並行処理
 
-10. [サンプルプログラム](language-spec/10-examples.md)
+11. [サンプルプログラム](language-spec/11-examples.md)
     - 簡単な計算機
     - 状態を持つカウンター
     - ファイル処理（ライフサイクル管理効果を使用）
 
-11. [文法（EBNF）](language-spec/11-grammar.md)
+12. [文法（EBNF）](language-spec/12-grammar.md)
 
-12. [今後の展望](language-spec/12-future.md)
+13. [今後の展望](language-spec/13-future.md)
 
-13. [参考文献](language-spec/13-references.md)
+14. [参考文献](language-spec/14-references.md)
 
 ## 更新履歴
 

@@ -1,27 +1,27 @@
-# 4. 文
+# 5. 文
 
-## 4.1 文の概要
+## 5.1 文の概要
 
 Protorun言語における「文 (Statement)」は、プログラムの実行フローを制御するための構文要素です。現在の仕様では、文として分類されるのは **`return` 文のみ**です。
 
 文は関数本体やブロック式 `{...}` の内部など、特定のコンテキストで使用されます。
 
-- **return文 (`ReturnStatement`)**: 現在の関数から値を返します。（[4.2 return文](#42-return文-return-statement)参照）
+- **return文 (`ReturnStatement`)**: 現在の関数から値を返します。（[5.2 return文](#52-return文-return-statement)参照）
 
-なお、式（[5. 式](05-expressions.md) 参照）や宣言（[3. 宣言](03-declarations.md) 参照）は、Protorunにおいては「文」とは区別されます。
+なお、式（[6. 式](06-expressions.md) 参照）や宣言（[4. 宣言](04-declarations.md) 参照）は、Protorunにおいては「文」とは区別されます。
 
 Protorunでは、文や宣言の終わりを示すためにセミコロンは**不要**です。通常、**改行**が要素の区切りとして解釈されます。
 
 この章では、`return` 文について詳しく説明します。
 
-## 4.2 return文 (Return Statement)
+## 5.2 return文 (Return Statement)
 
 **構文:**
 
 ```ebnf
 ReturnStatement ::= 'return' Expression?
 ```
-(式の詳細な文法は [5. 式](05-expressions.md) を参照)
+(式の詳細な文法は [6. 式](06-expressions.md) を参照)
 
 **意味:**
 

@@ -1,6 +1,6 @@
-# 10. 文法（EBNF）
+# 12. 文法（EBNF）
 
-## 10.1 文法の目的と概要
+## 12.1 文法の目的と概要
 
 Protorun言語の文法は、言語の構文を形式的に定義するためのものです。この文法定義は以下の目的を持っています：
 
@@ -12,7 +12,7 @@ Protorun言語の文法は、言語の構文を形式的に定義するための
 
 以下の文法はEBNF（拡張バッカス・ナウア記法）形式で記述されており、Protorun言語の構文要素を定義しています。
 
-## 10.2 EBNF文法
+## 12.2 EBNF文法
 
 ```ebnf
 Program ::= (Declaration | Expression)*
@@ -185,13 +185,13 @@ QualifiedIdentifier ::= (Identifier ".")* Identifier
 Operator ::= "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" | "!" | "|>" | "|>*" | ">>>" | ">>>*"
 ```
 
-## 10.3 文法の説明
+## 12.3 文法の説明
 
-### 10.3.1 プログラム構造
+### 12.3.1 プログラム構造
 
 Protorun言語のプログラムは、トップレベルに配置できる宣言（Declaration）と式（Expression）の集合で構成されます。宣言には関数、型、トレイト、実装、効果、ハンドラ、変数束縛（`let`, `var`）の定義が含まれます。
 
-### 10.3.2 宣言
+### 12.3.2 宣言
 
 - **関数宣言（FunctionDecl）**: `fn`キーワードで始まり、関数名、ジェネリックパラメータ（オプション）、パラメータリスト、暗黙的パラメータリスト（オプション）、戻り値の型（オプション）、効果型（オプション）、関数本体（式）で構成されます。
 - **型宣言（TypeDecl）**: レコード型、シールドトレイトの定義を含みます。
@@ -201,22 +201,22 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 - **ハンドラ宣言（HandlerDecl）**: 効果ハンドラを定義します。
 - **変数束縛宣言（LetDecl, VarDecl）**: `let` または `var` キーワードを使用して、イミュータブルまたはミュータブルな変数を宣言し、初期値を束縛します。
 
-### 10.3.3 型システム
+### 12.3.3 型システム
 
 - **型参照（TypeRef）**: 型名とジェネリック引数で構成されます。所有権修飾子（`own`、`&`、`&mut`）を含むことができます。
 - **関数型（FunctionType）**: パラメータ型、戻り値の型、効果型で構成されます。
 - **配列型（ArrayType）**: 要素型の配列です。
 - **効果型（EffectType）**: 関数が持つ可能性のある効果の型です。
 
-### 10.3.4 文 (Statement)
+### 12.3.4 文 (Statement)
 
 文は制御フローを変更するために使用されます。現在のProtorun言語の仕様では、文として分類されるのは **`return` 文のみ**です。関数本体やブロック式 `{...}` の内部など、特定のコンテキストで使用されます。
 
 - **return文 (ReturnStatement)**: 現在の関数から値を返します。
 
-式を副作用のためだけに実行する場合（例: `println("Hello")`）、それは文ではなく、ブロック式 `{...}` 内の要素 (`BlockItem::Expression`) として扱われます。詳細は [5. 式](05-expressions.md) の章を参照してください。
+式を副作用のためだけに実行する場合（例: `println("Hello")`）、それは文ではなく、ブロック式 `{...}` 内の要素 (`BlockItem::Expression`) として扱われます。詳細は [6. 式](06-expressions.md) の章を参照してください。
 
-### 10.3.5 式 (Expression)
+### 12.3.5 式 (Expression)
 
 - **リテラル式（LiteralExpr）**: 整数、浮動小数点数、文字列、真偽値、ユニットのリテラル、およびコレクションリテラル（リスト、マップ、セット）です。
 - **識別子式（IdentifierExpr）**: 変数や関数の名前です。
@@ -235,7 +235,7 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 - **スコープ付き効果式（ScopedEffectExpr）**: 効果のスコープを定義します。
 - **範囲式（RangeExpr）**: 範囲を表現します。
 
-### 10.3.6 パターン (Pattern)
+### 12.3.6 パターン (Pattern)
 
 - **リテラルパターン（LiteralPattern）**: リテラル値とのマッチングです。
 - **識別子パターン（IdentifierPattern）**: 変数束縛です。
@@ -243,12 +243,12 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 - **コンストラクタパターン（ConstructorPattern）**: 代数的データ型の分解です。
 - **ワイルドカードパターン（WildcardPattern）**: 任意の値とマッチングします。
 
-## 10.4 特殊な構文要素
+## 12.4 特殊な構文要素
 
 以下の特殊な構文要素の詳細については、対応する言語仕様の章を参照してください：
 
-- **効果ハンドラ**: [7. 代数的効果](07-algebraic-effects.md)
-- **ライフサイクル管理効果**: [7.4 ライフサイクル管理効果](07-algebraic-effects.md#74-ライフサイクル管理効果) <!-- Note: Assuming section numbers in 07-algebraic-effects.md will also be updated later if needed -->
-- **暗黙的パラメータ**: [7.8 暗黙的パラメータと効果システム](07-algebraic-effects.md#78-暗黙的パラメータと効果システム) <!-- Note: Assuming section numbers in 07-algebraic-effects.md will also be updated later if needed -->
-- **コレクション内包表記**: [5.2.1 コレクションリテラル内包表記](05-expressions.md#521-コレクションリテラル内包表記)
-- **バインド式**: [5.2.2 バインド式](05-expressions.md#522-バインド式)
+- **効果ハンドラ**: [8. 代数的効果](08-algebraic-effects.md)
+- **ライフサイクル管理効果**: [8.4 ライフサイクル管理効果](08-algebraic-effects.md#84-ライフサイクル管理効果) <!-- Note: Assuming section numbers in 08-algebraic-effects.md will also be updated later if needed -->
+- **暗黙的パラメータ**: [8.8 暗黙的パラメータと効果システム](08-algebraic-effects.md#88-暗黙的パラメータと効果システム) <!-- Note: Assuming section numbers in 08-algebraic-effects.md will also be updated later if needed -->
+- **コレクション内包表記**: [6.3.1 コレクションリテラル内包表記](06-expressions.md#631-コレクションリテラル内包表記)
+- **バインド式**: [6.3.2 バインド式](06-expressions.md#632-バインド式)
