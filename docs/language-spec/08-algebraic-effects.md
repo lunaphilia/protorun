@@ -2,700 +2,392 @@
 
 ## 8.1 代数的効果の概念と目的
 
-代数的効果は、副作用を型安全に表現し制御するためのProtorun言語の中核機能です。この機能は以下の目的で設計されています：
+代数的効果は、計算効果（副作用や特殊な制御フロー）を型安全に表現し、モジュール化して扱うための Protorun 言語の中核機能です。この機能は以下の目的で設計されています：
 
-1. **型安全な副作用**: 関数が持つ可能性のある副作用を型レベルで追跡し、安全に制御します。
-2. **効果の分離**: 純粋な計算ロジックと副作用を明確に分離します。
-3. **合成可能性**: 異なる効果を持つ計算を安全に合成できるようにします。
-4. **局所的な効果**: 効果の影響範囲を明示的に制限し、プログラムの理解と推論を容易にします。
-5. **継続ベースの制御フロー**: 例外処理や非決定性計算などの高度な制御フローパターンを表現します。
+1.  **型安全な効果**: 関数が持つ可能性のある計算効果を型レベルで追跡し、安全に制御します。
+2.  **効果の分離**: 純粋な計算ロジックと計算効果（副作用の実装や制御フローの操作）を明確に分離します。
+3.  **合成可能性**: 異なる効果を持つ計算を安全に合成できるようにします。
+4.  **局所的な効果ハンドリング**: 効果の影響範囲（どのハンドラで処理されるか）を明示的に指定し、プログラムの理解と推論を容易にします。
+5.  **継続ベースの制御フロー**: 例外処理、非同期処理、非決定性計算、状態管理などの高度な制御フローパターンを統一的に表現します。
 
-代数的効果は、モナドのような他の副作用制御メカニズムと比較して、より直感的で合成しやすいアプローチを提供します。効果ハンドラを通じて効果の実装を提供することで、効果の使用と実装を分離し、コードの再利用性と保守性を向上させます。
+代数的効果は、モナドのような他の計算効果管理メカニズムと比較して、より直接的で合成しやすいアプローチを提供することを目指します。効果ハンドラを通じて効果の実装を提供することで、効果の使用（インターフェース）と実装（ハンドラ）を分離し、コードの再利用性、テスト容易性、保守性を向上させます。
 
-## 8.2 効果の定義
+## 8.2 効果インターフェースの定義 (`effect`)
 
-```
-// 基本的な効果定義
+効果インターフェースは、特定の計算効果が提供する操作のシグネチャの集合を定義します。`effect` キーワードを用いて定義します。
+
+```protorun
+// 基本的な効果インターフェース定義
 effect Console {
   fn log(message: String): Unit
   fn readLine(): String
 }
 
-// パラメータ化された効果
+// パラメータ化された効果インターフェース
 effect State<S> {
   fn get(): S
   fn set(newState: S): Unit
-  fn modify(f: (S) -> S): Unit
+  fn modify(f: (S) -> S): Unit // 関数を受け取る操作も可能
 }
 
-// 所有権を考慮した効果定義
+// 所有権を考慮した効果インターフェース定義
 effect FileSystem {
-  // ファイルの所有権を返す操作
-  fn openFile(path: String): Result<own File, IOError>
-  
-  // ファイルの所有権を消費する操作
-  fn closeFile(file: own File): Result<Unit, IOError>
-  
-  // ファイルの借用を使用する操作
-  fn readFile(file: &File): Result<String, IOError>
-  
-  // ファイルの可変借用を使用する操作
-  fn writeFile(file: &mut File, content: String): Result<Unit, IOError>
+  // FileHandle の所有権を返す操作
+  fn open(path: String, mode: FileMode): Result<own FileHandle, IOError>
+  // FileHandle の所有権を消費する操作
+  fn close(handle: own FileHandle): Result<Unit, IOError>
+  // FileHandle の借用を使用する操作
+  fn read(handle: &FileHandle): Result<String, IOError>
+  // FileHandle の可変借用を使用する操作
+  fn write(handle: &mut FileHandle, content: String): Result<Unit, IOError>
+}
+
+// 仮の型定義
+type FileHandle { /* ... */ }
+type FileMode { Read, Write, ReadWrite }
+type IOError { /* ... */ }
+```
+
+*   `effect EffectName { ... }` は、`EffectName` という名前の効果インターフェースを定義します。
+*   内部には、その効果が提供する操作（関数シグネチャ）を記述します。
+*   効果インターフェースは型パラメータを持つことができます (`State<S>`)。
+*   操作シグネチャは、所有権 (`own`, `&`, `&mut`) を含む通常の関数シグネチャと同じルールに従います。
+*   **重要:** 効果インターフェースの操作定義には、通常、ハンドラ固有の設定データ（例: ファイルパス、データベース接続文字列）は含めません。これらはハンドラ自身が保持します。
+
+## 8.3 ハンドラ型の定義 (`handler`)
+
+ハンドラ型は、特定の効果インターフェース (`EffectType`) の操作を実装し、かつ自身の状態や設定データを保持できる新しい型を定義します。`handler` キーワードを用いて定義します。
+
+```protorun
+// ハンドラ型定義の基本構文
+handler HandlerName: EffectType {
+  // フィールド定義 (通常の type と同じ構文)
+  let field1: Type1
+  let mutable field2: Type2
+  // ...
+
+  // 効果操作の実装 (メソッド定義)
+  fn operation1(args...): ReturnType = {
+    // self を使ってフィールドにアクセス可能
+    // 継続 (resume) を扱える (後述)
+    // ... 実装 ...
+  }
+  // ... 他の操作の実装 ...
 }
 ```
 
-効果の定義は、関数のシグネチャの集合として表現されます。各効果操作は、その効果が提供する機能を表します。効果はパラメータ化することができ、特定の型に対して効果を定義できます。また、所有権システムと統合されており、効果操作は所有権の移動や借用を明示的に表現できます。
+*   `handler HandlerName: EffectType { ... }` は、`HandlerName` という名前の新しい型を定義します。この型は `EffectType` インターフェースを実装します。
+*   **フィールド定義:** ハンドラが状態や設定を保持するために、内部にフィールドを定義できます。フィールド定義の構文は、通常の `type` 宣言（レコード形式など）と同じです。
+*   **効果操作の実装:** `EffectType` で定義された各操作に対応するメソッド実装を記述します。メソッド内では `self` を通じてインスタンスのフィールドにアクセスできます。
+*   **継続制御:** ハンドラのメソッド実装は、代数的効果システムの核となる **継続 (`resume`)** を扱う特別な能力を持ちます。これにより、計算の中断、再開、破棄などを制御できます（詳細は 8.7 節）。
 
-## 8.3 効果ハンドラの定義
+**ハンドラインスタンスの生成:**
 
-効果ハンドラはtraitに対するimplと同様の構文で定義できます。効果ハンドラには3つの実装スタイルがあります：
+ハンドラ型のインスタンスは、通常の `type` と同じ **レコードリテラル構文** を使って生成・初期化します。
 
-### 8.3.1 暗黙的な継続（デフォルト）
-
-```
-// 暗黙的な継続を使用した効果ハンドラ
+```protorun
+// 状態を持たないハンドラ型の例
 handler ConsoleHandler: Console {
-  fn log(message: String): Unit = {
-    println(message)
-    // 暗黙的にresumeが呼び出される
+  // フィールドなし
+
+  fn log(message: String): Unit = { println(message) }
+  fn readLine(): String = { readLineFromStdio() } // 仮の関数
+}
+// インスタンス生成 (フィールドがないので空のレコードリテラル)
+let consoleHandlerInstance = ConsoleHandler {}
+
+// 状態を持つハンドラ型の例
+handler StateHandler<S>: State<S> {
+  let mutable state: S // フィールド定義
+
+  // 効果操作の実装
+  fn get(): S = self.state
+  fn set(newState: S): Unit = { self.state = newState }
+  fn modify(f: (S) -> S): Unit = { self.state = f(self.state) }
+}
+// インスタンス生成 (フィールドを初期化)
+let stateHandlerInstance = StateHandler<Int> { state: 0 }
+
+// 設定を持つハンドラ型の例
+handler LocalFileHandler: FileSystem {
+  let basePath: String // 設定フィールド
+
+  fn open(path: String, mode: FileMode): Result<own FileHandle, IOError> = {
+    let fullPath = self.basePath + "/" + path // フィールドを使用
+    // ... fullPath を使ってファイルを開く処理 ...
   }
-  
-  fn readLine(): String = {
-    readLine()
-    // 戻り値が自動的に継続に渡される
-  }
+  // ... 他の操作の実装 (close, read, write) ...
+}
+// インスタンス生成 (設定を渡して初期化)
+let localFsHandlerInstance = LocalFileHandler { basePath: "/tmp/data" }
+```
+
+このように、`handler` は状態と振る舞い（効果実装）をカプセル化した型を定義し、そのインスタンスが実際の効果処理を担当します。
+
+## 8.4 Effect パラメータによる効果の宣言
+
+関数が特定の効果操作を実行する可能性があること、および対応するハンドラ実装に依存することを宣言するために、**Effect パラメータ** 構文を使用します。
+
+```protorun
+// 関数定義: 'console' という名前で Console 効果の実装に依存することを宣言
+fn greet(name: String)(effect console: Console): Unit {
+  // パラメータ名を使って効果操作を呼び出す
+  console.log(s"こんにちは、${name}さん！")
+}
+
+// 複数の Effect パラメータを持つ関数
+// 'log' という名前で Console 効果、'state' という名前で State<Int> 効果に依存
+fn counter(effect log: Console, effect state: State<Int>): Int {
+  let current = state.get()
+  log.log(s"現在の値: $current")
+  state.set(current + 1)
+  state.get() // 新しい値を返す
+}
+
+// ファイル操作の例 (異なる実装に依存)
+// 'localFs' と 'remoteFs' という名前で FileEffect の異なる実装に依存
+fn processFiles(effect localFs: FileEffect, effect remoteFs: FileEffect): Result<Unit, Error> {
+  let handle1 = localFs.open("local.txt", FileMode.Read)? // localFs に束縛されたハンドラが使われる
+  let content = localFs.read(&handle1)?
+  localFs.close(handle1)?
+
+  let handle2 = remoteFs.open("remote/data.zip", FileMode.Write)? // remoteFs に束縛されたハンドラが使われる
+  remoteFs.write(&mut handle2, content)?
+  remoteFs.close(handle2)?
+
+  Result.Ok(())
 }
 ```
 
-暗黙的な継続スタイルでは、効果ハンドラの実装は通常の関数と同様に記述できます。継続の呼び出しは自動的に行われ、戻り値は継続に渡されます。これにより、効果ハンドラの実装が簡潔になり、多くの一般的なケースで十分です。
+**Effect パラメータ (`effect alias: EffectType`) の意味:**
 
-### 8.3.2 明示的な継続
+1.  **効果発生の可能性:** この関数は、`alias` という名前を通じて `EffectType` で定義された操作を実行する可能性があります。
+2.  **ハンドラ依存性:** この関数を呼び出す際には、`alias` という名前に対して `EffectType` を実装するハンドラインスタンスが提供されている必要があります。
+3.  **効果操作の呼び出し:** 関数内では、`alias.operation(...)` という構文で効果操作を呼び出します。この呼び出しは、定義により **代数的効果のメカニズム（中断と継続処理）** を起動します。
 
+この Effect パラメータ構文により、関数が必要とする名前付きの効果実装への依存性が明確になり、従来の `& EffectType` という戻り値型への注釈は不要になります。
+
+## 8.5 効果ハンドラインスタンスの提供 (`with` 構文)
+
+関数が必要とする Effect パラメータに対して、具体的なハンドラインスタンスを提供（注入）するために `with` 構文を使用します。`with` 構文は、特定のスコープ内でハンドラを有効にします。
+
+**`with` 構文:**
+
+```protorun
+with alias1 = handlerInstance1: EffectType1,
+     alias2 = handlerInstance2: EffectType2,
+     ...
+{
+  // このブロック内で、指定されたエイリアスに対応するハンドラが有効になる
+  // ... Effect パラメータを持つ関数を呼び出すコード ...
+}
 ```
-// 明示的な継続を使用した効果ハンドラ
+
+*   `alias = handlerInstance: EffectType`:
+    *   `handlerInstance`: 提供するハンドラ型のインスタンス（値）。`HandlerType { field: value }` のようにその場で生成することも、既存の変数を使うこともできます。
+    *   `alias`: このハンドラインスタンスを束縛する名前（エイリアス）。関数側の Effect パラメータのエイリアスと対応します。
+    *   `EffectType`: このハンドラが実装する効果インターフェース。型チェックに使われます。
+*   カンマ区切りで複数のハンドラを同時に指定できます。これによりネストが深くなるのを防ぎます。
+*   **スコープ:** `with` ブロック `{ ... }` 内で、指定されたエイリアスに対応する Effect パラメータを持つ関数が呼び出されると、束縛されたハンドラインスタンスが効果処理のために使用されます。
+
+**使用例:**
+
+```protorun
+// ハンドラ型定義 (再掲)
+handler ConsoleHandler: Console { /* ... */ }
+handler StateHandler<S>: State<S> { let mutable state: S }
+
+// 関数定義 (再掲)
+fn counter(effect log: Console, effect state: State<Int>): Int { /* ... */ }
+
+// with を使ってハンドラインスタンスを提供・注入
+with log = ConsoleHandler {}, // ConsoleHandler インスタンスを 'log' に束縛
+     state = StateHandler<Int> { state: 0 } // StateHandler インスタンスを 'state' に束縛
+     : Console, State<Int> // 型を明示 (省略可能か？要検討)
+{
+  let val1 = counter() // counter は log と state ハンドラを使って実行される
+  let val2 = counter()
+  println(s"最終値: ${val2}")
+}
+
+// 別の例: ファイルシステム
+handler LocalFileHandler: FileSystem { let basePath: String }
+handler S3FileHandler: FileSystem { let bucket: String, let region: String }
+fn processFiles(effect localFs: FileEffect, effect remoteFs: FileEffect): Result<Unit, Error> { /* ... */ }
+
+let localConfig = "/tmp/data"
+let s3Config = ("my-app-bucket", "us-east-1")
+
+with localFs = LocalFileHandler { basePath: localConfig },
+     remoteFs = S3FileHandler { bucket: s3Config.0, region: s3Config.1 }
+     : FileEffect // 同じ EffectType に複数のハンドラを異なるエイリアスで束縛
+{
+  processFiles()?
+}
+```
+
+この `with` 構文により、効果を使うコード（関数）と効果を実装するコード（ハンドラ）を分離し、合成点（`with` ブロック）で依存性を注入するという、疎結合な設計が可能になります。
+
+## 8.6 継続制御
+
+代数的効果の核心は、ハンドラが **継続 (`resume`)** を制御できる点にあります。効果操作 (`alias.operation()`) が呼び出されると、計算は中断され、制御が対応するハンドラのメソッド実装に移ります。このとき、ハンドラは中断箇所からの「残りの計算」を表す継続を受け取ります。
+
+ハンドラのメソッド実装は、この継続をどう扱うかを決定できます。
+
+### 8.6.1 暗黙的な継続（デフォルト）
+
+ハンドラのメソッド実装で継続を明示的に扱わない場合、デフォルトの動作として、メソッドの実行が完了した後に暗黙的に継続が **1回だけ** 呼び出され、メソッドの戻り値が継続に渡されます。
+
+```protorun
+handler SimpleStateHandler<S>: State<S> {
+  let mutable state: S
+  fn get(): S = self.state // 戻り値 state が暗黙的に継続に渡される
+  fn set(newState: S): Unit = {
+    self.state = newState
+    // 何も返さない (Unit) が、暗黙的に継続が呼び出される
+  }
+}
+```
+このスタイルは、単純な状態変更や副作用の実行に適しており、コードが簡潔になります。
+
+### 8.6.2 明示的な継続
+
+継続をより細かく制御したい場合、ハンドラのメソッド実装は継続を明示的にパラメータとして受け取ることができます。継続の型は、残りの計算が期待する入力と出力を反映します。
+
+```protorun
 handler ExplicitConsoleHandler: Console {
+  // log 操作は Unit を返す計算の継続を受け取る
   fn log(message: String, resume: () -> Unit): Unit = {
     println(message)
-    resume()  // 明示的に継続を呼び出す
+    resume() // 明示的に継続を呼び出す
   }
-  
+
+  // readLine 操作は String を受け取る計算の継続を受け取る
   fn readLine(resume: (String) -> Unit): Unit = {
-    let input = readLine()
-    resume(input)  // 明示的に値を継続に渡す
+    let input = readLineFromStdio() // 仮の関数
+    resume(input) // 読み取った値を継続に渡して再開
   }
 }
 ```
+明示的な継続スタイルは、非同期処理や、継続の呼び出しタイミングを制御したい場合に有用です。
 
-明示的な継続スタイルでは、効果ハンドラの実装は継続を明示的に受け取り、呼び出す必要があります。これにより、継続の呼び出しタイミングや方法をより細かく制御できます。例えば、非同期処理や複雑な制御フローを実装する場合に有用です。
+### 8.6.3 特殊な継続制御 (`noresume`, `multiresume`)
 
-### 8.3.3 特殊な継続制御
+ハンドラは、継続の呼び出し方をさらに特殊化できます。
 
-```
-// 継続を呼び出さない効果ハンドラ
-handler ExceptionHandler<E>: Exception<E> {
-  fn raise<T>(error: E): noresume T = {
-    // noresume型は継続を呼び出さないことを示す
-    Result.Err(error)
-  }
-}
+*   **継続を呼び出さない (`noresume`)**: 例外処理（大域脱出）のように、残りの計算を実行せずに処理を終了する場合に使います。メソッドの戻り値型に `noresume` (またはそれに類する表現) を付けます。
 
-// 継続を複数回呼び出す効果ハンドラ
-handler ChoiceHandler: Choice {
-  fn choose<T>(options: [T]): multiresume T = {
-    // multiresume型は複数回の継続呼び出しを示す
-    for option in options {
-      // 各選択肢に対して継続を呼び出す
-      resume(option) match {
-        Result.Ok(value) => return value,  // 成功したら結果を返す
-        Result.Err(_) => continue          // 失敗したら次の選択肢を試す
+    ```protorun
+    effect Exception<E> { fn raise<T>(error: E): T } // T は任意の型
+
+    handler ExceptionHandler<E>: Exception<E> {
+      // raise が呼ばれたら継続を破棄し、Result.Err を返す
+      fn raise<T>(error: E): noresume Result<T, E> = {
+        Result.Err(error) // resume() を呼び出さない
       }
     }
-    // 例外ではなくResult.Errを返す
-    Result.Err(ChoiceError.NoValidChoice)
-  }
-}
-```
 
-特殊な継続制御スタイルでは、継続を呼び出さない（`noresume`）または複数回呼び出す（`multiresume`）ことを明示的に示すことができます。これにより、例外処理や非決定性計算などの高度な制御フローパターンを表現できます。
-
-## 8.4 ライフサイクル管理効果
-
-Protorun言語では、リソース管理と効果システムを統合するために、ビルトインの`LifecycleEffect<R>`型を提供しています。この型を継承する効果は、リソースのライフサイクル（獲得と解放）を自動的に管理することができます。
-
-### 8.4.1 ライフサイクル管理効果の概念と目的
-
-ライフサイクル管理効果は、以下の目的で設計されています：
-
-1. **安全なリソース管理**: リソースの獲得と解放を自動的に管理し、リソースリークを防止します。
-2. **明示的なライフサイクル**: リソースのライフサイクル（獲得と解放）を明示的に定義します。
-3. **型安全性**: リソース操作の型安全性を保証し、不正な使用を防止します。
-4. **効果システムとの統合**: 代数的効果システムと統合し、リソース管理を効果として表現します。
-5. **合成可能性**: 他の効果と組み合わせて使用できるようにします。
-
-ライフサイクル管理効果は、C++のRAIIパターン、Rustの所有権システム、そして代数的効果からインスピレーションを得ています。特に：
-
-- **自動リソース管理**: スコープベースのリソース管理により、リソースの解放忘れを防止します。これは、ガベージコレクションに依存せずに、予測可能なリソース管理を実現します。
-
-- **明示的な解放関数**: 各ライフサイクル管理効果は明示的な解放関数（`release`）を定義する必要があります。これにより、リソースの解放方法が明確になり、リソース管理の意図が明示的になります。
-
-- **効果としての表現**: リソース管理を効果として表現することで、効果システムの型安全性と合成可能性を活用できます。これにより、リソース管理と他の効果を自然に組み合わせることができます。
-
-### 8.4.2 ライフサイクル管理効果の定義
-
-ライフサイクル管理効果は、`LifecycleEffect<R>`型を継承することで定義します。この型は、リソースの獲得と解放のための標準的なインターフェースを提供します。
-
-```
-// ビルトインのLifecycleEffect型
-effect LifecycleEffect<R> {
-  // リソース獲得操作（固定名）
-  fn acquire(): R
-  
-  // リソース解放操作（固定名）
-  fn release(resource: R): Unit
-}
-```
-
-`LifecycleEffect<R>`を継承する効果は、`acquire`と`release`メソッドを実装する必要があります。`acquire`メソッドが呼び出されると、返されるリソースは自動的に追跡され、スコープ終了時に対応する`release`メソッドが自動的に呼び出されます。
-
-以下は、データベース接続を管理するライフサイクル管理効果の例です：
-
-```
-// データベース効果の定義
-effect Database: LifecycleEffect<Connection> {
-  // LifecycleEffectから継承した操作を実装
-  fn acquire(): Connection = {
-    // 実際の接続処理
-    RealDatabase.connect(dbUrl)
-  }
-  
-  fn release(conn: Connection): Unit = {
-    // 実際の切断処理
-    conn.close()
-  }
-  
-  // 追加の効果操作
-  fn query(sql: String): Result<QueryResult, DbError>
-  fn execute(sql: String): Result<Unit, DbError>
-  fn transaction<T, E>(action: () -> Result<T, E> & Database): Result<T, E | DbError>
-}
-```
-
-ライフサイクル管理効果は、リソース管理に関連する操作だけでなく、そのリソースを使用するための追加の操作も定義できます。例えば、`Database`効果は、データベース接続の獲得と解放に加えて、クエリの実行やトランザクションの管理などの操作も提供します。
-
-### 8.4.3 ライフサイクル管理効果の使用
-
-ライフサイクル管理効果を使用するには、まず効果を宣言し、`acquire`メソッドを呼び出してリソースを獲得します。リソースは、関数のスコープが終了すると自動的に解放されます。
-
-```
-// 使用例
-fn processUserData(userId: String): Result<UserData, Error> & Database = {
-  // リソース獲得（スコープ終了時に自動的に解放される）
-  let conn = Database.acquire()
-  
-  // クエリ実行
-  let userData = Database.query(s"SELECT * FROM users WHERE id = $userId")?
-  
-  Result.Ok(userData)
-} // connは自動的に解放される（Database.release(conn)が呼び出される）
-```
-
-ライフサイクル管理効果を使用する関数は、その効果を型シグネチャに宣言する必要があります。これにより、関数が持つ可能性のある副作用が型レベルで追跡されます。
-
-以下は、ファイル処理を行うライフサイクル管理効果の使用例です：
-
-```
-// ファイル処理の実装（ライフサイクル管理効果を使用）
-fn processFile(path: String): Result<String, IOError> & FileSystem = {
-  // ファイルを開く（スコープ終了時に自動的に閉じられる）
-  let file = FileSystem.acquire()
-  
-  // ファイルから読み込む
-  let content = FileSystem.read()
-  
-  // 処理された内容を別のファイルに書き込む
-  let processed = content.toUpperCase()
-  FileSystem.write(processed)
-  
-  Result.Ok(processed)
-} // fileは自動的に解放される（FileSystem.release(file)が呼び出される）
-```
-
-### 8.4.4 ライフサイクル管理効果のハンドラ
-
-ライフサイクル管理効果のハンドラは、リソースの獲得と解放の実装を提供します。ハンドラは、効果の操作を実装し、リソースの適切な管理を保証します。
-
-```
-// 効果ハンドラの実装
-handler DatabaseHandler: Database {
-  // LifecycleEffectから継承した操作の実装
-  fn acquire(): Connection = {
-    // 実際の接続処理
-    RealDatabase.connect(dbUrl)
-  }
-  
-  fn release(conn: Connection): Unit = {
-    // 実際の切断処理
-    conn.close()
-  }
-  
-  // 追加の効果操作の実装
-  fn query(sql: String): Result<QueryResult, DbError> = {
-    // 実装...
-  }
-  
-  fn execute(sql: String): Result<Unit, DbError> = {
-    // 実装...
-  }
-  
-  fn transaction<T, E>(action: () -> Result<T, E> & Database): Result<T, E | DbError> = {
-    let conn = acquire()
-    let txResult = conn.beginTransaction()
-    
-    // トランザクション開始に失敗した場合はエラーを返す
-    if txResult.isErr() {
-      return Result.Err(txResult.unwrapErr())
+    // 使用例
+    fn runWithException<T, E>(action: (effect exc: Exception<E>) -> T): Result<T, E> = {
+      with exc = ExceptionHandler<E>(): Exception<E> {
+        // action() 内で exc.raise が呼ばれると、この with ブロック全体が Err を返す
+        Result.Ok(action(effect exc = exc))
+      }
     }
-    
-    // アクションを実行
-    let result = action()
-    
-    // 結果に基づいてコミットまたはロールバック
-    match result {
-      Result.Ok(_) => {
-        let commitResult = conn.commit()
-        if commitResult.isErr() {
-          // コミットに失敗した場合はエラーを返す
-          return Result.Err(commitResult.unwrapErr())
+    ```
+
+*   **継続を複数回呼び出す (`multiresume`)**: 非決定性計算（バックトラック）のように、残りの計算を異なる状態で複数回試す場合に使います。メソッドの戻り値型に `multiresume` (またはそれに類する表現) を付けます。
+
+    ```protorun
+    effect Choice { fn choose<T>(options: [T]): T }
+
+    handler ChoiceHandler: Choice {
+      // choose が呼ばれたら、各選択肢で継続を試す
+      fn choose<T>(options: [T]): multiresume T = {
+        for option in options {
+          // 各選択肢で継続を呼び出し、結果を試す (Result<T, ResumeAgain> のような型が必要か？)
+          let result = resume(option)
+          // もし result が成功ならそれを返し、そうでなければ次の選択肢へ
+          // ... (詳細なメカニズムは要検討) ...
         }
-      },
-      Result.Err(_) => {
-        // エラーの場合はロールバック
-        let _ = conn.rollback() // ロールバックの失敗は無視
+        // すべて失敗した場合の処理
       }
     }
-    
-    // アクションの結果を返す
-    result
-  }
-}
-```
+    ```
+    (`multiresume` の正確なセマンティクスと型付けは複雑であり、さらなる検討が必要です。)
 
-ライフサイクル管理効果のハンドラは、以下の特徴を持ちます：
+これらの継続制御能力により、代数的効果は非常に表現力の高い計算効果管理メカニズムとなります。
 
-1. **リソースの獲得と解放**: ハンドラは、`acquire`メソッドでリソースを獲得し、`release`メソッドでリソースを解放します。
-2. **自動解放**: `acquire`メソッドで獲得したリソースは、スコープ終了時に自動的に`release`メソッドで解放されます。
-3. **追加の操作**: ハンドラは、リソース管理に加えて、そのリソースを使用するための追加の操作も実装できます。
+## 8.7 ライフサイクル管理効果
 
-以下は、ファイルシステムのライフサイクル管理効果ハンドラの例です：
+リソース管理（獲得と解放）は一般的な計算効果であり、代数的効果でうまくモデル化できます。Protorun は、これを支援するための規約やビルトイン機能を提供する可能性があります。
 
-```
-// ライフサイクル管理効果ハンドラを定義
-handler FileSystemHandler: FileSystem {
-  // LifecycleEffectから継承した操作の実装
-  fn acquire(): File = {
-    // ファイルを開く
-    File.open("input.txt")
-  }
-  
-  fn release(file: File): Unit = {
-    // ファイルを閉じる
-    file.close()
-  }
-  
-  // 追加の効果操作の実装
-  fn read(): String = {
-    // 実装...
-    "ファイルの内容"
-  }
-  
-  fn write(content: String): Unit = {
-    // 実装...
-  }
-}
-```
+**アプローチ：ハンドラがリソースを管理**
 
-### 8.4.5 複数のライフサイクル効果の使用
+新しい設計モデルでは、ハンドラインスタンスが状態を持つため、リソース（ファイルハンドル、データベース接続など）をハンドラインスタンスのフィールドとして保持し、効果操作を通じてそのリソースを操作するのが自然です。
 
-複数のライフサイクル管理効果を同時に使用することもできます。各効果は独立して管理され、それぞれのリソースは適切なタイミングで解放されます。
-
-```
-// 複数のライフサイクル効果を使用する例
-fn processData(): Result<String, Error> & Database & FileSystem = {
-  // データベース接続を獲得
-  let conn = Database.acquire()
-  
-  // ファイルを開く
-  let file = FileSystem.acquire()
-  
-  // データベースからデータを取得
-  let data = Database.query("SELECT * FROM data")?
-  
-  // ファイルに書き込み
-  FileSystem.write(data.toString())
-  
-  // ファイルから読み込み
-  let content = FileSystem.read()
-  
-  Result.Ok(content)
-} // conn と file は自動的に解放される（逆順）
-```
-
-複数のリソースが獲得された場合、それらは獲得された順序の逆順で解放されます。これにより、リソース間の依存関係がある場合でも、安全に解放されることが保証されます。
-
-### 8.4.6 ライフサイクル管理効果の利点
-
-ライフサイクル管理効果を使用することには、以下のような利点があります：
-
-1. **リソースリークの防止**: リソースの解放忘れを防止し、リソースリークを防ぎます。
-2. **型安全性**: リソース管理を型レベルで追跡し、不正な使用を防止します。
-3. **コードの簡潔さ**: 明示的な解放コードを書く必要がなく、コードの簡潔さが向上します。
-4. **合成可能性**: 他の効果と組み合わせて使用できるため、複雑な処理を簡潔に表現できます。
-5. **例外安全性**: 例外が発生した場合でも、リソースは適切に解放されます。
-
-ライフサイクル管理効果は、Protorun言語のリソース管理の中核となる機能であり、安全で効率的なリソース管理を実現します。
-
-## 8.5 効果の使用
-
-```
-// 効果を使用する関数
-fn greet(name: String): Unit & Console = {
-  Console.log(s"こんにちは、${name}さん！")
+```protorun
+// 効果インターフェース (リソース獲得・解放操作を含む)
+effect ManagedResource<R> {
+  fn acquire(): Result<R, Error> // リソースを獲得 (あるいは参照を返す？)
+  fn useResource(resource: &R, /* ... */): Result<Unit, Error>
+  fn release(resource: R): Result<Unit, Error> // 明示的な解放？
 }
 
-// 複数の効果
-fn counter(): Int & Console & State<Int> = {
-  let current = State.get()
-  Console.log(s"現在の値: $current")
-  State.set(current + 1)
-  State.get()
-}
+// ハンドラ型 (リソースと状態を保持)
+handler ResourceManager<R>: ManagedResource<R> {
+  let resourceConfig: ResourceConfig // リソース生成に必要な設定
+  let mutable resourceInstance: Option<R> = None // 保持するリソースインスタンス
 
-// 効果スコープを使用
-fn processData(data: String): String = {
-  // 通常のスコープ（効果なし）
-  let length = data.length
-  
-  // Console効果のスコープ
-  with Console {
-    Console.log(s"データ処理: $length文字")
-  }
-  
-  // State効果のスコープ
-  with State<ProcessingState> {
-    let state = State.get()
-    // 状態に基づく処理
-    State.set({ ...state, processed: true })
-  }
-  
-  // 処理結果
-  processResult(data)
-}
-```
-
-効果を使用する関数は、関数シグネチャに`&`演算子を使用してその効果を宣言します。これにより、関数が持つ可能性のある副作用が型レベルで追跡されます。複数の効果を持つ関数は、`&`演算子を使用して効果を組み合わせることができます。また、`with`式を使用して効果のスコープを明示的に制限することもできます。
-
-## 8.6 効果ハンドラの使用
-
-```
-// 効果ハンドラを使用した関数
-fn runWithConsole<T>(action: () -> T & Console): T = {
-  with ConsoleHandler: Console {
-    action()
-  }
-}
-
-// 状態効果のハンドラを使用
-fn runWithState<S, T>(initialState: S, action: () -> T & State<S>): (T, S) = {
-  var state = initialState
-  
-  // 状態ハンドラを定義
-  handler StateHandler: State<S> {
-    fn get(): S = state
-    
-    fn set(newState: S): Unit = {
-      state = newState
+  fn acquire(): Result<R, Error> = {
+    if self.resourceInstance.isSome() {
+      // 既に獲得済みの場合のエラー処理など
     }
-    
-    fn modify(f: (S) -> S): Unit = {
-      state = f(state)
-    }
+    // self.resourceConfig を使ってリソースを生成
+    let newResource = createResource(self.resourceConfig)?
+    self.resourceInstance = Some(newResource)
+    // R を返すか、あるいは内部で保持するだけか？ 要検討
+    Ok(newResource) // 仮: R を返す
   }
-  
-  // ハンドラを適用
-  let result = with StateHandler: State<S> {
-    action()
-  }
-  
-  (result, state)
-}
 
-// 明示的な継続を使用するハンドラ
-fn runWithExplicitConsole<T>(action: () -> T & Console): T = {
-  // 明示的な継続を使用するハンドラを定義
-  handler ExplicitConsoleHandler: Console {
-    fn log(message: String, resume: () -> Unit): Unit = {
-      println(message)
-      resume()
-    }
-    
-    fn readLine(resume: (String) -> Unit): Unit = {
-      let input = readLine()
-      resume(input)
-    }
+  fn useResource(resource: &R, /* ... */): Result<Unit, Error> = {
+    // resource を使った処理
   }
-  
-  with ExplicitConsoleHandler: Console {
-    action()
-  }
-}
 
-// 継続を呼び出さないハンドラ（Result型ベースのエラー処理）
-fn runWithException<T, E>(action: () -> T & Exception<E>): Result<T, E> = {
-  // 継続を呼び出さないハンドラを定義
-  handler ExceptionHandler: Exception<E> {
-    fn raise<R>(error: E): noresume Result<R, E> = {
-      return Result.Err(error)
-    }
-  }
-  
-  // ExceptionHandlerを適用し、結果をResult型で返す
-  with ExceptionHandler: Exception<E> {
-    Result.Ok(action())
+  fn release(resource: R): Result<Unit, Error> = {
+    // リソースを解放する処理
+    destroyResource(resource)?
+    self.resourceInstance = None
+    Ok(())
   }
 }
 ```
 
-効果ハンドラは、`with ハンドラ: 効果`構文を使用して適用されます。これにより、特定のスコープ内での効果の実装を提供します。効果ハンドラはインラインで定義することもできますし、事前に定義したハンドラを使用することもできます。効果ハンドラは、効果の使用と実装を分離し、同じ効果に対して異なる実装を提供することを可能にします。
+**自動解放 (RAII) との連携:**
 
-## 8.7 効果の合成
+C++ の RAII や Rust の `Drop` トレイトのように、スコープを抜けたら自動的にリソースが解放される仕組みと代数的効果をどう連携させるかは重要な設計課題です。
 
-```
-// 複数の効果を扱う
-fn program(): Int = {
-  // 複数のハンドラを合成
-  with ConsoleHandler: Console {
-    with StateHandler(initialState = 0): State<Int> {
-      counter()
-    }
-  }
-}
+*   **`with` ブロックと連動:** `with alias = handlerInstance: EffectType { ... }` ブロックを抜ける際に、`handlerInstance` が持つリソース（例えば `release` メソッドを持つフィールド）を自動的に解放する、というルールを導入することが考えられます。
+*   **`LifecycleEffect` のような規約:** 特定のインターフェース（例: `acquire`/`release` を持つ `LifecycleEffect`）をハンドラが実装していれば、`with` が自動解放を試みる、という方法も考えられます。
 
-// 効果ハンドラを指定したスコープ
-fn main(): Unit = {
-  // Console効果のハンドラを指定
-  with ConsoleHandler: Console {
-    // このスコープ内のConsole効果はConsoleHandlerでハンドルされる
-    Console.log("アプリケーション開始")
-    
-    // State効果のハンドラを指定
-    with StateHandler(initialState = defaultConfig): State<AppConfig> {
-      // このスコープ内のState効果はStateHandlerでハンドルされる
-      let config = State.get()
-      Console.log(s"設定: $config")
-      
-      // アプリケーションロジック
-      runApplication()
-    }
-    
-    Console.log("アプリケーション終了")
-  }
-}
-```
+この領域は、所有権システムとの連携も含め、さらなる詳細な設計が必要です。
 
-代数的効果の主要な利点の一つは、異なる効果を持つ計算を簡単に合成できることです。効果ハンドラを組み合わせることで、複雑な副作用を持つプログラムを構築できます。効果ハンドラはネストすることができ、内側のハンドラから外側のハンドラへと効果が伝播します。これにより、モジュラーで再利用可能な方法で副作用を管理できます。
+## 8.8 Effect パラメータと依存性注入 (再掲)
 
-## 8.8 暗黙的パラメータと効果システム
+Effect パラメータ (`effect alias: EffectType`) と拡張された `with` 構文 (`with alias = Handler(): EffectType, ...`) は、依存性注入パターンを型安全かつ明示的に実現するための主要なメカニズムとなります。
 
-Protorun言語では、暗黙的パラメータと効果システムを統合することで、依存性注入パターンを型安全に実現できます。この統合により、効果を暗黙的に渡すことができ、コードの簡潔さと型安全性を両立できます。
+これにより、関数は抽象的な効果インターフェースにのみ依存し、具体的な実装（ハンドラ）は呼び出し側（`with` ブロック）で注入されるため、疎結合でテストしやすいコードを書くことができます。
 
-### 8.8.1 暗黙的パラメータの概念と目的
+## 8.9 設計上の考慮事項 (更新)
 
-暗黙的パラメータは、以下の目的で設計されています：
+代数的効果とハンドラを設計する際には、以下の点を考慮することが重要です：
 
-1. **依存性注入**: 関数が必要とする依存関係を明示的に宣言し、暗黙的に提供できるようにします。
-2. **コードの簡潔さ**: 依存関係を明示的に渡す必要がなく、コードの簡潔さが向上します。
-3. **型安全性**: 暗黙的パラメータは型チェックされ、必要な依存関係が提供されていることが保証されます。
-4. **効果システムとの統合**: 効果を暗黙的パラメータとして使用できるようにし、効果の使用と提供を簡潔に表現できます。
+1.  **効果の粒度**: 効果インターフェースは適切な粒度で設計し、関連する操作をグループ化します。
+2.  **ハンドラの責務**: ハンドラは効果の実装と、必要な状態や設定の管理を担当します。状態を持つハンドラと持たないハンドラを適切に使い分けます。
+3.  **データと効果の分離**: 効果インターフェースの操作シグネチャには、ハンドラ固有のデータを含めず、抽象性を保ちます。データはハンドラインスタンスが保持するか、操作の引数として渡されるべきかを慎重に検討します（通常はハンドラが保持する方が疎結合）。
+4.  **継続制御の選択**: ハンドラの各操作実装において、継続をどう扱うか（暗黙的、明示的、`noresume`, `multiresume`）を適切に選択します。
+5.  **合成可能性**: 異なる効果やハンドラを `with` 構文で容易に組み合わせられるように設計します。
+6.  **型安全性**: Effect パラメータと `with` 構文により、ハンドラの依存関係と提供が型レベルでチェックされることを保証します。
+7.  **パフォーマンス**: （言語実装の課題として）効果処理メカニズム（中断、継続キャプチャ、ハンドラ呼び出し）のオーバーヘッドを最小限に抑える最適化が重要です。
 
-暗黙的パラメータは、Scalaのimplicit parameterからインスピレーションを得ていますが、効果システムと統合することで、より安全で使いやすい依存性注入メカニズムを提供します。
-
-### 8.8.2 暗黙的パラメータの宣言
-
-暗黙的パラメータは、関数シグネチャの後に`(with param: Type)`構文で宣言します。これにより、関数が必要とする依存関係を明示的に宣言できます。
-
-```
-// 暗黙的パラメータを宣言
-fn processData(data: String)(with logger: Logger): Result<ProcessedData, Error> = {
-  logger.log("データ処理開始")
-  // 処理...
-  logger.log("データ処理完了")
-  Result.Ok(processedData)
-}
-```
-
-複数の暗黙的パラメータを宣言する場合は、カンマで区切ります：
-
-```
-fn complexOperation(data: String)(with db: Database, logger: Logger): Result<Output, Error> = {
-  // dbとloggerが暗黙的に利用可能
-  logger.log("操作開始")
-  let result = db.query(s"SELECT * FROM data WHERE id = '${data}'")?
-  logger.log("操作完了")
-  Result.Ok(processResult(result))
-}
-```
-
-暗黙的パラメータは、関数の型シグネチャの一部となり、コンパイラによって型チェックされます。これにより、必要な依存関係が提供されていることが保証されます。
-
-### 8.8.3 暗黙的パラメータの提供
-
-暗黙的パラメータは、`with`式を使用して提供します。`with`式は、特定のスコープ内で暗黙的パラメータを利用可能にします。
-
-```
-// 暗黙的パラメータの提供
-with LoggerHandler: Logger {
-  // この呼び出しでは、スコープ内のLoggerが暗黙的に渡される
-  processData("raw data")
-}
-```
-
-複数の暗黙的パラメータを提供する場合は、複数の`with`式をネストするか、カンマで区切って一つの`with`式で提供できます：
-
-```
-// 複数の暗黙的パラメータの提供（ネスト）
-with LoggerHandler: Logger {
-  with DatabaseHandler: Database {
-    // LoggerとDatabaseが暗黙的に利用可能
-    complexOperation("data123")
-  }
-}
-
-// 複数の暗黙的パラメータの提供（カンマ区切り）
-with LoggerHandler: Logger, DatabaseHandler: Database {
-  // LoggerとDatabaseが暗黙的に利用可能
-  complexOperation("data123")
-}
-```
-
-暗黙的パラメータの提供は、スコープベースです。つまり、`with`式のスコープ内でのみ、その暗黙的パラメータが利用可能になります。これにより、依存関係の影響範囲を明示的に制限できます。
-
-### 8.8.4 ライフサイクル管理効果と暗黙的パラメータの統合
-
-ライフサイクル管理効果は、暗黙的パラメータとしても使用できます。これにより、リソース管理と依存性注入を統合できます。
-
-```
-// 暗黙的パラメータを受け取る関数
-fn getUserById(userId: String)(with db: Database): Result<User, DbError> = {
-  let result = db.query(s"SELECT * FROM users WHERE id = $userId")?
-  
-  if result.isEmpty() {
-    Result.Err(DbError.NotFound(s"ユーザーが見つかりません: $userId"))
-  } else {
-    let row = result.first()
-    Result.Ok(User {
-      id: row.getString("id"),
-      name: row.getString("name"),
-      email: row.getString("email")
-    })
-  }
-}
-
-// 使用例
-with DatabaseHandler: Database {
-  // Database効果が利用可能になる
-  let conn = Database.acquire()
-  
-  // 暗黙的パラメータとして効果を渡す
-  let user = getUserById("user123")?
-  displayUser(user)
-}
-```
-
-この例では、`getUserById`関数は`Database`効果を暗黙的パラメータとして受け取ります。`with DatabaseHandler: Database`式によって、`Database`効果が提供され、`getUserById`関数内で使用できるようになります。
-
-ライフサイクル管理効果と暗黙的パラメータの統合には、以下のような利点があります：
-
-1. **リソース管理と依存性注入の統合**: リソースの獲得と解放を自動的に管理しながら、そのリソースを暗黙的に提供できます。
-2. **コードの簡潔さ**: リソースの獲得と解放、および依存関係の提供を簡潔に表現できます。
-3. **型安全性**: リソース管理と依存性注入が型レベルで追跡され、不正な使用を防止します。
-
-### 8.8.5 複数の効果と暗黙的パラメータの組み合わせ
-
-複数の効果と暗黙的パラメータを組み合わせることで、より複雑な依存関係を表現できます。
-
-```
-// 複数の効果を暗黙的に使用する関数
-fn processUserOrder(userId: String, orderId: String)(with db: Database, logger: Logger, client: HttpClient): Result<OrderDetails, Error> = {
-  logger.log(LogLevel.Info, s"処理開始: ユーザー $userId, 注文 $orderId")
-  
-  let userData = db.query(s"SELECT * FROM users WHERE id = $userId")?
-  let orderData = db.query(s"SELECT * FROM orders WHERE id = $orderId")?
-  
-  let additionalInfo = client.get(s"https://api.example.com/orders/$orderId/details")?
-  
-  logger.log(LogLevel.Info, "処理完了")
-  Result.Ok(combineOrderDetails(userData, orderData, additionalInfo))
-}
-
-// 使用例
-fn main(): Result<Unit, Error> & Console = {
-  // 各効果のハンドラを適用
-  with DatabaseHandler: Database {
-    with LoggerHandler: Logger {
-      with HttpClientHandler: HttpClient {
-        let orderDetails = processUserOrder("user123", "order456")?
-        displayOrderDetails(orderDetails)
-        
-        Result.Ok(())
-      }
-    }
-  } // すべてのリソースは自動的に解放される
-}
-```
-
-この例では、`processUserOrder`関数は`Database`、`Logger`、`HttpClient`の3つの効果を暗黙的パラメータとして受け取ります。それぞれの効果は、対応するハンドラによって提供されます。
-
-### 8.8.6 効果ハンドラと暗黙的パラメータの連携
-
-効果ハンドラ自体も暗黙的パラメータを受け取ることができます。これにより、効果ハンドラの実装を柔軟に変更できます。
-
-```
-// 暗黙的パラメータを使用して効果を実装
-fn runWithDatabase<T>(action: () -> T & DbAccess & Logging)(with db: Database, logger: Logger): Result<T, Error> = {
-  // 効果ハンドラを定義
-  handler DbHandler: DbAccess {
-    fn query(sql: String): Result<QueryResult, DbError> = {
-      db.query(sql)
-    }
-    
-    fn execute(sql: String): Result<Unit, DbError> = {
-      db.execute(sql)
-    }
-  }
-  
-  handler LogHandler: Logging {
-    fn log(level: LogLevel, message: String): Unit = {
-      logger.log(level, message)
-    }
-  }
-  
-  // 効果ハンドラを適用
-  with DbHandler: DbAccess {
-    with LogHandler: Logging {
-      // action()を実行し、結果を返す
-      action()
-    }
-  }
-}
-
-## 8.9 代数的効果の設計上の考慮事項
-
-代数的効果を設計する際には、以下の点を考慮することが重要です：
-
-1. **効果の粒度**: 効果は適切な粒度で設計し、関連する操作をグループ化します。
-2. **効果の合成**: 効果は合成可能に設計し、異なる効果を組み合わせて使用できるようにします。
-3. **効果の局所性**: 効果の影響範囲を明示的に制限し、プログラムの理解と推論を容易にします。
-4. **効果の型安全性**: 効果は型レベルで追跡され、適切なハンドラが提供されていることを保証します。
-5. **効果の推論**: 効果推論を活用して、明示的な効果注釈を最小限に抑えます。
-
-代数的効果は、副作用を型安全に管理するための強力なツールであり、関数型プログラミングの純粋性と命令型プログラミングの表現力を組み合わせることができます。
+代数的効果は、計算効果を構造化し、型安全に管理するための強力なツールであり、関数型プログラミングの純粋性と命令型プログラミングの表現力や状態管理を組み合わせるための有望なアプローチです。

@@ -105,35 +105,12 @@ bind {
   validEmail
 }
 
-// with式（効果スコープ）
-with Console {
-  Console.log("このスコープ内でConsole効果を使用可能")
-}
-
-// with式（ハンドラは常に式）
-with consoleHandler { // consoleHandler はハンドラオブジェクトを持つ変数や式
-  Console.log("このスコープ内のConsole効果は consoleHandler でハンドル")
-}
-
-// with式（効果の暗黙的な提供 - これはハンドラの実装に依存）
-// with DatabaseHandler { // DatabaseHandler が Database 効果を提供する式である必要がある
-//   processUserData("user123")
-// }
-
-// with式（複数のハンドラ式を提供 - カンマ区切りは現在サポートされていない）
-// with databaseHandler, loggerHandler { ... }
-
-// 効果のスコープ化
-with scoped Logger {
-  // このスコープ内でのみ有効な効果の実装
-  fn log(message: String): Unit = {
-    println(s"[LOG] $message")
-  }
-  
-  // 効果を使用するコード
-  Logger.log("Starting process...")
-  // 処理...
-  Logger.log("Process complete")
+// with式（ハンドラインスタンスの提供）
+with alias1 = handlerInstance1: EffectType1,
+     alias2 = handlerInstance2: EffectType2, ...
+{
+  // ブロック内で alias1 や alias2 に対応する効果操作を呼び出す
+  // ...
 }
 ```
 
@@ -171,11 +148,9 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 
 - **コレクションリテラル内包表記**: コレクション操作を簡潔に表現するための構文です。Pythonの内包表記からインスピレーションを得ており、コレクションの種類（リスト、マップ、セット）に応じた構文を提供します。
 
-- **bind式**: モナド的な連鎖を表現するための構文です。Option、Result、Futureなどのモナド的な型の連鎖に最適化されています。Haskellのdoノーテーションからインスピレーションを得ていますが、より明示的な名前を使用しています。
+- **bind式**: モナド的な計算の連鎖を簡潔に表現するための構文です。（詳細は [6.3.2 bind式](#632-bind式) を参照）
 
-- **with式**: 効果ハンドラ（式として評価される）を適用するスコープを定義します。`with handlerExpr { bodyExpr }` の形式を取ります。`handlerExpr` は効果ハンドラを提供する式である必要があります。オプションで `: EffectType` を指定して、ハンドルする効果の型を明示することもできます。`with` 式全体の値は `bodyExpr` の評価結果となります。
-
-- **効果のスコープ化**: 効果の実装を局所的に提供するための構文です。これにより、効果の実装を必要な場所に限定し、グローバルな状態の変更を避けることができます。これは、効果システムの柔軟性と安全性を向上させるための設計決定です。
+- **with式**: 特定のスコープ内で効果ハンドラインスタンスを有効にするための式です。`with alias1 = handlerInstance1: EffectType1, alias2 = handlerInstance2: EffectType2, ... { bodyExpr }` の形式を取ります。カンマ区切りで複数のハンドラを同時に指定でき、ネストを回避できます。`bodyExpr` の評価結果が `with` 式全体の値となります。（詳細は [6.3.5 with式](#635-with式) を参照）
 
 ### 6.3.1 コレクションリテラル内包表記
 
@@ -354,24 +329,24 @@ let process = (input: String) => {
 
 ラムダ式の本体 (`=>` の右辺) は単一の `Expression` です。これにはリテラル、変数、関数呼び出し、演算、そしてブロック式 `{...}` など、任意の式を含めることができます。複数の宣言や文を実行したい場合は、ブロック式を使用する必要があります。
 
-### 6.3.5 with式の用途と返り値
+### 6.3.5 with式
 
-`with` 式は、特定のスコープ内で効果ハンドラを適用するために使用されます。`with handlerExpr { bodyExpr }` の形式を取り、`bodyExpr` の評価結果を返します。
+`with` 式は、特定のスコープ内で効果ハンドラインスタンスを適用するために使用されます。`with alias = handlerInstance: EffectType, ... { bodyExpr }` の形式を取り、`bodyExpr` の評価結果を返します。
 
 ```
 // with式の返り値を変数に代入
-let result = with Console {
-  Console.log("計算を開始します")
+let result = with log = ConsoleHandler {}: Console {
+  log.log("計算を開始します")
   let x = complexCalculation()
-  Console.log("計算結果: " + x.toString())
+  log.log("計算結果: " + x.toString())
   x  // この値がwith式の返り値となる
 }
 
 // with式の返り値を関数の引数として使用
-processResult(with State<Counter> {
-  let current = State.get()
-  State.modify(c => c.increment())
-  current.value * 2  // この値がwith式の返り値となる
+processResult(with st = StateHandler<Int> { state: 0 }: State<Int> {
+  let current = st.get()
+  st.modify(c => c + 1)
+  current * 2  // この値がwith式の返り値となる
 })
 ```
 
@@ -380,71 +355,51 @@ with式の返り値を使用することには、以下のような実用的な�
 1. **効果の局所化と結果の取得**: 効果の使用を特定のスコープに限定しながら、その結果を外部で利用できます。
 
    ```
-   // リソース管理と結果の取得
-   let fileContents = with ResourceManager<File> {
-     // ファイルを開く（スコープ終了時に自動的に閉じられる）
-     let file = ResourceManager.open(() => File.open("data.txt"))?
-    
-     // ファイルの内容を読み込み、処理した結果を返す
-     ResourceManager.use(&file, f => f.readToString())?
-       |> processData
+   // リソース管理と結果の取得 (ハンドラがリソースを管理する想定)
+   let fileContents = with fs = LocalFileHandler { basePath: "/data" }: FileSystem {
+     let handle = fs.open("data.txt", FileMode.Read)?
+     let content = fs.read(&handle)?
+     fs.close(handle)?
+     processData(content) // 処理結果を返す
+     // fs インスタンスの破棄時にリソースが解放される (RAII連携、詳細は8.7節)
    }
-   // fileContentsには処理済みのファイル内容が格納され、
-   // ファイルは自動的に閉じられている
+   // fileContents には処理済みデータが格納される
    ```
 
-2. **合成性の向上**: with式を他の式と自然に組み合わせることができます。
+2. **合成性の向上**: `with` 式を他の式（`if`, `match` など）と自然に組み合わせることができます。
 
    ```
    // 条件分岐での使用
    let result = if condition {
-     with Console {
-       Console.log("条件が真の場合の処理")
+     with log = ConsoleHandler {}: Console {
+       log.log("条件が真の場合の処理")
        computeForTrue()
      }
    } else {
-     with Logger {
-       Logger.log("条件が偽の場合の処理")
+     with log = FileLogger { path: "/log/false.log" }: Console {
+       log.log("条件が偽の場合の処理")
        computeForFalse()
      }
    }
    ```
 
-3. **効果の組み合わせと結果の合成**: 異なる効果を持つ複数のwith式から返された値を合成できます。
+3. **効果の組み合わせと結果の合成**: 拡張された `with` 構文により、複数の効果を組み合わせ、その結果を合成できます。
 
    ```
    // 複数の効果と結果の合成
-   let combinedResult = {
-     let result1 = with Console {
-       Console.log("最初の処理")
-       computeFirst()
-     }
-     
-     let result2 = with State<AppState> {
-       let state = State.get()
-       computeSecond(state)
-     }
-     
-     // 2つの結果を合成
-     combineResults(result1, result2)
-   }
-
-4. **リソース管理の安全性**: リソースの安全な管理と結果の取得を一つの式で表現できます。
-
-   ```
-   // 複数のリソースを使用した計算
-   let result = with ResourceManager<Connection> {
-     let conn = ResourceManager.open(() => Database.connect(url))?
-     
-     with Transaction(conn): Transaction {
-       // トランザクション内の処理
-       let data = executeQuery(conn, query)?
-       processData(data)
-     }  // トランザクションは自動的にコミットまたはロールバック
-   }  // 接続は自動的に閉じられる
+   let combinedResult = with log = ConsoleHandler {}: Console,
+                            st = StateHandler<Int> { state: 0 }: State<Int>
+                       {
+                         log.log("最初の処理")
+                         let result1 = computeFirst()
+                         st.set(result1)
+                         log.log("次の処理")
+                         let result2 = computeSecond(st.get())
+                         combineResults(result1, result2) // ブロックの結果
+                       }
    ```
 
-with式が値を返す式として設計されていることは、Protorunの式ベースの設計原則に沿っており、言語全体の一貫性と表現力を向上させます。これにより、効果の制御と計算の結果を自然に組み合わせることができ、より簡潔で読みやすいコードを書くことが可能になります。
+`with` 式が値を返す式として設計されていることは、Protorun の式ベースの設計原則に沿っており、言語全体の一貫性と表現力を向上させます。これにより、効果の制御と計算の結果を自然に組み合わせることができ、より簡潔で読みやすいコードを書くことが可能になります。詳細は [8.5 効果ハンドラインスタンスの提供 (`with` 構文)](08-algebraic-effects.md#85-効果ハンドラインスタンスの提供-with-構文) を参照してください。
 
 ## 6.4 パターンマッチング
 
@@ -562,7 +517,31 @@ Protorun言語の関数合成機能は、以下の原則に基づいて設計さ
 
 これらの演算子により、データ変換パイプラインや処理フローを簡潔かつ読みやすく表現できます。また、効果システムと統合されているため、副作用を持つ関数の合成も型安全に行うことができます。
 
-## 6.6 メンバーアクセス式
+## 6.6 効果操作呼び出し式
+
+関数内で Effect パラメータのエイリアスを使って効果操作を呼び出す構文 `alias.operation(...)` も式の一種です。
+
+```protorun
+fn example(effect log: Console): Int = {
+  log.log("開始") // 効果操作呼び出し式 (Unit を返す)
+  let result = calculate()
+  log.log("終了") // 効果操作呼び出し式
+  result
+}
+```
+
+**意味:**
+
+`alias.operation(...)` という式は、見た目はメソッド呼び出しに似ていますが、定義により **代数的効果のメカニズム** を起動します。
+
+1.  現在の計算が中断されます。
+2.  継続（残りの計算）がキャプチャされます。
+3.  `with` 文によって `alias` に束縛されているアクティブなハンドラインスタンスの `operation` メソッド実装に制御が移ります（継続も渡されます）。
+4.  ハンドラメソッドが継続を処理し、最終的な結果を返します。この結果が `alias.operation(...)` 式全体の値となります。
+
+この呼び出しは、通常の関数呼び出しとは異なり、非局所的な制御フロー（中断、再開、大域脱出など）を引き起こす可能性がある点が重要です。詳細は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
+
+## 6.7 メンバーアクセス式
 
 メンバーアクセス式は、レコード型やモジュールなどの構造化されたデータのメンバー（フィールドや関数）にアクセスするために使用されます。ドット (`.`) 演算子を使用します。
 

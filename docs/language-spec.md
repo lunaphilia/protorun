@@ -4,83 +4,72 @@ Protorun言語の仕様は以下のセクションに分かれています。各
 
 ## 目次
 
-1. [序論](language-spec/01-introduction.md)
-   - 設計理念
-   - コア機能の優先順位
-
-2. [字句構造](language-spec/02-lexical-structure.md)
-   - キーワード
-   - 演算子
-   - リテラル
-   - コメント
-
-3. [型システム](language-spec/03-type-system.md)
-   - 基本型
-   - 複合型
-   - 型定義
-   - トレイト（インターフェース）
-   - 管理型（旧リソース型）
-   - 管理型の暗黙的な使用
-   - リソースパターン型クラス
-
-4. [宣言](language-spec/04-declarations.md)
-   - 変数宣言
-   - 関数定義
-   - 型宣言（レコード、enumなど）
-   - トレイト宣言
-   - 実装宣言
-   - 効果宣言
-   - ハンドラ宣言
-
-5. [文](language-spec/05-statements.md)
-   - 式文
-   - let文
-   - var文
-   - return文
-   - ブロック
-
-6. [式](language-spec/06-expressions.md)
-   - 制御構造 (if, match, bind, with)
-   - パターンマッチング
-   - 関数合成
-   - メンバーアクセス
-   - リテラル
-   - 演算子
-
-7. [所有権システム](language-spec/07-ownership.md)
-   - 所有権
-   - 借用
-   - ライフタイム
-   - リソース管理
-
-8. [代数的効果](language-spec/08-algebraic-effects.md)
-   - 効果の定義
-   - 効果ハンドラの定義
-   - ライフサイクル管理を持つ効果
-   - 効果の使用
-   - 効果ハンドラの使用
-   - 効果の合成
-   - 管理型の暗黙的な使用と代数的効果の関係
-
-9. [モジュールシステム](language-spec/09-modules.md)
-   - モジュール定義
-   - インポート
-   - エクスポート
-
+1.  [序論](language-spec/01-introduction.md)
+    *   1.1 設計理念
+    *   1.2 コア機能の優先順位
+2.  [字句構造](language-spec/02-lexical-structure.md)
+    *   2.1 キーワード
+    *   2.2 演算子
+    *   2.3 リテラル
+    *   2.4 コメント
+3.  [型システム](language-spec/03-type-system.md)
+    *   3.1 型システムの概要と目的
+    *   3.2 基本型
+    *   3.3 複合型
+    *   3.4 代数的効果と型システム
+4.  [宣言](language-spec/04-declarations.md)
+    *   4.1 宣言の概要
+    *   4.2 変数宣言 (`let`, `var`)
+    *   4.3 関数定義 (`fn`)
+    *   4.4 型定義 (`type`, `enum`)
+    *   4.5 効果インターフェースとハンドラ型の定義 (`effect`, `handler`)
+    *   4.6 トレイト定義と実装 (`trait`, `impl`)
+5.  [文](language-spec/05-statements.md)
+    *   5.1 文の概要
+    *   5.2 return文 (`ReturnStatement`)
+6.  [式](language-spec/06-expressions.md)
+    *   6.1 式の概要と設計原則
+    *   6.2 ブロック式 (`BlockExpr`)
+    *   6.3 制御構造 (`if`, `match`, `bind`, `with`)
+    *   6.4 パターンマッチング
+    *   6.5 関数合成
+    *   6.6 効果操作呼び出し式
+    *   6.7 メンバーアクセス式
+7.  [所有権システム](language-spec/07-ownership.md)
+    *   7.1 所有権
+    *   7.2 借用
+    *   7.3 ライフタイム
+    *   7.4 リソース管理
+8.  [代数的効果](language-spec/08-algebraic-effects.md)
+    *   8.1 代数的効果の概念と目的
+    *   8.2 効果インターフェースの定義 (`effect`)
+    *   8.3 ハンドラ型の定義 (`handler`)
+    *   8.4 Effect パラメータによる効果の宣言
+    *   8.5 効果ハンドラインスタンスの提供 (`with` 構文)
+    *   8.6 継続制御
+    *   8.7 ライフサイクル管理効果 (RAII連携)
+    *   8.8 Effect パラメータと依存性注入
+    *   8.9 設計上の考慮事項 (更新)
+9.  [モジュールシステム](language-spec/09-modules.md)
+    *   9.1 モジュール定義
+    *   9.2 インポート
+    *   9.3 エクスポート
 10. [標準ライブラリ](language-spec/10-standard-library.md)
-    - コアデータ構造
-    - I/O操作
-    - 並行処理
-
+    *   10.1 コアデータ構造
+    *   10.2 I/O操作
+    *   10.3 並行処理
 11. [サンプルプログラム](language-spec/11-examples.md)
-    - 簡単な計算機
-    - 状態を持つカウンター
-    - ファイル処理（ライフサイクル管理効果を使用）
-
+    *   11.1 サンプルプログラムの目的と概要
+    *   11.2 簡単な計算機 (例外効果)
+    *   11.3 状態を持つカウンター (状態効果)
+    *   11.4 ファイル処理 (効果とハンドラ)
+    *   11.5 依存性注入としての Effect パラメータ
 12. [文法（EBNF）](language-spec/12-grammar.md)
-
+    *   12.1 文法の目的と概要
+    *   12.2 EBNF文法
+    *   12.3 文法の説明
+    *   12.4 特殊な構文要素
 13. [今後の展望](language-spec/13-future.md)
-
 14. [参考文献](language-spec/14-references.md)
 
 ## 更新履歴

@@ -4,11 +4,11 @@
 
 サンプルプログラムは、Protorun言語の機能と使用パターンを実際のコード例を通じて示すことを目的としています。これらの例は以下の役割を果たします：
 
-1. **言語機能の実演**: 言語の主要な機能を実際のコードで示します。
-2. **パターンの例示**: 一般的なプログラミングパターンをProtorun言語でどのように実装するかを示します。
-3. **ベストプラクティス**: 言語の推奨される使用方法とスタイルを示します。
-4. **学習リソース**: 言語を学ぶ開発者のための具体的な参考例を提供します。
-5. **機能の組み合わせ**: 異なる言語機能がどのように連携するかを示します。
+1.  **言語機能の実演**: 言語の主要な機能を実際のコードで示します。
+2.  **パターンの例示**: 一般的なプログラミングパターンをProtorun言語でどのように実装するかを示します。
+3.  **ベストプラクティス**: 言語の推奨される使用方法とスタイルを示します。
+4.  **学習リソース**: 言語を学ぶ開発者のための具体的な参考例を提供します。
+5.  **機能の組み合わせ**: 異なる言語機能がどのように連携するかを示します。
 
 以下のサンプルプログラムは、Protorun言語の様々な側面を示すために選ばれています。
 
@@ -16,7 +16,7 @@
 
 この例は、代数的データ型、パターンマッチング、代数的効果（例外処理）を使用した簡単な計算機の実装を示しています。
 
-```
+```protorun
 // 計算機の実装
 enum Expr {
   Number(Int),
@@ -26,22 +26,27 @@ enum Expr {
   Divide(Expr, Expr)
 }
 
-// 例外効果
+// 例外効果インターフェース
 effect Exception<E> {
-  fn raise<T>(error: E): T // noresume はハンドラ側で指定
+  fn raise<T>(error: E): T // T は任意の型 (脱出するため)
 }
 
-// 例外ハンドラ
+// 例外ハンドラ型
 handler ExceptionHandler<E>: Exception<E> {
-  fn raise<T>(error: E): noresume Result<T, E> = Result.Err(error)
+  // フィールドなし
+  fn raise<T>(error: E): noresume Result<T, E> = { // noresume で継続を破棄
+    Result.Err(error)
+  }
 }
 
-// 式の評価
-fn evaluate(expr: Expr): Result<Int, String> & Exception<String> = {
+// 式の評価 (Effect パラメータを使用)
+fn evaluate(expr: Expr)(effect exc: Exception<String>): Result<Int, String> = {
   match expr {
     Expr.Number(value) => Result.Ok(value),
 
     Expr.Add(left, right) => {
+      // 再帰呼び出しも Effect パラメータを暗黙的に引き継ぐ (要仕様確認)
+      // あるいは明示的に渡す: evaluate(left)(effect exc = exc)?
       let l = evaluate(left)?
       let r = evaluate(right)?
       Result.Ok(l + r)
@@ -64,7 +69,8 @@ fn evaluate(expr: Expr): Result<Int, String> & Exception<String> = {
       let r = evaluate(right)?
 
       if r == 0 {
-        Exception.raise("ゼロ除算エラー")
+        // Effect パラメータを使って効果操作を呼び出す
+        exc.raise("ゼロ除算エラー")
       } else {
         Result.Ok(l / r)
       }
@@ -72,21 +78,21 @@ fn evaluate(expr: Expr): Result<Int, String> & Exception<String> = {
   }
 }
 
-// runWithException ヘルパー関数 (08-algebraic-effects.md の例を参考)
-fn runWithException<T, E>(action: () -> T & Exception<E>): Result<T, E> = {
-  // ハンドラをインラインで定義
-  let handler = handler: Exception<E> {
-    fn raise<R>(error: E): noresume Result<R, E> = Result.Err(error)
-  }
-  // with 式でハンドラを適用
-  with handler { // ハンドラは式として渡す, 効果型指定は省略可能
-    Result.Ok(action())
+// runWithException ヘルパー関数 (新しい構文を使用)
+fn runWithException<T, E>(action: (effect exc: Exception<E>) -> T): Result<T, E> = {
+  // ハンドラインスタンスを生成
+  let handlerInstance = ExceptionHandler<E> {}
+  // with 式でハンドラを注入
+  with exc = handlerInstance: Exception<E> {
+    // action を呼び出す。action 内の exc.raise は handlerInstance で処理される
+    // action が正常終了すれば Ok、raise されれば Err が with 式の結果となる
+    Result.Ok(action(effect exc = exc)) // action に effect パラメータを渡す (構文要検討)
   }
 }
 
 
 // 使用例
-fn main(): Unit & Console = {
+fn main()(effect console: Console): Unit = {
   let expr = Expr.Add(
     Expr.Number(10),
     Expr.Multiply(
@@ -95,307 +101,343 @@ fn main(): Unit & Console = {
     )
   )
 
-  // evaluate は Result<Int, String> & Exception<String> を返す
-  // runWithException で Exception 効果をハンドルし、Result<Int, String> に変換
-  let result = runWithException(() => evaluate(expr))
+  // evaluate は Result<Int, String> を返す (Exception 効果は runWithException で処理される)
+  let result = runWithException((effect exc) => evaluate(expr)(effect exc = exc)) // ラムダ式で Effect パラメータを受け取る
 
   match result {
-    Result.Ok(value) => Console.log(s"結果: $value"),
-    Result.Err(error) => Console.log(s"エラー: $error")
+    Result.Ok(value) => console.log(s"結果: $value"),
+    Result.Err(error) => console.log(s"エラー: $error")
   }
+
+  // ゼロ除算の例
+  let expr_div_zero = Expr.Divide(Expr.Number(5), Expr.Number(0))
+  let result_div_zero = runWithException((effect exc) => evaluate(expr_div_zero)(effect exc = exc))
+
+  match result_div_zero {
+    Result.Ok(value) => console.log(s"結果: $value"), // ここは通らない
+    Result.Err(error) => console.log(s"エラー: $error") // "エラー: ゼロ除算エラー"
+  }
+}
+
+// main 関数を実行するためのトップレベルハンドラ (仮)
+with console = ConsoleHandler {}: Console {
+  main()
 }
 ```
 
 この例では、以下の言語機能を示しています：
 
-1. **代数的データ型（enum）**: 式の構造を表現するための階層的なデータ型
-2. **パターンマッチング**: 式の種類に基づいた処理の分岐
-3. **代数的効果**: 例外処理のための型安全なメカニズム
-4. **特殊な継続制御**: `noresume`キーワードを使用した継続を呼び出さない効果ハンドラ
-5. **エラー処理**: `Result`型と`?`演算子を使用したエラー伝播（効果ハンドラとの連携）
+1.  **代数的データ型（enum）**: 式の構造を表現。
+2.  **パターンマッチング**: 式の種類に基づいた処理の分岐。
+3.  **代数的効果**: 例外処理のための型安全なメカニズム (`Exception<E>`)。
+4.  **ハンドラ型**: 効果インターフェースの実装 (`ExceptionHandler<E>`)。
+5.  **Effect パラメータ**: 関数が効果実装に依存することを宣言 (`effect exc: Exception<String>`)。
+6.  **効果操作呼び出し**: エイリアスを使った呼び出し (`exc.raise(...)`)。
+7.  **`with` 式**: ハンドラインスタンスの注入 (`with exc = ExceptionHandler<E> {} ...`)。
+8.  **継続制御**: `noresume` による大域脱出。
+9.  **エラー処理**: `Result` 型と `?` 演算子。
 
 ## 11.3 状態を持つカウンター
 
 この例は、状態効果を使用したカウンターの実装を示しています。
 
-```
-// 状態効果 (08-algebraic-effects.md より)
+```protorun
+// 状態効果インターフェース (再掲)
 effect State<S> {
   fn get(): S
   fn set(newState: S): Unit
   fn modify(f: (S) -> S): Unit
 }
 
-// カウンターの実装
-fn makeCounter(): () -> Int & State<Int> = { // initial は不要 (状態はハンドラで管理)
-  () => {
-    let current = State.get()
-    State.modify(count => count + 1)
-    current
-  }
+// 状態ハンドラ型 (再掲)
+handler StateHandler<S>: State<S> {
+  let mutable state: S // フィールド定義
+
+  // 効果操作の実装
+  fn get(): S = self.state
+  fn set(newState: S): Unit = { self.state = newState }
+  fn modify(f: (S) -> S): Unit = { self.state = f(self.state) }
 }
 
-// runWithState ヘルパー関数 (08-algebraic-effects.md の例を参考)
-fn runWithState<S, T>(initialState: S, action: () -> T & State<S>): (T, S) = {
-  var state = initialState
 
-  // ハンドラをインラインで定義
-  let handler = handler: State<S> {
-    fn get(): S = state
-    fn set(newState: S): Unit = { state = newState }
-    fn modify(f: (S) -> S): Unit = { state = f(state) }
-  }
+// カウンターの実装 (Effect パラメータを使用)
+// この関数自体は状態を持たず、State<Int> 効果に依存する
+fn counterTick(effect state: State<Int>): Int = {
+  let current = state.get()
+  state.modify(count => count + 1)
+  current // インクリメント前の値を返す
+}
 
-  // with 式でハンドラを適用
-  let result = with handler { // ハンドラは式として渡す
-    action()
+// runWithState ヘルパー関数 (新しい構文を使用)
+fn runWithState<S, T>(initialState: S, action: (effect st: State<S>) -> T): (T, S) = {
+  // ハンドラインスタンスを生成
+  let handlerInstance = StateHandler<S> { state: initialState }
+  // with 式でハンドラを注入
+  let result = with st = handlerInstance: State<S> {
+    action(effect st = st) // action に Effect パラメータを渡す (構文要検討)
   }
-  (result, state) // 最終的な状態も返す
+  // 最終的な状態をハンドラインスタンスから取得
+  let finalState = handlerInstance.state // フィールドアクセス (可視性要検討)
+  (result, finalState)
 }
 
 
 // 使用例
-fn main(): Unit & Console = {
-  let counter = makeCounter()
+fn main()(effect console: Console): Unit = {
 
-  // runWithState を使ってカウンターを実行し、最終状態は無視
-  let (result1, _) = runWithState(0, () => {
-    let r1 = counter()
-    Console.log(s"1回目: ${r1}") // 0
-    Result.Ok(r1) // runWithState に結果を返す (型を合わせるため Result を使用)
+  // runWithState を使ってカウンターを実行
+  let (result1, state1) = runWithState(0, (effect st) => {
+    let r1 = counterTick(effect state = st)
+    console.log(s"1回目: ${r1}") // 0
+    r1 // ヘルパー関数に結果を返す
   })
+  console.log(s"状態1: ${state1}") // 1
 
-  let (result2, _) = runWithState(1, () => { // 初期状態を 1 に設定
-    let r2 = counter()
-    Console.log(s"2回目: ${r2}") // 1
-    Result.Ok(r2)
+  // 別の初期状態で実行
+  let (result2, state2) = runWithState(10, (effect st) => {
+    let r2 = counterTick(effect state = st)
+    console.log(s"2回目: ${r2}") // 10
+    r2
   })
+  console.log(s"状態2: ${state2}") // 11
 
-  let (result3, _) = runWithState(2, () => { // 初期状態を 2 に設定
-    let r3 = counter()
-    Console.log(s"3回目: ${r3}") // 2
-    Result.Ok(r3)
+  // 一つのハンドラスコープで複数回実行
+  let (finalResult, finalState) = runWithState(0, (effect st) => {
+      console.log(s"A: ${counterTick(effect state = st)}") // 0
+      console.log(s"B: ${counterTick(effect state = st)}") // 1
+      console.log(s"C: ${counterTick(effect state = st)}") // 2
+      "Done" // 最後の結果
   })
+  console.log(s"最終状態: ${finalState}") // 3
+}
 
-  // または、一つのハンドラスコープで実行
-  let (finalResult, finalState) = runWithState(0, () => {
-      let c = makeCounter()
-      Console.log(s"A: ${c()}") // 0
-      Console.log(s"B: ${c()}") // 1
-      Console.log(s"C: ${c()}") // 2
-      Result.Ok("Done") // 最後の結果
-  })
-  Console.log(s"最終状態: $finalState") // 3
+// main 関数を実行するためのトップレベルハンドラ (仮)
+with console = ConsoleHandler {}: Console {
+  main()
 }
 ```
 
 この例では、以下の言語機能を示しています：
 
-1. **状態効果**: 明示的な状態の取得と更新
-2. **クロージャ**: 状態を捕捉する関数
-3. **効果ハンドラ**: 状態効果の実装
-4. **ジェネリクス**: 型パラメータを使用した汎用的な状態ハンドラ
-5. **効果スコープ**: `with`式を使用した効果の局所的な適用
+1.  **状態効果**: `State<S>` インターフェース。
+2.  **ハンドラ型**: 状態をフィールドとして持つ `StateHandler<S>`。
+3.  **Effect パラメータ**: `effect state: State<Int>`。
+4.  **効果操作呼び出し**: `state.get()`, `state.modify(...)`。
+5.  **`with` 式**: `StateHandler` インスタンスの注入。
+6.  **ハンドラインスタンスの状態**: `with` ブロックを抜けた後にハンドラの状態を取得（フィールド可視性による）。
 
 ## 11.4 ファイル処理（ライフサイクル管理効果を使用）
 
-この例は、ライフサイクル管理効果を使用したファイル処理の実装を示しています。ライフサイクル管理効果の詳細については、[8.4 ライフサイクル管理効果](08-algebraic-effects.md#84-ライフサイクル管理効果)を参照してください。
+この例は、ライフサイクル管理効果を使用したファイル処理の実装を示しています。（ライフサイクル管理効果と RAII の連携はまだ詳細設計が必要です。ここでは基本的な考え方を示します。）
 
-```
-// FileSystem 効果 (08-algebraic-effects.md より)
-effect FileSystem: LifecycleEffect<File> { // File 型は別途定義が必要
-  fn acquire(): File // LifecycleEffect から継承
-  fn release(resource: File): Unit // LifecycleEffect から継承
-  fn read(): String // FileSystem 固有の操作 (例)
-  fn write(content: String): Unit // FileSystem 固有の操作 (例)
+```protorun
+// FileSystem 効果インターフェース (再掲)
+effect FileSystem {
+  fn open(path: String, mode: FileMode): Result<own FileHandle, IOError>
+  fn close(handle: own FileHandle): Result<Unit, IOError>
+  fn read(handle: &FileHandle): Result<String, IOError>
+  fn write(handle: &mut FileHandle, content: String): Result<Unit, IOError>
+}
+// 仮の型定義
+type FileHandle { id: Int } // 簡単のため ID のみ
+type FileMode { Read, Write }
+type IOError { message: String }
+
+// ファイルシステムハンドラ型 (リソースを管理する可能性)
+// 簡単のため、ここでは状態を持たないハンドラとする
+handler SimpleFileHandler: FileSystem {
+  // フィールドなし
+
+  fn open(path: String, mode: FileMode): Result<own FileHandle, IOError> = {
+    println(s"Simulating open: ${path}, mode: ${mode}")
+    // 実際のファイルオープン処理...
+    Ok(FileHandle { id: 123 }) // 仮のハンドル
+  }
+  fn close(handle: own FileHandle): Result<Unit, IOError> = {
+    println(s"Simulating close: handle ${handle.id}")
+    // 実際のファイルクローズ処理...
+    Ok(())
+  }
+  fn read(handle: &FileHandle): Result<String, IOError> = {
+    println(s"Simulating read: handle ${handle.id}")
+    Ok("Simulated file content")
+  }
+  fn write(handle: &mut FileHandle, content: String): Result<Unit, IOError> = {
+    println(s"Simulating write: handle ${handle.id}, content: '${content}'")
+    Ok(())
+  }
 }
 
-// ファイル処理の実装（ライフサイクル管理効果を使用）
-fn processFile(path: String): Result<String, IOError> & FileSystem = {
-  // ファイルを開く（スコープ終了時に自動的に閉じられる）
-  let file = FileSystem.acquire()
+// ファイル処理の実装 (Effect パラメータを使用)
+fn processFile(path: String)(effect fs: FileSystem): Result<String, IOError> = {
+  // ハンドラにファイルを開かせ、ハンドルを取得
+  let handle = fs.open(path, FileMode.Read)?
 
-  // ファイルから読み込む
-  let content = FileSystem.read()
+  // try-finally のような構造が必要か？ (RAII連携待ち)
+  // 現状では明示的に close を呼ぶ必要がある
+  let contentResult = fs.read(&handle) // read の結果を一旦変数に
 
-  // 処理された内容を別のファイルに書き込む
-  let processed = content.toUpperCase()
-  FileSystem.write(processed)
+  // close を呼ぶ (エラーがあってもなくても)
+  let closeResult = fs.close(handle)
 
-  Result.Ok(processed)
-} // file は自動的に解放される
+  // read の結果と close の結果を組み合わせる
+  match (contentResult, closeResult) {
+    (Result.Ok(content), Result.Ok(_)) => Result.Ok(content.toUpperCase()),
+    (Result.Err(readErr), _) => Result.Err(readErr), // read エラー優先
+    (_, Result.Err(closeErr)) => Result.Err(closeErr) // close エラー
+  }
+}
+
+// 使用例
+fn main()(effect console: Console): Unit = {
+  // ハンドラインスタンスを生成
+  let fsHandler = SimpleFileHandler {}
+
+  // with でハンドラを注入して実行
+  let result = with fs = fsHandler: FileSystem {
+    processFile("my_data.txt")(effect fs = fs) // Effect パラメータを渡す
+  }
+
+  match result {
+    Result.Ok(processedContent) => console.log(s"処理結果: ${processedContent}"),
+    Result.Err(ioError) => console.log(s"ファイルエラー: ${ioError.message}")
+  }
+}
+
+// main 関数を実行するためのトップレベルハンドラ (仮)
+with console = ConsoleHandler {}: Console {
+  main()
+}
 ```
 
 この例では、以下の言語機能を示しています：
 
-1. **ライフサイクル管理効果**: リソースの獲得と解放を自動的に管理
-2. **効果ハンドラ**: リソース管理効果の実装（別途定義が必要）
-3. **エラー処理**: `Result`型を使用したエラー表現（IOErrorなど）
-4. **効果シグネチャ**: 関数が `FileSystem` 効果を持つことを示す
+1.  **効果インターフェース**: ファイル操作を定義 (`FileSystem`)。
+2.  **ハンドラ型**: ファイル操作を実装 (`SimpleFileHandler`)。
+3.  **Effect パラメータ**: ファイルシステム実装への依存性 (`effect fs: FileSystem`)。
+4.  **`with` 式**: ハンドラの注入。
+5.  **リソース管理の課題**: 現状では明示的な `close` が必要。RAII との連携が望まれる点を示唆。
 
-## 11.5 暗黙的パラメータを使用したデータベース操作
+## 11.5 依存性注入としての Effect パラメータ
 
-この例は、暗黙的パラメータと効果システムを使用したデータベース操作の実装を示しています。暗黙的パラメータの詳細については、[8.8 暗黙的パラメータと効果システム](08-algebraic-effects.md#88-暗黙的パラメータと効果システム)を参照してください。
+この例は、Effect パラメータが依存性注入のメカニズムとしてどのように機能するかを示します。特に、データベースアクセスのような外部サービスへの依存を抽象化する例です。
 
-```
+```protorun
 // ユーザーデータ型
-type User = {
-  id: String,
-  name: String,
-  email: String
-}
+type User = { id: String, name: String, email: String }
+type DbError { NotFound(String), ConnectionError(String) }
 
-// Database 効果 (08-algebraic-effects.md より)
-effect Database: LifecycleEffect<Connection> { // Connection 型は別途定義が必要
-  fn acquire(): Connection
-  fn release(resource: Connection): Unit
-  fn query(sql: String): Result<QueryResult, DbError> // QueryResult, DbError は別途定義が必要
+// データベースアクセス効果インターフェース
+effect Database {
+  fn query(sql: String): Result<List<Map<String, String>>, DbError> // 簡単のため Map を使用
   fn execute(sql: String): Result<Unit, DbError>
 }
 
+// ユーザーリポジトリ関数 (Database 効果に依存)
+fn getUserById(userId: String)(effect db: Database): Result<User, DbError> = {
+  let result = db.query(s"SELECT * FROM users WHERE id = '$userId'")?
 
-// ユーザーリポジトリ
-fn getUserById(userId: String)(with db: Database): Result<User, DbError> = {
-  let result = db.query(s"SELECT * FROM users WHERE id = $userId")?
-
-  if result.isEmpty() { // QueryResult に isEmpty メソッドが必要
+  if result.isEmpty() {
     Result.Err(DbError.NotFound(s"ユーザーが見つかりません: $userId"))
   } else {
-    let row = result.first() // QueryResult に first メソッドが必要
+    let row = result[0] // 最初の行を取得
     Result.Ok(User {
-      id: row.getString("id"), // row に getString メソッドが必要
-      name: row.getString("name"),
-      email: row.getString("email")
+      id: row.get("id").getOrElse(""), // Map から値を取得 (Option を想定)
+      name: row.get("name").getOrElse(""),
+      email: row.get("email").getOrElse("")
     })
   }
 }
 
-fn updateUser(user: User)(with db: Database): Result<Unit, DbError> = {
-  db.execute(s"UPDATE users SET name = '${user.name}', email = '${user.email}' WHERE id = '${user.id}'")?
-  Result.Ok(())
+fn updateUser(user: User)(effect db: Database): Result<Unit, DbError> = {
+  db.execute(s"UPDATE users SET name = '${user.name}', email = '${user.email}' WHERE id = '${user.id}'")
 }
 
-// 使用例 (ハンドラ定義は省略)
-// let dbHandler = handler: Database { ... }
-// fn main(): Unit & Console = {
-//   with dbHandler { // ハンドラ式を使用
-//     let userResult = getUserById("user123")
-//     match userResult {
-//       Result.Ok(user) => {
-//         Console.log(s"ユーザー名: ${user.name}")
-//         let updatedUser = { ...user, name: "新しい名前" } // レコード更新構文が必要
-//         updateUser(updatedUser) match {
-//           Result.Ok(_) => Console.log("更新成功"),
-//           Result.Err(e) => Console.log(s"更新エラー: $e")
-//         }
-//       },
-//       Result.Err(e) => Console.log(s"取得エラー: $e")
-//     }
-//   }
-// }
+// --- ハンドラ定義 (例) ---
 
-```
+// 実際のデータベースハンドラ型
+handler PostgresDbHandler: Database {
+  let connectionString: String
+  // connectionPool: ConnectionPool // 内部状態としてプールを持つなど
 
-この例では、以下の言語機能を示しています：
-
-1. **暗黙的パラメータ**: `Database` 効果を暗黙的に関数に渡す
-2. **効果システムとの連携**: 効果を依存性として注入する
-3. **レコード型**: ユーザーデータの表現
-4. **エラー処理**: `Result` 型によるデータベースエラーの処理
-5. **文字列補間**: SQL文の構築
-
-## 11.6 代数的効果と暗黙的パラメータの連携
-
-この例は、代数的効果と暗黙的パラメータがどのように連携できるかを示しています。
-
-```
-// データベースアクセス効果
-effect DbAccess {
-  fn query(sql: String): Result<QueryResult, DbError>
-  fn execute(sql: String): Result<Unit, DbError>
+  fn query(sql: String): Result<List<Map<String, String>>, DbError> = {
+    // self.connectionString を使って Postgres に接続し、クエリ実行
+    // ... 実際の DB アクセスロジック ...
+  }
+  fn execute(sql: String): Result<Unit, DbError> = {
+    // ... 実際の DB アクセスロジック ...
+  }
 }
 
-// ロギング効果
-effect Logging {
-  fn log(level: LogLevel, message: String): Unit // LogLevel は別途定義が必要
+// テスト用モックハンドラ型
+handler MockDbHandler: Database {
+  let mutable users: Map<String, User> // テストデータを保持
+
+  fn query(sql: String): Result<List<Map<String, String>>, DbError> = {
+    // sql を簡易的にパースして users からデータを返す (テスト用)
+    // ... モック実装 ...
+  }
+  fn execute(sql: String): Result<Unit, DbError> = {
+    // users マップを更新する (テスト用)
+    // ... モック実装 ...
+  }
 }
 
-// ビジネスロジック
-fn processUserData(userId: String): Result<UserData, Error> & DbAccess & Logging = { // UserData, Error は別途定義が必要
-  Logging.log(LogLevel.Info, s"ユーザーデータの処理開始: $userId")
+// --- 使用例 ---
 
-  // データベースからユーザー情報を取得
-  let userResult = DbAccess.query(s"SELECT * FROM users WHERE id = '$userId'")?
-
-  if userResult.isEmpty() {
-    Logging.log(LogLevel.Warning, s"ユーザーが見つかりません: $userId")
-    return Result.Err(Error.NotFound(s"ユーザーが見つかりません: $userId"))
+fn main()(effect console: Console): Unit = {
+  // --- 本番環境での実行 ---
+  console.log("--- 本番 DB で実行 ---")
+  let dbConnectionString = "postgres://user:pass@host:port/db"
+  with db = PostgresDbHandler { connectionString: dbConnectionString }: Database {
+    let userResult = getUserById("user123")(effect db = db)
+    match userResult {
+      Result.Ok(user) => console.log(s"取得ユーザー: ${user.name}"),
+      Result.Err(e) => console.log(s"取得エラー: ${e}")
+    }
   }
 
-  let userData = parseUserData(userResult.first()) // parseUserData は別途定義が必要
+  // --- テスト環境での実行 ---
+  console.log("\n--- モック DB で実行 ---")
+  let initialUsers = Map.of([
+    ("user123", User { id: "user123", name: "Alice", email: "alice@example.com" })
+  ])
+  with db = MockDbHandler { users: initialUsers }: Database {
+    // ユーザー取得テスト
+    let userResult = getUserById("user123")(effect db = db)
+    match userResult {
+      Result.Ok(user) => console.log(s"取得ユーザー (モック): ${user.name}"), // Alice
+      Result.Err(e) => console.log(s"取得エラー (モック): ${e}")
+    }
 
-  // 処理ログを記録
-  DbAccess.execute(s"INSERT INTO logs (user_id, action) VALUES ('$userId', 'data_processed')")?
+    // ユーザー更新テスト
+    let updatedUser = User { id: "user123", name: "Alice Smith", email: "alice.smith@example.com" }
+    let updateResult = updateUser(updatedUser)(effect db = db)
+    match updateResult {
+      Result.Ok(_) => console.log("更新成功 (モック)"),
+      Result.Err(e) => console.log(s"更新エラー (モック): ${e}")
+    }
 
-  Logging.log(LogLevel.Info, s"ユーザーデータの処理完了: $userId")
-  Result.Ok(userData)
-}
-
-// 暗黙的パラメータを使用して効果を実装するヘルパー関数
-fn runWithDbAndLogger<T>(action: () -> T & DbAccess & Logging)(with db: Database, logger: Logger): Result<T, Error> = {
-  // 効果ハンドラを定義 (インライン)
-  let dbHandler = handler: DbAccess {
-    fn query(sql: String): Result<QueryResult, DbError> = db.query(sql)
-    fn execute(sql: String): Result<Unit, DbError> = db.execute(sql)
-  }
-
-  let logHandler = handler: Logging {
-    fn log(level: LogLevel, message: String): Unit = logger.log(level, message)
-  }
-
-  // 効果ハンドラを適用
-  with dbHandler {
-    with logHandler {
-      // action()を実行し、結果を Result.Ok でラップ
-      // action() 内で発生した効果 (DbAccess, Logging) はここでハンドルされる
-      // action() が Result.Err を返した場合、それがそのままこの with 式の結果となる
-      Result.Ok(action())
+    // 再度取得して確認
+    let userResultAfterUpdate = getUserById("user123")(effect db = db)
+    match userResultAfterUpdate {
+      Result.Ok(user) => console.log(s"再取得ユーザー (モック): ${user.name}"), // Alice Smith
+      Result.Err(e) => console.log(s"再取得エラー (モック): ${e}")
     }
   }
 }
 
-// 使用例
-fn main(): Unit & Console = {
-  // データベースハンドラとロガーハンドラを定義 (実際の接続やファイル設定など)
-  let dbHandler = handler: Database { /* 実装... */ }
-  let loggerHandler = handler: Logger { /* 実装... */ }
-
-  // ハンドラを適用して、暗黙的パラメータを提供
-  with dbHandler {
-    with loggerHandler {
-      // runWithDbAndLogger を呼び出し、暗黙的に db と logger を渡す
-      runWithDbAndLogger(() => {
-        processUserData("user123") // DbAccess と Logging 効果を使用
-      }) match {
-        Result.Ok(userDataResult) => {
-             match userDataResult {
-                 Result.Ok(userData) => Console.log(s"ユーザーデータ: $userData"),
-                 Result.Err(processError) => Console.log(s"処理エラー: $processError")
-             }
-        },
-        Result.Err(handlerError) => Console.log(s"ハンドラエラー: $handlerError")
-      }
-    }
-  }
+// main 関数を実行するためのトップレベルハンドラ (仮)
+with console = ConsoleHandler {}: Console {
+  main()
 }
 ```
 
 この例では、以下の言語機能を示しています：
 
-1. **代数的効果と暗黙的パラメータの連携**: 効果ハンドラが暗黙的パラメータを使用して実装される
-2. **複数の効果**: 複数の効果を組み合わせたビジネスロジック
-3. **効果ハンドラの合成**: 複数のハンドラを組み合わせた処理
-4. **エラー処理**: `Result` 型によるエラー処理
-5. **依存性の注入**: `runWithDbAndLogger` 関数が依存性（`db`, `logger`）を受け取り、それを使用して効果ハンドラを構成する
+1.  **依存性注入**: `getUserById` や `updateUser` は抽象的な `Database` 効果に依存し、具体的な実装（`PostgresDbHandler` や `MockDbHandler`）は `with` で注入される。
+2.  **テスト容易性**: 同じビジネスロジック（`getUserById` など）を、本番用ハンドラとテスト用モックハンドラで差し替えて実行できる。
+3.  **ハンドラ型の状態**: `MockDbHandler` がテストデータを内部状態として保持する例。
+4.  **疎結合**: ビジネスロジックが特定のデータベース実装に依存しない。
 
-これらのサンプルプログラムは、Protorun言語の主要な機能と使用パターンを示しています。実際のアプリケーション開発では、これらのパターンを組み合わせて、より複雑で実用的なプログラムを構築することができます。
+Effect パラメータと `with` 式は、このような依存性の注入と抽象化を実現するための強力なツールとなります。

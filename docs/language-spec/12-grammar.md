@@ -19,8 +19,8 @@ Program ::= (Declaration | Expression)*
 
 Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl | ExportDecl | EnumDecl | LetDecl | VarDecl
 
-FunctionDecl ::= "fn" Identifier GenericParams? ParamList (":" Type)? ("&" EffectType)? "=" Expression
-               | "fn" Identifier GenericParams? ParamList ImplicitParamList? (":" Type)? ("&" EffectType)? "=" Expression
+FunctionDecl ::= "fn" Identifier GenericParams? ParamList EffectParamList? (":" Type)? "=" Expression
+               | "fn" Identifier GenericParams? ParamList ImplicitParamList? EffectParamList? (":" Type)? "=" Expression
 
 TypeDecl ::= "type" Identifier GenericParams? "=" (RecordType | Type)
 
@@ -28,7 +28,7 @@ TraitDecl ::= "trait" Identifier GenericParams? ("{" TraitMember* "}")? (":" Typ
 
 ImplDecl ::= "impl" GenericParams? TypeRef ":" TypeRef "{" ImplMember* "}"
 
-EffectDecl ::= "effect" Identifier GenericParams? (":" TypeRef)? "{" EffectOperation* "}"
+EffectDecl ::= "effect" Identifier GenericParams? "{" EffectOperation* "}"
 
 HandlerDecl ::= "handler" Identifier GenericParams? ":" TypeRef "{" HandlerMember* "}"
 
@@ -46,22 +46,24 @@ ImplMember ::= FunctionDecl
 
 HandlerMember ::= HandlerFunction | FieldDecl
 
-HandlerFunction ::= Identifier GenericParams? ParamList (":" ReturnType)? "=" Expression
-                  | Identifier GenericParams? ParamList "," "resume" ":" ResumeType (":" ReturnType)? "=" Expression
-                  | Identifier GenericParams? ParamList ":" "noresume" ReturnType "=" Expression
-                  | Identifier GenericParams? ParamList ":" "multiresume" ReturnType "=" Expression
+HandlerFunction ::= "fn" Identifier GenericParams? ParamList (":" ReturnType)? "=" Expression
+                  | "fn" Identifier GenericParams? ParamList "," "resume" ":" ResumeType (":" ReturnType)? "=" Expression
+                  | "fn" Identifier GenericParams? ParamList ":" "noresume" ReturnType "=" Expression
+                  | "fn" Identifier GenericParams? ParamList ":" "multiresume" ReturnType "=" Expression
 
-FieldDecl ::= Identifier ":" Type
+FieldDecl ::= ("let" | "var") Identifier ":" Type
 
-EffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)? ";"
-                  | "fn" "acquire" GenericParams? ParamList (":" Type)? ";"
-                  | "fn" "release" "(" "resource" ":" TypeRef ")" ":" Type? ";"
+EffectOperation ::= "fn" Identifier GenericParams? ParamList (":" Type)?
 
 ParamList ::= "(" (Param ("," Param)*)? ")"
 
 ImplicitParamList ::= "(" "with" Param ("," Param)* ")"
 
+EffectParamList ::= "(" (EffectParam ("," EffectParam)*)? ")"
+
 Param ::= Identifier ":" Type
+
+EffectParam ::= "effect" Identifier ":" TypeRef
 
 GenericParams ::= "<" (GenericParam ("," GenericParam)*)? ">"
 
@@ -80,11 +82,9 @@ TypeRef ::= Identifier GenericArgs?
 
 GenericArgs ::= "<" (Type ("," Type)*)? ">"
 
-FunctionType ::= "(" (Type ("," Type)*)? ")" "->" Type ("&" EffectType)?
+FunctionType ::= "(" (Type ("," Type)*)? ")" "->" Type
 
 ArrayType ::= "[" Type "]"
-
-EffectType ::= TypeRef ("&" TypeRef)*
 
 ResumeType ::= "(" (Type ("," Type)*)? ")" "->" ReturnType
 
@@ -108,9 +108,8 @@ Expression ::= LiteralExpr
              | MemberAccessExpr
              | BinaryExpr
              | UnaryExpr
-             | HandleExpr
+             | EffectOperationCallExpr
              | WithExpr
-             | ScopedEffectExpr
              | RangeExpr
 
 LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral
@@ -147,22 +146,16 @@ CallExpr ::= Expression "(" (Expression ("," Expression)*)? ")"
 
 MemberAccessExpr ::= Expression "." Identifier
 
+EffectOperationCallExpr ::= Expression "." Identifier "(" (Expression ("," Expression)*)? ")"
+
 BinaryExpr ::= Expression Operator Expression
 
 UnaryExpr ::= Operator Expression
 
-HandleExpr ::= "handle" Expression "{" (EffectCase)* "}"
-
-WithExpr ::= "with" (Expression | TypeRef) (":" TypeRef)? BlockExpr
-           | "with" (Expression | TypeRef) ("," (Expression | TypeRef))* BlockExpr
-
-ScopedEffectExpr ::= "with" "scoped" Identifier BlockExpr
+WithExpr ::= "with" WithBinding ("," WithBinding)* (":" TypeRef ("," TypeRef)*)? BlockExpr
+WithBinding ::= Identifier "=" Expression
 
 RangeExpr ::= Expression ".." Expression
-
-EffectCase ::= QualifiedIdentifier ParamList "=>" BlockExpr
-             | QualifiedIdentifier ParamList "," "resume" ":" ResumeType "=>" BlockExpr
-             | "return" Pattern "=>" BlockExpr
 
 Pattern ::= LiteralPattern
           | IdentifierPattern
