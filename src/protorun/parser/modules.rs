@@ -6,14 +6,14 @@ use nom::{
     character::complete::char,
     combinator::{cut, map, opt},
     multi::many0,
-    sequence::{delimited, preceded, terminated, tuple},
+    sequence::{delimited, pair, preceded, terminated}, // tuple を削除
 };
+// VerboseError のインポートは不要になったので削除
 
-use crate::protorun::ast::{Module, ExportDecl, ImportDecl, ImportItem, Decl};
-use super::common::{ParseResult, ws_comments, identifier_string, calculate_span};
-// function_declaration を declarations からインポート
-use super::declarations::{parse_type_declaration, parse_trait_declaration, parse_impl_declaration, parse_function_declaration};
-use super::statements::statement; // statement は statements から
+use crate::protorun::ast::{Module, ExportDecl, ImportDecl, ImportItem, Decl, Pattern, TypeDecl, TraitDecl, ImplDecl};
+use super::common::{ParseResult, ws_comments, identifier_string, calculate_span, keyword};
+// parse_declaration をインポートし、他の宣言パーサーも追加
+use super::declarations::{parse_declaration, parse_type_declaration, parse_trait_declaration, parse_impl_declaration};
 
 /// インポート種別
 enum ImportType {
@@ -21,60 +21,12 @@ enum ImportType {
     Module(String, String),
 }
 
-/// エクスポート宣言のパース
-pub fn parse_export<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, (ExportDecl, Option<Decl>)> {
-    let (input, _) = ws_comments(tag("export"))(input)?;
-    
-    // 関数宣言のエクスポート
-    let (input, decl) = opt(|i| parse_function_declaration(i, original_input))(input)?; // 関数名を修正
-    
-    if let Some(decl) = decl {
-        let span = calculate_span(original_input, input);
-        match &decl {
-            Decl::Function { name, .. } => {
-                return Ok((input, (ExportDecl::Single { name: name.clone(), span }, Some(decl))));
-            }
-            _ => unreachable!(),
-        }
-    }
-    
-    // グループエクスポートまたは個別エクスポート
-    let (input, export) = alt((
-        // グループエクスポート
-        map(
-            preceded(
-                ws_comments(char('{')),
-                cut(terminated(
-                    many0(terminated(
-                        ws_comments(identifier_string),
-                        opt(ws_comments(char(',')))
-                    )),
-                    ws_comments(char('}'))
-                ))
-            ),
-            |names| {
-                let span = calculate_span(original_input, input);
-                (ExportDecl::Group { names, span }, None)
-            }
-        ),
-        // 個別エクスポート（識別子のみ）
-        map(
-            ws_comments(identifier_string),
-            |name| {
-                let span = calculate_span(original_input, input);
-                (ExportDecl::Single { name, span }, None)
-            }
-        )
-    ))(input)?;
-    
-    Ok((input, export))
-}
+// parse_export 関数を削除
 
 /// インポートアイテムのパース
 fn parse_import_item<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, ImportItem> {
     let (input, name) = ws_comments(identifier_string)(input)?;
     
-    // asキーワードの後のスペースを必須にしない
     let (input, alias) = opt(
         preceded(
             ws_comments(tag("as")),
@@ -97,11 +49,10 @@ fn parse_import_item<'a>(input: &'a str, original_input: &'a str) -> ParseResult
 pub fn parse_import<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, ImportDecl> {
     let (input, _) = ws_comments(tag("import"))(input)?;
     
-    // 選択的インポートまたはモジュール全体のインポートをパース
     let (input, import_type) = alt((
         // 選択的インポート
         map(
-            tuple((
+            pair( // tuple を pair に変更
                 preceded(
                     ws_comments(tag("{")),
                     cut(terminated(
@@ -122,14 +73,14 @@ pub fn parse_import<'a>(input: &'a str, original_input: &'a str) -> ParseResult<
                         ws_comments(char('"'))
                     )
                 )
-            )),
+            ),
             |(imports, module_path)| {
                 ImportType::Selective(imports, module_path)
             }
         ),
         // モジュール全体のインポート
         map(
-            tuple((
+            pair( // tuple を pair に変更
                 delimited(
                     ws_comments(char('"')),
                     identifier_string,
@@ -139,7 +90,7 @@ pub fn parse_import<'a>(input: &'a str, original_input: &'a str) -> ParseResult<
                     ws_comments(tag("as")),
                     ws_comments(identifier_string)
                 )
-            )),
+            ),
             |(module_path, alias)| {
                 ImportType::Module(module_path, alias)
             }
@@ -168,47 +119,157 @@ pub fn parse_import<'a>(input: &'a str, original_input: &'a str) -> ParseResult<
 }
 
 
+/// モジュール内のアイテム
+#[derive(Debug)]
+enum ModuleItem {
+    Import(ImportDecl),
+    ExportGroup(ExportDecl),
+    Declaration { decl: Decl, is_exported: bool },
+    TypeDeclaration { decl: TypeDecl, is_exported: bool },
+    TraitDeclaration { decl: TraitDecl, is_exported: bool },
+    ImplDeclaration(ImplDecl),
+}
+
+/// モジュール内の単一アイテムをパースする関数 (シンプル版)
+fn parse_module_item<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, ModuleItem> {
+    alt((
+        // インポート宣言 (export 不可)
+        map(ws_comments(|i| parse_import(i, original_input)), ModuleItem::Import),
+        // グループエクスポート (export { ... })
+        map(
+            preceded(
+                keyword("export"), // "export" を先にパース
+                preceded(
+                    ws_comments(char('{')), // '{' をパース
+                    cut(terminated(
+                        many0(terminated(
+                            ws_comments(identifier_string), // 識別子をパース
+                            opt(ws_comments(char(','))) // オプションのカンマ
+                        )),
+                        ws_comments(char('}')) // '}' をパース
+                    ))
+                )
+            ),
+            move |names| { // パースされた識別子のリスト (names) を受け取る
+                let span = calculate_span(original_input, input); // スパン計算 (より正確な計算が必要かも)
+                ModuleItem::ExportGroup(ExportDecl::Group { names, span })
+            }
+        ),
+        // エクスポートされる宣言 (export + 宣言)
+        preceded(
+            keyword("export"), // "export" を先にパース
+            alt(( // 次に来る宣言の種類を alt で試す
+                map(ws_comments(|i| parse_declaration(i, original_input)), |d| ModuleItem::Declaration { decl: d, is_exported: true }),
+                map(ws_comments(|i| parse_type_declaration(i, original_input)), |d| ModuleItem::TypeDeclaration { decl: d, is_exported: true }),
+                map(ws_comments(|i| parse_trait_declaration(i, original_input)), |d| ModuleItem::TraitDeclaration { decl: d, is_exported: true }),
+                // impl はエクスポートできないのでここには含めない
+            ))
+        ),
+        // エクスポートされない宣言
+        alt((
+            map(ws_comments(|i| parse_declaration(i, original_input)), |d| ModuleItem::Declaration { decl: d, is_exported: false }),
+            map(ws_comments(|i| parse_type_declaration(i, original_input)), |d| ModuleItem::TypeDeclaration { decl: d, is_exported: false }),
+            map(ws_comments(|i| parse_trait_declaration(i, original_input)), |d| ModuleItem::TraitDeclaration { decl: d, is_exported: false }),
+            map(ws_comments(|i| parse_impl_declaration(i, original_input)), ModuleItem::ImplDeclaration), // is_exported は false 固定なので不要
+        ))
+    ))(input)
+}
+
+
 /// モジュール宣言のパース
 pub fn parse_module<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Module> {
-    let (input, _) = ws_comments(tag("module"))(input)?;
+    let (input, _) = keyword("module")(input)?;
     let (input, path) = ws_comments(identifier_string)(input)?;
     let (input, _) = ws_comments(char('{'))(input)?;
-    
-    // エクスポート宣言をパース
-    let (input, exports_and_decls) = many0(|i| parse_export(i, original_input))(input)?;
-    
-    // エクスポート宣言と関数宣言を分離
-    let mut exports = Vec::new();
-    let mut declarations = Vec::new();
-    
-    for (export, decl_opt) in exports_and_decls {
-        exports.push(export);
-        if let Some(decl) = decl_opt {
-            declarations.push(decl);
+
+    let mut current_input = input;
+    let mut items = Vec::new();
+
+    // モジュール内のアイテムをループでパース
+    loop {
+        // 空白とコメントをスキップ
+        let (next_input, _) = ws_comments::<_, ()>(|i| Ok((i, ())))(current_input)?;
+
+        // ループ終了条件: '}' が見つかったら終了
+        if next_input.starts_with('}') {
+            current_input = next_input;
+            break;
+        }
+        // ループが終了しない場合のエラーハンドリング（無限ループ防止）
+        if next_input.is_empty() {
+             use nom::error::VerboseErrorKind; // エラー種類をインポート
+             return Err(nom::Err::Error(nom::error::VerboseError{ errors: vec![(next_input, VerboseErrorKind::Context("Unexpected EOF in module body"))]}));
+        }
+
+
+        // 次のアイテムをパース
+        match parse_module_item(next_input, original_input) {
+            Ok((next_input_after_item, item)) => {
+                items.push(item);
+                current_input = next_input_after_item;
+            }
+            Err(e) => {
+                 return Err(e); // エラーを返す
+            }
         }
     }
-    
-    // インポート宣言をパース
-    let (input, imports) = many0(|i| parse_import(i, original_input))(input)?;
-    
-    // 非エクスポート関数宣言をパース
-    let (input, non_export_decls) = many0(|i| parse_function_declaration(i, original_input))(input)?; // 関数名を修正
-    
-    // 非エクスポート関数宣言を追加
-    declarations.extend(non_export_decls);
-    
-    // 型宣言をパース
-    let (input, type_declarations) = many0(|i| parse_type_declaration(i, original_input))(input)?;
-    
-    // トレイト宣言をパース
-    let (input, trait_declarations) = many0(|i| parse_trait_declaration(i, original_input))(input)?;
-    
-    // 実装宣言をパース
-    let (input, impl_declarations) = many0(|i| parse_impl_declaration(i, original_input))(input)?;
 
-    // 文のパース処理を削除
 
-    let (input, _) = ws_comments(char('}'))(input)?;
+    let (input, _) = cut(ws_comments(char('}')))(current_input)?;
+
+    // パース結果を Module 構造体に格納
+    let mut exports = Vec::new();
+    let mut imports = Vec::new();
+    let mut declarations = Vec::new();
+    let mut type_declarations = Vec::new();
+    let mut trait_declarations = Vec::new();
+    let mut impl_declarations = Vec::new();
+
+    for item in items {
+        match item {
+            ModuleItem::Import(i) => imports.push(i),
+            ModuleItem::ExportGroup(e) => exports.push(e),
+            ModuleItem::Declaration { decl, is_exported } => {
+                if is_exported {
+                    let name = match &decl {
+                        Decl::Let { pattern: Pattern::Identifier(name, _), .. } => Some(name.clone()),
+                        Decl::Var { name, .. } => Some(name.clone()),
+                        _ => None,
+                    };
+                    if let Some(name) = name {
+                        let span = match &decl {
+                            Decl::Let { span, .. } => span.clone(),
+                            Decl::Var { span, .. } => span.clone(),
+                        };
+                        exports.push(ExportDecl::Single { name, span });
+                    } else if is_exported {
+                         eprintln!("Warning: export keyword used with non-exportable declaration pattern.");
+                    }
+                }
+                declarations.push(decl);
+            },
+            ModuleItem::TypeDeclaration { decl, is_exported } => {
+                if is_exported {
+                    let (name, span) = match &decl {
+                        TypeDecl::Record { name, span, .. } => (name.clone(), span.clone()),
+                        TypeDecl::Enum { name, span, .. } => (name.clone(), span.clone()),
+                        TypeDecl::Alias { name, span, .. } => (name.clone(), span.clone()),
+                    };
+                    exports.push(ExportDecl::Single { name, span });
+                }
+                type_declarations.push(decl);
+            },
+             ModuleItem::TraitDeclaration { decl, is_exported } => {
+                if is_exported {
+                    let name = decl.name.clone();
+                    let span = decl.span.clone();
+                    exports.push(ExportDecl::Single { name, span });
+                }
+                trait_declarations.push(decl);
+            },
+            ModuleItem::ImplDeclaration(id) => impl_declarations.push(id),
+        }
+    }
     
     let span = calculate_span(original_input, input);
     
@@ -220,8 +281,7 @@ pub fn parse_module<'a>(input: &'a str, original_input: &'a str) -> ParseResult<
         type_declarations,
         trait_declarations,
         impl_declarations,
-        // statements: statements, // 削除
-        expressions: Vec::new(), // モジュール内にトップレベル式はないはずなので空で初期化
+        expressions: Vec::new(),
         span,
     }))
 }

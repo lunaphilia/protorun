@@ -78,7 +78,9 @@ pub enum Expr {
     },
     /// ラムダ式
     LambdaExpr {
-        parameters: Vec<Parameter>,
+        parameters: Option<Vec<Parameter>>, // 通常のパラメータリスト (Option)
+        effect_parameters: Option<Vec<EffectParameter>>, // Effectパラメータリスト (Option)
+        implicit_parameters: Option<Vec<Parameter>>, // Implicitパラメータリスト (Option)
         body: Box<Expr>,
         span: Span,
     },
@@ -178,14 +180,7 @@ pub enum Stmt {
 /// 宣言のAST
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
-    /// 関数宣言
-    Function {
-        name: String,
-        parameters: Vec<Parameter>,
-        return_type: Option<Type>,
-        body: Expr, // 関数本体は式
-        span: Span,
-    },
+    // Function variant removed
     /// let宣言 (不変束縛)
     Let {
         pattern: Pattern, // name: String から Pattern に変更
@@ -210,6 +205,14 @@ pub enum Decl {
 pub struct Parameter {
     pub name: String,
     pub type_annotation: Option<Type>,
+    pub span: Span,
+}
+
+/// Effect パラメータ
+#[derive(Debug, Clone, PartialEq)]
+pub struct EffectParameter {
+    pub name: String,
+    pub effect_type: Type, // 型は Type を使う
     pub span: Span,
 }
 

@@ -354,61 +354,91 @@ fn test_decl_var() { // var宣言のテストを追加
 
 
 #[test]
-fn test_decl_function() {
-    let span_func = Span {
+fn test_decl_function_as_let_lambda() { // 関数名を変更し、let + lambda で表現
+    let span_let = Span { // let 全体のスパン
         start: 0,
         end: 20,
         line: 1,
         column: 1,
     };
-    
-    let span_param = Span {
+    let span_pattern = Span { // パターン 'foo' のスパン
         start: 4,
-        end: 5,
+        end: 7,
         line: 1,
         column: 5,
     };
-    
-    let span_body = Span {
-        start: 15,
-        end: 16,
+    let span_lambda = Span { // ラムダ式全体のスパン
+        start: 10,
+        end: 20,
         line: 1,
-        column: 16,
+        column: 11,
     };
-    
+    let span_param = Span { // パラメータ 'x' のスパン
+        start: 13, // 'fn (x) = x' の 'x'
+        end: 14,
+        line: 1,
+        column: 14,
+    };
+    let span_body = Span { // 本体 'x' のスパン
+        start: 19, // 'fn (x) = x' の最後の 'x'
+        end: 20,
+        line: 1,
+        column: 20,
+    };
+
     let parameter = Parameter {
         name: "x".to_string(),
         type_annotation: None,
         span: span_param,
     };
-    
-    let body = Expr::Identifier("x".to_string(), span_body);
-    
-    let decl = Decl::Function {
-        name: "foo".to_string(),
-        parameters: vec![parameter],
-        return_type: None,
+
+    let body = Box::new(Expr::Identifier("x".to_string(), span_body));
+
+    let lambda_expr = Expr::LambdaExpr {
+        parameters: Some(vec![parameter]), // Option<Vec<Parameter>> に変更
+        effect_parameters: None, // 追加
+        implicit_parameters: None, // 追加
         body,
-        span: span_func.clone(),
+        span: span_lambda.clone(),
     };
-    
+
+    let pattern = Pattern::Identifier("foo".to_string(), span_pattern);
+
+    let decl = Decl::Let {
+        pattern,
+        type_annotation: None,
+        value: lambda_expr,
+        span: span_let.clone(),
+    };
+
     match decl {
-        Decl::Function { name, parameters, return_type, body, span } => {
-            assert_eq!(name, "foo");
-            assert_eq!(parameters.len(), 1);
-            assert_eq!(return_type, None);
-            assert_eq!(span, span_func);
-            
-            assert_eq!(parameters[0].name, "x");
-            
-            match body {
-                Expr::Identifier(name, _) => assert_eq!(name, "x"),
-                _ => panic!("期待される識別子ではありません"),
+        Decl::Let { pattern, type_annotation, value, span } => {
+            assert_eq!(span, span_let);
+            assert_eq!(type_annotation, None);
+
+            match pattern {
+                Pattern::Identifier(name, _) => assert_eq!(name, "foo"),
+                _ => panic!("期待される識別子パターンではありません"),
+            }
+
+            match value {
+                Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, span: lambda_span } => {
+                    assert_eq!(lambda_span, span_lambda);
+                    assert!(parameters.is_some());
+                    assert_eq!(parameters.as_ref().unwrap().len(), 1);
+                    assert_eq!(parameters.as_ref().unwrap()[0].name, "x");
+                    assert!(effect_parameters.is_none());
+                    assert!(implicit_parameters.is_none());
+
+                    match *body {
+                        Expr::Identifier(name, _) => assert_eq!(name, "x"),
+                        _ => panic!("期待される識別子ではありません"),
+                    }
+                },
+                _ => panic!("期待されるラムダ式ではありません"),
             }
         },
-        // match を網羅的にする
-        Decl::Let { .. } => panic!("期待される関数宣言ではありません (Let)"),
-        Decl::Var { .. } => panic!("期待される関数宣言ではありません (Var)"),
+        Decl::Var { .. } => panic!("期待される let 宣言ではありません (Var)"),
     }
 }
 

@@ -47,36 +47,8 @@ fn main() {
     println!("\n宣言:"); // タイトル変更
     for (i, decl) in program.declarations.iter().enumerate() {
         match decl {
-            Decl::Function { name, parameters, return_type, .. } => {
-                let params: Vec<String> = parameters.iter()
-                    .map(|p| {
-                        if let Some(t) = &p.type_annotation {
-                            match t {
-                                Type::Simple { name, .. } => {
-                                    format!("{}: {}", p.name, name)
-                                },
-                                _ => format!("{}: <複合型>", p.name),
-                            }
-                        } else {
-                            p.name.clone()
-                        }
-                    })
-                    .collect();
-                
-                let ret_type = if let Some(t) = return_type {
-                    match t {
-                        Type::Simple { name, .. } => {
-                            format!(": {}", name)
-                        },
-                        _ => ": <複合型>".to_string(),
-                    }
-                } else {
-                    String::new()
-                };
-                
-                println!("  関数 #{}: fn {}({}){}", i + 1, name, params.join(", "), ret_type);
-            },
-            Decl::Let { pattern, type_annotation, .. } => {
+            // Decl::Function アームを削除
+            Decl::Let { pattern, type_annotation, value, .. } => { // value を追加
                 // パターンと型注釈（あれば）を表示
                 let type_str = if let Some(t) = type_annotation {
                     match t {
@@ -91,7 +63,16 @@ fn main() {
                     protorun::ast::Pattern::Identifier(name, _) => name.clone(),
                     _ => "<パターン>".to_string(),
                 };
-                println!("  Let宣言 #{}: let {}{}", i + 1, pattern_str, type_str);
+                // 値がラムダ式の場合、関数として表示する（簡易版）
+                if let protorun::ast::Expr::LambdaExpr { parameters, .. } = value {
+                    let params_str = parameters.as_ref().map_or("()".to_string(), |params| {
+                        let p_strs: Vec<String> = params.iter().map(|p| p.name.clone()).collect();
+                        format!("({})", p_strs.join(", "))
+                    });
+                    println!("  関数 (Let) #{}: let {}{} = fn ...", i + 1, pattern_str, type_str);
+                } else {
+                    println!("  Let宣言 #{}: let {}{}", i + 1, pattern_str, type_str);
+                }
             },
             Decl::Var { name, type_annotation, .. } => {
                 // 変数名と型注釈（あれば）を表示

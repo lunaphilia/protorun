@@ -283,27 +283,66 @@ trait Monad<T> {
 
 ### 6.3.3 ラムダ式 (Lambda Expressions)
 
-ラムダ式（無名関数）は、関数をその場で定義するための簡潔な構文です。`=>` 演算子を使用して、パラメータリストと関数本体を区切ります。
+ラムダ式（無名関数）は、関数をその場で定義するための構文です。`fn` キーワードで始まり、パラメータリスト（複数種類あり、すべてオプション）、そして `=` の後に続く関数本体（式）で構成されます。
+
+**構文:**
+
+```ebnf
+LambdaExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? "=" Expression
+ParamList ::= "(" (Param ("," Param)*)? ")"
+EffectParamList ::= "(" (EffectParam ("," EffectParam)*)? ")"
+ImplicitParamList ::= "(" "with" Param ("," Param)* ")"
+Param ::= Identifier (":" Type)?
+EffectParam ::= "effect" Identifier ":" TypeRef
+```
+
+- `fn`: ラムダ式の開始を示すキーワード。
+- `ParamList?`: 通常のパラメータリスト（オプション）。`()` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。
+- `EffectParamList?`: Effect パラメータリスト（オプション）。`()` で囲み、カンマ区切りで `effect identifier: TypeRef` を記述します。関数が依存する効果インターフェースを指定します。
+- `ImplicitParamList?`: Implicit パラメータリスト（オプション）。`(with ...)` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。コンテキストから暗黙的に渡される値を指定します（Scala の implicit parameter list に類似）。
+- `= Expression`: 関数本体。単一の式である必要があります。複数の文を実行したい場合はブロック式 `{...}` を使用します。
+
+**具体例:**
 
 ```protorun
-// 基本形
-(param1: Type1, param2: Type2) => expression
+// 通常のパラメータのみ
+let add = fn (a: Int, b: Int): Int = a + b
+let square = fn x = x * x // 型推論
 
-// 型推論が可能な場合
-let add = (a, b) => a + b
+// Effect パラメータを持つラムダ式
+let logOperation = fn (data: Data) (effect logger: Logger) = {
+  logger.log(s"Processing $data")
+  process(data)
+}
 
-// 単一パラメータの場合 (カッコは省略可能)
-let square = x => x * x
+// Implicit パラメータを持つラムダ式
+let greet = fn (name: String) (with context: Context) = {
+  s"${context.greeting}, $name!"
+}
 
-// 複数文を実行する場合 (ブロック式を使用)
-let process = (input: String) => {
+// 複数のパラメータリストを持つラムダ式
+let complexCalc = fn (x: Int) (effect state: State<Int>) (with config: Config) = {
+  let current = state.get()
+  state.set(current + x * config.multiplier)
+  state.get()
+}
+
+// パラメータなしのラムダ式
+let getMeaning = fn = 42
+
+// ブロック式を本体に持つラムダ式
+let process = fn (input: String) = {
   let trimmed = input.trim()
   println(s"Processing: $trimmed")
   trimmed.toUpperCase() // ブロックの最後の式が返り値
 }
 ```
 
-ラムダ式の本体 (`=>` の右辺) は単一の `Expression` です。これにはリテラル、変数、関数呼び出し、演算、そしてブロック式 `{...}` など、任意の式を含めることができます。複数の文を実行したい場合は、ブロック式を使用する必要があります。
+**特徴:**
+
+- **統一された関数定義**: `let` 束縛と組み合わせることで、名前付き関数も無名関数も同じ `fn ... = ...` 形式で表現されます ([4.2.2 `let` による関数定義](04-declarations.md#let-による関数定義) を参照)。
+- **パラメータリストの柔軟性**: 通常、Effect、Implicit の3種類のパラメータリストを任意の順序（ただし、各種類は1回まで）で記述できます（※注: 現在のパーサー実装では `ParamList? EffectParamList? ImplicitParamList?` の順序のみサポート）。これにより、カリー化や依存性の注入を表現豊かに行えます。
+- **式ベース**: ラムダ式の本体は常に単一の式です。
 
 ### 6.3.4 with式
 
@@ -431,7 +470,7 @@ Protorun言語のパターンマッチングは、以下の原則に基づいて
 関数内で Effect パラメータのエイリアスを使って効果操作を呼び出す構文 `alias.operation(...)` も式の一種です。
 
 ```protorun
-fn example(effect log: Console): Int = {
+let example = fn (effect log: Console): Int = {
   log.log("開始") // 効果操作呼び出し式 (Unit を返す)
   let result = calculate()
   log.log("終了") // 効果操作呼び出し式

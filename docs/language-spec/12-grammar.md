@@ -17,10 +17,7 @@ Protorun言語の文法は、言語の構文を形式的に定義するための
 ```ebnf
 Program ::= (Declaration | Expression)*
 
-Declaration ::= FunctionDecl | TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl | ExportDecl | EnumDecl | LetDecl | VarDecl
-
-FunctionDecl ::= "fn" Identifier GenericParams? ParamList EffectParamList? (":" Type)? "=" Expression
-               | "fn" Identifier GenericParams? ParamList ImplicitParamList? EffectParamList? (":" Type)? "=" Expression
+Declaration ::= TypeDecl | TraitDecl | ImplDecl | EffectDecl | HandlerDecl | ExportDecl | EnumDecl | LetDecl | VarDecl
 
 TypeDecl ::= "type" Identifier GenericParams? "=" (RecordType | Type)
 
@@ -140,7 +137,7 @@ SetComprehension ::= "#{" Expression "for" Pattern "<-" Expression ("if" Express
 
 BindExpr ::= "bind" "{" (Pattern "<-" Expression)* Expression "}"
 
-LambdaExpr ::= ParamList "=>" Expression
+LambdaExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? "=" Expression
 
 CallExpr ::= Expression "(" (Expression ("," Expression)*)? ")"
 

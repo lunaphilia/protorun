@@ -6,15 +6,13 @@ use crate::protorun::ast::{BinaryOperator, Expr, UnaryOperator, ComprehensionKin
 
 #[test]
 fn test_parse_block_expr() {
-    let input = "{ let x = 10 \n x }"; // セミコロンを削除し、改行を追加
+    let input = "{ let x = 10 \n x }";
     let mut parser = Parser::new(None);
 
     let expr = parser.parse_expression(input).unwrap();
 
     match expr {
-        // ブロック式全体が返されることを期待
-        Expr::BlockExpr { items, .. } => { // final_expr を削除
-            // 最後の要素が Expression(Identifier("x")) であることを確認
+        Expr::BlockExpr { items, .. } => {
             assert!(items.len() > 0);
             match items.last().unwrap() {
                 BlockItem::Expression(expr) => {
@@ -25,8 +23,7 @@ fn test_parse_block_expr() {
                 },
                 _ => panic!("Block final item is not Expression"),
             }
-            // items の残りの要素（let 宣言）を確認
-            assert_eq!(items.len(), 2); // let と x があるはず
+            assert_eq!(items.len(), 2);
             match &items[0] {
                 BlockItem::Declaration(decl) => {
                     match decl {
@@ -52,23 +49,22 @@ fn test_parse_block_expr() {
 
 #[test]
 fn test_parse_nested_block_expr() {
-    let input = "{ let x = 10 \n { let y = 20 \n x + y } }"; // セミコロンを削除し、改行を追加
+    let input = "{ let x = 10 \n { let y = 20 \n x + y } }";
     let mut parser = Parser::new(None);
 
     let expr = parser.parse_expression(input).unwrap();
-    // アサーション修正: BlockExpr { items: [Let x, BlockExpr { items: [Let y, Expr(BinaryOp)] }] } を期待
     match expr {
-        Expr::BlockExpr { items: outer_items, .. } => { // final_expr を削除
-            assert_eq!(outer_items.len(), 2); // let x と 内側ブロック
-            match &outer_items[1] { // 最後の要素が内側ブロック
+        Expr::BlockExpr { items: outer_items, .. } => {
+            assert_eq!(outer_items.len(), 2);
+            match &outer_items[1] {
                 BlockItem::Expression(outer_final_expr) => {
                      match outer_final_expr {
-                         Expr::BlockExpr { items: inner_items, .. } => { // final_expr を削除
-                            assert_eq!(inner_items.len(), 2); // let y と x + y
-                            match &inner_items[1] { // 最後の要素が二項演算
+                         Expr::BlockExpr { items: inner_items, .. } => {
+                            assert_eq!(inner_items.len(), 2);
+                            match &inner_items[1] {
                                 BlockItem::Expression(inner_final_expr) => {
                                      match inner_final_expr {
-                                         Expr::BinaryOp { operator, .. } => assert_eq!(*operator, BinaryOperator::Add), // x + y
+                                         Expr::BinaryOp { operator, .. } => assert_eq!(*operator, BinaryOperator::Add),
                                          _ => panic!("Inner block final item is not BinaryOp"),
                                      }
                                 },
@@ -1139,16 +1135,20 @@ fn test_parse_nested_collections() {
 fn test_parse_lambda_expr() {
     // 基本的なラムダ式
     {
-        let input = "(x) => x + 1";
+        let input = "fn (x) = x + 1";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
-        
+
         match expr {
-            Expr::LambdaExpr { parameters, body, .. } => {
-                assert_eq!(parameters.len(), 1);
-                
-                assert_eq!(parameters[0].name, "x");
-                assert!(parameters[0].type_annotation.is_none());
+            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+                assert!(parameters.is_some());
+                let params = parameters.as_ref().unwrap();
+                assert_eq!(params.len(), 1);
+
+                assert_eq!(params[0].name, "x");
+                assert!(params[0].type_annotation.is_none());
+                assert!(effect_parameters.is_none());
+                assert!(implicit_parameters.is_none());
                 
                 match *body {
                     Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Add),
@@ -1161,18 +1161,22 @@ fn test_parse_lambda_expr() {
     
     // 型注釈付きのパラメータを持つラムダ式
     {
-        let input = "(x: Int) => x * 2";
+        let input = "fn (x: Int) = x * 2";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
-        
+
         match expr {
-            Expr::LambdaExpr { parameters, body, .. } => {
-                assert_eq!(parameters.len(), 1);
-                
-                assert_eq!(parameters[0].name, "x");
-                assert!(parameters[0].type_annotation.is_some());
-                
-                match &parameters[0].type_annotation {
+            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+                assert!(parameters.is_some());
+                let params = parameters.as_ref().unwrap();
+                assert_eq!(params.len(), 1);
+
+                assert_eq!(params[0].name, "x");
+                assert!(params[0].type_annotation.is_some());
+                assert!(effect_parameters.is_none());
+                assert!(implicit_parameters.is_none());
+
+                match &params[0].type_annotation {
                     Some(ty) => {
                         match ty {
                             crate::protorun::ast::Type::Simple { name, .. } => assert_eq!(name, "Int"),
@@ -1193,16 +1197,20 @@ fn test_parse_lambda_expr() {
     
     // 複数のパラメータを持つラムダ式
     {
-        let input = "(x: Int, y: Int) => x + y";
+        let input = "fn (x: Int, y: Int) = x + y";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
-        
+
         match expr {
-            Expr::LambdaExpr { parameters, body, .. } => {
-                assert_eq!(parameters.len(), 2);
-                
-                assert_eq!(parameters[0].name, "x");
-                assert_eq!(parameters[1].name, "y");
+            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+                assert!(parameters.is_some());
+                let params = parameters.as_ref().unwrap();
+                assert_eq!(params.len(), 2);
+
+                assert_eq!(params[0].name, "x");
+                assert_eq!(params[1].name, "y");
+                assert!(effect_parameters.is_none());
+                assert!(implicit_parameters.is_none());
                 
                 match *body {
                     Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Add),
@@ -1213,16 +1221,19 @@ fn test_parse_lambda_expr() {
         }
     }
     
-    // 空のパラメータリストを持つラムダ式
+    // パラメータなしのラムダ式
     {
-        let input = "() => 42";
+        let input = "fn = 42";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
-        
+
         match expr {
-            Expr::LambdaExpr { parameters, body, .. } => {
-                assert_eq!(parameters.len(), 0);
-                
+            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+                // パラメータリストがない場合は None になるはず
+                assert!(parameters.is_none());
+                assert!(effect_parameters.is_none());
+                assert!(implicit_parameters.is_none());
+
                 match *body {
                     Expr::IntLiteral(value, _) => assert_eq!(value, 42),
                     _ => panic!("期待される整数リテラルではありません"),
@@ -1234,14 +1245,18 @@ fn test_parse_lambda_expr() {
     
     // ブロック式を本体に持つラムダ式
     {
-        let input = "(x) => { let y = x * 2 \n y + 1 }"; // セミコロンを削除し、改行を追加
+        let input = "fn (x) = { let y = x * 2 \n y + 1 }";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
         match expr {
-            Expr::LambdaExpr { parameters, body, .. } => {
-                assert_eq!(parameters.len(), 1);
-                assert_eq!(parameters[0].name, "x");
+            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+                assert!(parameters.is_some());
+                let params = parameters.as_ref().unwrap();
+                assert_eq!(params.len(), 1);
+                assert_eq!(params[0].name, "x");
+                assert!(effect_parameters.is_none());
+                assert!(implicit_parameters.is_none());
 
                 // body が BlockExpr であることを確認
                 match *body {
@@ -1263,6 +1278,7 @@ fn test_parse_lambda_expr() {
             _ => panic!("期待されるラムダ式ではありません"),
         }
     }
+    // TODO: Effect パラメータ、Implicit パラメータを含むテストケースを追加する
 }
 
 #[test]

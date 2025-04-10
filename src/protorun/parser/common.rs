@@ -1,17 +1,18 @@
 // Protorun言語のパーサー共通ユーティリティ
 
+use crate::protorun::ast::{Parameter, Span}; // Parameter を追加
+use crate::protorun::error::Error;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
     character::complete::{alpha1, alphanumeric1, char, multispace1},
-    combinator::{cut, map, recognize, value},
+    combinator::{cut, map, opt, recognize, value}, // opt を追加
     error::{context, ErrorKind, VerboseError},
     multi::{many0, separated_list0},
-    sequence::{delimited, pair, preceded, terminated}, IResult,
+    sequence::{delimited, pair, preceded, terminated},
+    IResult,
 };
-
-use crate::protorun::ast::Span;
-use crate::protorun::error::Error;
+use super::types::parse_type; // parse_type を追加
 
 /// パーサーの結果型
 pub type ParseResult<'a, T> = IResult<&'a str, T, VerboseError<&'a str>>;
@@ -149,4 +150,23 @@ where
     F: FnMut(&'a str) -> ParseResult<'a, O>,
 {
     context(ctx, parser)
+}
+
+/// パラメータをパース (declarations.rs から移動)
+pub fn parameter<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Parameter> {
+    let (input, name) = ws_comments(identifier_string)(input)?;
+    let (input, type_annotation) = opt(
+        preceded(
+            ws_comments(char(':')),
+            |i| parse_type(i, original_input) // parse_type を使用
+        )
+    )(input)?;
+
+    let span = calculate_span(original_input, input);
+
+    Ok((input, Parameter {
+        name,
+        type_annotation,
+        span,
+    }))
 }

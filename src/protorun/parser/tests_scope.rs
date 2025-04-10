@@ -78,26 +78,38 @@ fn test_nested_block_scope_management() {
 fn test_function_scope_management() {
     // 関数スコープの管理を確認
     let input = "
-    fn add(a, b) = {
+    let add = fn (a, b) = {
         let result = a + b 
         result
     }
-    "; // セミコロンを削除
+    "; // fn add(...) を let add = fn (...) に変更
     
     let mut parser = Parser::new(None);
     let program = parser.parse_program(input).unwrap();
     
     assert_eq!(program.declarations.len(), 1);
-    
-    // 関数宣言が正しくパースされていることを確認
+
+    // let 宣言とラムダ式が正しくパースされていることを確認
     match &program.declarations[0] {
-        crate::protorun::ast::Decl::Function { name, parameters, .. } => {
-            assert_eq!(name, "add");
-            assert_eq!(parameters.len(), 2);
-            assert_eq!(parameters[0].name, "a");
-            assert_eq!(parameters[1].name, "b");
+        crate::protorun::ast::Decl::Let { pattern, value, .. } => {
+            // パターンのチェック
+            match pattern {
+                crate::protorun::ast::Pattern::Identifier(name, _) => assert_eq!(name, "add"),
+                _ => panic!("期待される識別子パターンではありません"),
+            }
+            // 値（ラムダ式）のチェック
+            match value {
+                Expr::LambdaExpr { parameters, .. } => {
+                    assert!(parameters.is_some());
+                    let params = parameters.as_ref().unwrap();
+                    assert_eq!(params.len(), 2);
+                    assert_eq!(params[0].name, "a");
+                    assert_eq!(params[1].name, "b");
+                },
+                _ => panic!("期待されるラムダ式ではありません"),
+            }
         },
-        _ => panic!("期待される関数宣言ではありません"),
+        _ => panic!("期待される let 宣言ではありません"),
     }
 }
 

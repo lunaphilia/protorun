@@ -7,12 +7,14 @@ use nom::{
     combinator::{cut, map, opt, value},
     error::VerboseError,
     multi::{many0, separated_list0},
-    sequence::{delimited, pair, preceded, terminated}, // terminated を追加
+    // sequence から重複を削除
+    sequence::{delimited, pair, preceded, terminated},
 };
 
-// BlockItem をインポート, HandlerSpec を削除
-use crate::protorun::ast::{Expr, BinaryOperator, UnaryOperator, ComprehensionKind, BlockItem};
-use super::common::{ParseResult, ws_comments, identifier_string, delimited_list, calculate_span};
+// EffectParameter をインポート
+use crate::protorun::ast::{Expr, BinaryOperator, UnaryOperator, ComprehensionKind, BlockItem, EffectParameter, Parameter};
+// keyword, parameter をインポート
+use super::common::{ParseResult, ws_comments, identifier_string, delimited_list, calculate_span, keyword, parameter};
 use super::literals::{int_literal_expr, float_literal_expr, string_literal_expr, bool_literal_expr, unit_literal_expr};
 use super::patterns::pattern;
 use super::types::parse_type;
@@ -644,145 +646,111 @@ pub fn collection_literal<'a>(input: &'a str, original_input: &'a str) -> ParseR
     ))(input)
 }
 
-/// パラメータをパース
-fn parameter<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, crate::protorun::ast::Parameter> {
-    // 識別子をパース
-    let (input, name) = identifier_string(input)?;
-    
-    // オプションの型注釈をパース
-    let (input, type_annotation) = opt(
-        preceded(
-            ws_comments(char(':')),
-            |i| super::types::parse_type(i, original_input)
-        )
-    )(input)?;
-    
+// parameter 関数は common.rs に移動
+
+/// Effect パラメータをパース: effect identifier : Type
+fn parse_effect_parameter<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, EffectParameter> {
+    let (input, _) = keyword("effect")(input)?;
+    let (input, name) = ws_comments(identifier_string)(input)?;
+    let (input, _) = ws_comments(char(':'))(input)?;
+    let (input, effect_type) = parse_type(input, original_input)?;
+
     let span = calculate_span(original_input, input);
-    
-    Ok((input, crate::protorun::ast::Parameter {
+
+    Ok((input, EffectParameter {
         name,
-        type_annotation,
+        effect_type,
         span,
     }))
 }
 
-/// ラムダ式をパース
+/// Effect パラメータリストをパース: ( EffectParam, ... )
+fn parse_effect_parameter_list<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Vec<EffectParameter>> {
+    delimited_list(
+        '(',
+        |i| parse_effect_parameter(i, original_input),
+        ',',
+        ')'
+    )(input)
+}
+
+/// Implicit パラメータリストをパース: ( with Param, ... )
+fn parse_implicit_parameter_list<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Vec<Parameter>> {
+    delimited(
+        ws_comments(char('(')),
+        preceded(
+            keyword("with"),
+            separated_list0(
+                ws_comments(char(',')),
+                |i| parameter(i, original_input) // common::parameter を使用
+            )
+        ),
+        cut(ws_comments(char(')')))
+    )(input)
+}
+
+/// ラムダ式をパース: fn ParamList? EffectParamList? ImplicitParamList? (: ReturnType)? = Expression
 pub fn lambda_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
-    // 入力が既に'('で始まっているかどうかを確認
-    if input.starts_with('(') {
-        // 先読みでラムダ式かどうかを確認
-        let (params_input, _) = char('(')(input)?;
+    println!("--- Entering lambda_expr ---"); dbg!(input); // Debug print
+    let start_pos = input.as_ptr() as usize - original_input.as_ptr() as usize; // Span計算用
 
-        let params_result = separated_list0(
-            ws_comments(char(',')),
-            |i| parameter(i, original_input)
-        )(params_input);
+    let (input, _) = keyword("fn")(input)?;
 
-        if let Ok((params_rest, _params)) = params_result { // params -> _params
-            let close_paren_result = ws_comments(char(')'))(params_rest);
-            if let Ok((after_paren, _)) = close_paren_result {
-                let arrow_result = ws_comments(tag("=>"))(after_paren);
-                if let Ok((_, _)) = arrow_result {
-                    // ラムダ式と確認できたので、パースを続行
-                    
-                    // 通常のパラメータリストのパース
-                    let delimited_result = delimited_list(
-                        '(',
-                        |i| parameter(i, original_input),
-                        ',',
-                        ')'
-                    )(input);
-                    
-                    match delimited_result {
-                        Ok((input, parameters)) => {
-                            // "=>"トークンをパース
-                            match ws_comments(tag("=>"))(input) {
-                                Ok((input, _)) => {
-                                    // 本体の式をパース
-                                    match expression(input, original_input) {
-                                        Ok((input, body)) => {
-                                            let span = calculate_span(original_input, input);
-                                            
-                                            return Ok((input, Expr::LambdaExpr {
-                                                parameters,
-                                                body: Box::new(body),
-                                                span,
-                                            }));
-                                        },
-                                        Err(e) => {
-                                            return Err(e);
-                                        }
-                                    }
-                                },
-                                Err(e) => {
-                                    return Err(e);
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            return Err(e);
-                        }
-                    }
-                }
-            }
-        }
-        
-        // ラムダ式ではないと判断
-        return Err(nom::Err::Error(VerboseError { errors: vec![(input, nom::error::VerboseErrorKind::Nom(nom::error::ErrorKind::Tag))] }));
-    } else {
-        // 既に'('が消費されている場合は、パラメータリストを直接パース
-        
-        // パラメータリストをパース（'('は既に消費されている）
-        match separated_list0(
-            ws_comments(char(',')),
-            |i| parameter(i, original_input)
-        )(input) {
-            Ok((input, params)) => {
-                match ws_comments(char(')'))(input) {
-                    Ok((input, _)) => {
-                        match ws_comments(tag("=>"))(input) {
-                            Ok((input, _)) => {
-                                match expression(input, original_input) {
-                                    Ok((input, body)) => {
-                                        let span = calculate_span(original_input, input);
-                                        
-                                        Ok((input, Expr::LambdaExpr {
-                                            parameters: params,
-                                            body: Box::new(body),
-                                            span,
-                                        }))
-                                    },
-                                    Err(e) => {
-                                        Err(e)
-                                    }
-                                }
-                            },
-                            Err(e) => {
-                                Err(e)
-                            }
-                        }
-                    },
-                    Err(e) => {
-                        Err(e)
-                    }
-                }
-            },
-            Err(e) => {
-                Err(e)
-            }
-        }
-    }
+    // 通常のパラメータリスト (Option)
+    let (input, parameters) = opt(
+        delimited_list(
+            '(',
+            |i| parameter(i, original_input), // common::parameter を使用
+            ',',
+            ')'
+        )
+    )(input)?;
+
+    // Effect パラメータリスト (Option)
+    let (input, effect_parameters) = opt(|i| parse_effect_parameter_list(i, original_input))(input)?;
+
+    // Implicit パラメータリスト (Option)
+    let (input, implicit_parameters) = opt(|i| parse_implicit_parameter_list(i, original_input))(input)?;
+
+    // 戻り値の型注釈 (Option)
+    let (input, _return_type_annotation) = opt( // 変数は使わないがパースは行う
+        preceded(
+            ws_comments(char(':')),
+            |i| parse_type(i, original_input)
+        )
+    )(input)?;
+
+    // '='
+    let (input, _) = cut(ws_comments(char('=')))(input)?;
+
+    // 本体
+    println!("--- lambda_expr: before body expression ---"); dbg!(input); // Debug print
+    let (input, body) = cut(|i| expression(i, original_input))(input)?;
+
+    let end_pos = input.as_ptr() as usize - original_input.as_ptr() as usize; // Span計算用
+    let span = calculate_span(original_input, &original_input[start_pos..end_pos]);
+
+    Ok((input, Expr::LambdaExpr {
+        parameters,
+        effect_parameters,
+        implicit_parameters,
+        body: Box::new(body),
+        span,
+    }))
 }
 
 /// 式をパース
 pub fn expression<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+    println!("--- Entering expression ---"); dbg!(input); // Debug print
     // 特殊な式と論理OR演算（最も優先度の低い演算子）をパース
+    // lambda_expr は 'fn' で始まるため、他のキーワードベースの式と同様に alt の先頭に配置
     alt((
+        |i| lambda_expr(i, original_input), // lambda_expr を先頭に移動
         |i| if_expr(i, original_input),
         |i| match_expr(i, original_input),
         |i| bind_expr(i, original_input),
         |i| with_expr(i, original_input),
-        |i| lambda_expr(i, original_input),
+        // |i| lambda_expr(i, original_input), // 古い位置から削除
         |i| collection_literal(i, original_input),
         |i| collection_comprehension(i, original_input),
         |i| logical_or(i, original_input)

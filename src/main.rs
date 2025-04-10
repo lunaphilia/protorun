@@ -104,25 +104,6 @@ fn print_program(program: &Program) {
 // 宣言を文字列に変換
 fn decl_to_string(decl: &Decl) -> String {
     match decl {
-        Decl::Function { name, parameters, return_type, .. } => {
-            let params: Vec<String> = parameters.iter()
-                .map(|p| {
-                    if let Some(t) = &p.type_annotation {
-                        format!("{}: {}", p.name, type_to_string(t))
-                    } else {
-                        p.name.clone()
-                    }
-                })
-                .collect();
-            
-            let ret_type = if let Some(t) = return_type {
-                format!(": {}", type_to_string(t))
-            } else {
-                String::new()
-            };
-            
-            format!("fn {}({}){}", name, params.join(", "), ret_type)
-        },
         Decl::Let { pattern, type_annotation, value, .. } => {
             let type_str = if let Some(t) = type_annotation {
                 format!(": {}", type_to_string(t))
@@ -331,19 +312,34 @@ fn expr_to_string(expr: &Expr) -> String {
                 expr_to_string(body)
             )
         },
-        Expr::LambdaExpr { parameters, body, .. } => {
-            let params: Vec<String> = parameters.iter()
-                .map(|p| {
-                    if let Some(t) = &p.type_annotation {
-                        format!("{}: {}", p.name, type_to_string(t))
-                    } else {
-                        p.name.clone()
-                    }
-                })
-                .collect();
-            
-            format!("({}) => {}",
-                params.join(", "),
+        // 重複していた古い LambdaExpr アームを削除し、新しい形式に修正
+        Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+            let params_str = parameters.as_ref().map_or("".to_string(), |params| { // パラメータなしの場合は空文字列
+                let p_strs: Vec<String> = params.iter()
+                    .map(|p| {
+                        if let Some(t) = &p.type_annotation {
+                            format!("{}: {}", p.name, type_to_string(t))
+                        } else {
+                            p.name.clone()
+                        }
+                    })
+                    .collect();
+                format!("({})", p_strs.join(", "))
+            });
+            // Effect/Implicit パラメータの表示 (簡易版)
+            let effect_params_str = effect_parameters.as_ref().map_or("".to_string(), |params| {
+                let p_strs: Vec<String> = params.iter().map(|p| format!("effect {}: {}", p.name, type_to_string(&p.effect_type))).collect();
+                format!("({})", p_strs.join(", "))
+            });
+             let implicit_params_str = implicit_parameters.as_ref().map_or("".to_string(), |params| {
+                let p_strs: Vec<String> = params.iter().map(|p| format!("with {}: {}", p.name, p.type_annotation.as_ref().map_or("< inferred >".to_string(), |t| type_to_string(t)))).collect();
+                format!("({})", p_strs.join(", "))
+            });
+
+            format!("fn {}{}{} = {}",
+                params_str,
+                effect_params_str,
+                implicit_params_str,
                 expr_to_string(body)
             )
         },
