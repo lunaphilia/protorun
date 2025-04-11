@@ -4,9 +4,9 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{char, multispace0},
-    combinator::{cut, map, opt, value},
-    error::VerboseError,
-    multi::{many0, separated_list0},
+    combinator::{cut, map, opt, value}, // map_res は不要になった
+    // error::{VerboseError, ErrorKind}, // ErrorKind, VerboseError は不要になった
+    multi::{many0, separated_list0}, // separated_list1 は不要になった
     // sequence から重複を削除
     sequence::{delimited, pair, preceded, terminated},
 };
@@ -22,46 +22,76 @@ use super::types::parse_type;
 use super::statements::statement;
 use super::declarations::parse_declaration;
 
-/// 括弧式をパース
-pub fn paren_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
-    // ラムダ式のパターンに一致する場合のチェックは不要
-    // lambda_exprがparen_exprよりも先に試されるため
-    
-    let (input, _) = char('(')(input)?;
-    let (input, _) = multispace0(input)?;
-    
-    // 空の括弧 -> ユニットリテラル
-    if let Ok((_, _)) = char::<&str, VerboseError<&str>>(')')(&input) {
-        let (input, _) = char(')')(input)?;
-        let span = calculate_span(original_input, input);
-        return Ok((input, Expr::UnitLiteral(span)));
-    }
-    
-    // 括弧内の式をパース
-    let (input, expr) = ws_comments(|i| expression(i, original_input))(input)?;
-    let (input, _) = cut(ws_comments(char(')')))(input)?;
-    
-    let span = calculate_span(original_input, input);
-    
+
+// --- 新しいパーサー関数 ---
+
+/// タプルリテラル (要素数 >= 2) をパース: (expr, expr, ...)
+fn tuple_literal<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+
+    let start_pos = input.as_ptr() as usize - original_input.as_ptr() as usize;
+    let (input, elements) = delimited(
+        ws_comments(char('(')),
+        |i| {
+
+            // Parse the first element
+            let (i, first) = expression(i, original_input)?;
+
+            // Parse the mandatory comma and second element
+            let (i, _) = ws_comments(char(','))(i)?;
+
+            let (i, second) = expression(i, original_input)?;
+
+            // Parse optional subsequent elements (preceded by comma)
+            let (i, rest) = many0(preceded(ws_comments(char(',')), |i| expression(i, original_input)))(i)?;
+
+
+            let mut elements = vec![first, second];
+            elements.extend(rest);
+            Ok((i, elements))
+        },
+        cut(ws_comments(char(')'))) // Ensure closing parenthesis
+    )(input)?;
+
+
+    let end_pos = input.as_ptr() as usize - original_input.as_ptr() as usize;
+    let span = calculate_span(original_input, &original_input[start_pos..end_pos]);
+    Ok((input, Expr::TupleLiteral { elements, span }))
+}
+
+/// グループ化式 (要素数 1) をパース: (expr)
+fn grouped_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+    let start_pos = input.as_ptr() as usize - original_input.as_ptr() as usize;
+    let (input, expr) = delimited(
+        ws_comments(char('(')),
+        |i| expression(i, original_input),
+        cut(ws_comments(char(')')))
+    )(input)?;
+    let end_pos = input.as_ptr() as usize - original_input.as_ptr() as usize;
+    let span = calculate_span(original_input, &original_input[start_pos..end_pos]);
     Ok((input, Expr::ParenExpr(Box::new(expr), span)))
 }
+
+// --- primary 関数の修正 ---
 
 /// 基本式をパース
 pub fn primary<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
     let result = ws_comments(
         alt((
-            // 括弧式
-            |i| paren_expr(i, original_input),
+            // 優先順位: タプル -> グループ化 -> ユニット -> その他リテラル/識別子/ブロック
+            // タプルリテラル (要素数 >= 2)
+            |i| tuple_literal(i, original_input),
+            // グループ化式 (要素数 1)
+            |i| grouped_expr(i, original_input),
+            // ユニットリテラル ()
+            |i| unit_literal_expr(i, original_input), // unit_literal_expr は () をパースする
+            // 浮動小数点リテラル (整数より先に試す)
+            |i| float_literal_expr(i, original_input),
             // 整数リテラル
             |i| int_literal_expr(i, original_input),
-            // 浮動小数点リテラル
-            |i| float_literal_expr(i, original_input),
             // 文字列リテラル
             |i| string_literal_expr(i, original_input),
             // 真偽値リテラル
             |i| bool_literal_expr(i, original_input),
-            // ユニットリテラル
-            |i| unit_literal_expr(i, original_input),
             // 識別子
             map(
                 identifier_string,
@@ -70,13 +100,15 @@ pub fn primary<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, E
                     Expr::Identifier(name, span)
                 }
             ),
-            // ブロック式
+            // ブロック式 (UnitLiteralを返す場合があるので、リテラルの後に置く)
             |i| block_expr(i, original_input)
         ))
     )(input);
-    
+
     result
 }
+
+// --- 古い paren_expr 関数は削除 ---
 
 /// ブロック式をパース: { (Declaration | Statement | Expression)* }
 /// ブロックの値は、意味解析/実行時に最後の要素が式ならその値、そうでなければ Unit となる。
@@ -691,7 +723,7 @@ fn parse_implicit_parameter_list<'a>(input: &'a str, original_input: &'a str) ->
 
 /// ラムダ式をパース: fn ParamList? EffectParamList? ImplicitParamList? (: ReturnType)? = Expression
 pub fn lambda_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
-    println!("--- Entering lambda_expr ---"); dbg!(input); // Debug print
+
     let start_pos = input.as_ptr() as usize - original_input.as_ptr() as usize; // Span計算用
 
     let (input, _) = keyword("fn")(input)?;
@@ -721,7 +753,7 @@ pub fn lambda_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'
     )(input)?;
 
     // 本体
-    println!("--- lambda_expr: before body expression ---"); dbg!(input); // Debug print
+
     let (input, body) = cut(|i| expression(i, original_input))(input)?;
 
     let end_pos = input.as_ptr() as usize - original_input.as_ptr() as usize; // Span計算用
@@ -738,7 +770,7 @@ pub fn lambda_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'
 
 /// 式をパース
 pub fn expression<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
-    println!("--- Entering expression ---"); dbg!(input); // Debug print
+
     // 特殊な式と論理OR演算（最も優先度の低い演算子）をパース
     // lambda_expr は 'fn' で始まるため、他のキーワードベースの式と同様に alt の先頭に配置
     alt((

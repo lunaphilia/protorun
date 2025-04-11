@@ -76,6 +76,11 @@ pub enum Expr {
         elements: Vec<Expr>,
         span: Span,
     },
+    /// タプルリテラル (要素数2以上)
+    TupleLiteral {
+        elements: Vec<Expr>, // 要素数は2以上であることが保証される
+        span: Span,
+    },
     /// ラムダ式
     LambdaExpr {
         parameters: Option<Vec<Parameter>>, // 通常のパラメータリスト (Option)

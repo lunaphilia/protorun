@@ -222,6 +222,137 @@ fn test_parse_arithmetic_expressions() {
 }
 
 #[test]
+fn test_parse_tuple_literal_and_grouping() {
+    // ユニットリテラル
+    {
+        let input = "()";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        match expr {
+            Expr::UnitLiteral(_) => (),
+            _ => panic!("Expected UnitLiteral for ()"),
+        }
+    }
+
+    // グループ化 (単一リテラル)
+    {
+        let input = "(42)";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        match expr {
+            Expr::ParenExpr(inner_expr, _) => {
+                match *inner_expr {
+                    Expr::IntLiteral(v, _) => assert_eq!(v, 42),
+                    _ => panic!("Expected IntLiteral inside ParenExpr"),
+                }
+            },
+            _ => panic!("Expected ParenExpr for (42)"),
+        }
+    }
+
+    // グループ化 (二項演算)
+    {
+        let input = "(1 + 2)";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        match expr {
+            Expr::ParenExpr(inner_expr, _) => {
+                match *inner_expr {
+                    Expr::BinaryOp { operator, .. } => assert_eq!(operator, BinaryOperator::Add),
+                    _ => panic!("Expected BinaryOp inside ParenExpr"),
+                }
+            },
+            _ => panic!("Expected ParenExpr for (1 + 2)"),
+        }
+    }
+
+    // タプルリテラル (要素数2)
+    {
+        let input = "(1, \"hello\")";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        match expr {
+            Expr::TupleLiteral { elements, .. } => {
+                assert_eq!(elements.len(), 2);
+                match &elements[0] {
+                    Expr::IntLiteral(v, _) => assert_eq!(*v, 1),
+                    _ => panic!("Expected IntLiteral(1)"),
+                }
+                match &elements[1] {
+                    Expr::StringLiteral(s, _) => assert_eq!(s, "hello"),
+                    _ => panic!("Expected StringLiteral(\"hello\")"),
+                }
+            },
+            _ => panic!("Expected TupleLiteral for (1, \"hello\")"),
+        }
+    }
+
+    // タプルリテラル (要素数3)
+    {
+        let input = "(true, 3.14, x)";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        match expr {
+            Expr::TupleLiteral { elements, .. } => {
+                assert_eq!(elements.len(), 3);
+                match &elements[0] {
+                    Expr::BoolLiteral(b, _) => assert_eq!(*b, true),
+                    _ => panic!("Expected BoolLiteral(true)"),
+                }
+                match &elements[1] {
+                    Expr::FloatLiteral(f, _) => assert_eq!(*f, 3.14),
+                    _ => panic!("Expected FloatLiteral(3.14)"),
+                }
+                match &elements[2] {
+                    Expr::Identifier(name, _) => assert_eq!(name, "x"),
+                    _ => panic!("Expected Identifier(\"x\")"),
+                }
+            },
+            _ => panic!("Expected TupleLiteral for (true, 3.14, x)"),
+        }
+    }
+
+     // ネストしたタプル
+    {
+        let input = "(1, (2, 3))";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+        match expr {
+            Expr::TupleLiteral { elements, .. } => {
+                assert_eq!(elements.len(), 2);
+                match &elements[0] {
+                    Expr::IntLiteral(v, _) => assert_eq!(*v, 1),
+                    _ => panic!("Expected IntLiteral(1)"),
+                }
+                match &elements[1] {
+                    Expr::TupleLiteral { elements: nested, .. } => {
+                         assert_eq!(nested.len(), 2);
+                         match &nested[0] {
+                             Expr::IntLiteral(v, _) => assert_eq!(*v, 2),
+                             _ => panic!("Expected nested IntLiteral(2)"),
+                         }
+                         match &nested[1] {
+                             Expr::IntLiteral(v, _) => assert_eq!(*v, 3),
+                             _ => panic!("Expected nested IntLiteral(3)"),
+                         }
+                    },
+                    _ => panic!("Expected nested TupleLiteral"),
+                }
+            },
+            _ => panic!("Expected outer TupleLiteral"),
+        }
+    }
+
+    // 要素数1のタプルリテラルはパースできない (グループ化としてパースされる)
+    {
+        let input = "(1,)"; // 末尾カンマがあってもグループ化としてパースされるか、エラーになるはず
+        let mut parser = Parser::new(None);
+        // この仕様ではパースエラーになるはず
+        assert!(parser.parse_expression(input).is_err());
+    }
+}
+
+#[test]
 fn test_parse_unary_expressions() {
     // 負の数
     {

@@ -197,9 +197,16 @@ fn expr_to_string(expr: &Expr) -> String {
                 .collect();
             format!("#{{{}}}", elements_str.join(", "))
         },
+        Expr::TupleLiteral { elements, .. } => { // Added arm for TupleLiteral
+            let elements_str: Vec<String> = elements.iter()
+                .map(expr_to_string)
+                .collect();
+            // UnitLiteral is handled separately, so elements will have >= 2 items here
+            format!("({})", elements_str.join(", "))
+        },
         Expr::Identifier(name, _) => name.clone(),
         Expr::BinaryOp { left, operator, right, .. } => {
-            format!("({} {} {})", 
+            format!("({} {} {})",
                 expr_to_string(left), 
                 op_to_string(operator), 
                 expr_to_string(right)

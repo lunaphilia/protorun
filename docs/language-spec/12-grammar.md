@@ -108,8 +108,10 @@ Expression ::= LiteralExpr
              | EffectOperationCallExpr
              | WithExpr
              | RangeExpr
+             | TupleExpr         // Added: Tuple literal (N>=2)
+             | GroupedExpr       // Added: Grouping expression
 
-LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral
+LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral // UnitLiteral is ()
               | ListLiteral | MapLiteral | SetLiteral
 
 ListLiteral ::= "[" (Expression ("," Expression)*)? "]"
@@ -117,6 +119,10 @@ ListLiteral ::= "[" (Expression ("," Expression)*)? "]"
 MapLiteral ::= "{" (Expression "->" Expression ("," Expression "->" Expression)*)? "}"
 
 SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
+
+TupleExpr ::= "(" Expression "," (Expression ",")* Expression ")" // N >= 2
+
+GroupedExpr ::= "(" Expression ")" // N = 1
 
 IdentifierExpr ::= Identifier
 
@@ -208,7 +214,7 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 
 ### 12.3.5 式 (Expression)
 
-- **リテラル式（LiteralExpr）**: 整数、浮動小数点数、文字列、真偽値、ユニットのリテラル、およびコレクションリテラル（リスト、マップ、セット）です。
+- **リテラル式（LiteralExpr）**: 整数、浮動小数点数、文字列、真偽値、ユニット `()`、およびコレクションリテラル（リスト、マップ、セット）です。
 - **識別子式（IdentifierExpr）**: 変数や関数の名前です。
 - **ブロック式（BlockExpr）**: 文の集合と最終的な式で構成されます。
 - **条件式（IfExpr）**: 条件に基づいて異なる式を評価します。
@@ -220,10 +226,12 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 - **メンバーアクセス式（MemberAccessExpr）**: オブジェクトのメンバーにアクセスします。
 - **二項演算式（BinaryExpr）**: 二つの式を演算子で結合します。
 - **単項演算式（UnaryExpr）**: 一つの式に演算子を適用します。
-- **ハンドル式（HandleExpr）**: 効果をハンドルします。
+- **ハンドル式（HandleExpr）**: 効果をハンドルします。 (注: 現在の文法定義には含まれていませんが、概念として存在)
 - **with式（WithExpr）**: 効果ハンドラを適用するスコープを定義します。複数のハンドラをカンマで区切って指定することもできます。
-- **スコープ付き効果式（ScopedEffectExpr）**: 効果のスコープを定義します。
+- **スコープ付き効果式（ScopedEffectExpr）**: 効果のスコープを定義します。 (注: 現在の文法定義には含まれていませんが、概念として存在)
 - **範囲式（RangeExpr）**: 範囲を表現します。
+- **タプル式（TupleExpr）**: `(式1, 式2, ...)` 形式で、要素数2以上のタプルを生成します。
+- **グループ化式（GroupedExpr）**: `(式)` 形式で、式の評価順序を制御します。これはタプルではありません。
 
 ### 12.3.6 パターン (Pattern)
 
