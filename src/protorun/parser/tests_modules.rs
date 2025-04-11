@@ -7,8 +7,8 @@ use crate::protorun::ast::{ExportDecl, ImportDecl, Decl, Pattern, Expr}; // Decl
 fn test_parse_module() {
     let input = r#"
         module Math {
-            export let add = fn (x: Int, y: Int): Int = x + y // Comma added between parameters
-            export let multiply = fn (x: Int, y: Int): Int = x * y // Comma added between parameters
+            export let add = fn (x: Int, y: Int): Int x + y // Comma added between parameters
+            export let multiply = fn (x: Int, y: Int): Int x * y // Comma added between parameters
         }
     "#;
     let mut parser = Parser::new(None);
@@ -64,7 +64,7 @@ fn test_parse_module() {
 fn test_parse_export() {
     let input = r#"
         module Test {
-            export let test = fn () = 42 // 関数宣言を let + fn に変更
+            export let test = fn () 42 // 関数宣言を let + fn に変更
             export {
                 add,
                 multiply

@@ -78,7 +78,7 @@ fn test_nested_block_scope_management() {
 fn test_function_scope_management() {
     // 関数スコープの管理を確認
     let input = "
-    let add = fn (a, b) = {
+    let add = fn (a, b) {
         let result = a + b 
         result
     }

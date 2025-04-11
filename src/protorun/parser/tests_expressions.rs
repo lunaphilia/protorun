@@ -1135,7 +1135,7 @@ fn test_parse_nested_collections() {
 fn test_parse_lambda_expr() {
     // 基本的なラムダ式
     {
-        let input = "fn (x) = x + 1";
+        let input = "fn (x) x + 1";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
@@ -1161,7 +1161,7 @@ fn test_parse_lambda_expr() {
     
     // 型注釈付きのパラメータを持つラムダ式
     {
-        let input = "fn (x: Int) = x * 2";
+        let input = "fn (x: Int) x * 2";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
@@ -1197,7 +1197,7 @@ fn test_parse_lambda_expr() {
     
     // 複数のパラメータを持つラムダ式
     {
-        let input = "fn (x: Int, y: Int) = x + y";
+        let input = "fn (x: Int, y: Int) x + y";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
@@ -1223,7 +1223,7 @@ fn test_parse_lambda_expr() {
     
     // パラメータなしのラムダ式
     {
-        let input = "fn = 42";
+        let input = "fn 42";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
@@ -1245,7 +1245,7 @@ fn test_parse_lambda_expr() {
     
     // ブロック式を本体に持つラムダ式
     {
-        let input = "fn (x) = { let y = x * 2 \n y + 1 }";
+        let input = "fn (x) { let y = x * 2 \n y + 1 }";
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 

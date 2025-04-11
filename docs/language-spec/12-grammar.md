@@ -137,7 +137,7 @@ SetComprehension ::= "#{" Expression "for" Pattern "<-" Expression ("if" Express
 
 BindExpr ::= "bind" "{" (Pattern "<-" Expression)* Expression "}"
 
-LambdaExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? "=" Expression
+LambdaExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? (":" ReturnType)? Expression
 
 CallExpr ::= Expression "(" (Expression ("," Expression)*)? ")"
 

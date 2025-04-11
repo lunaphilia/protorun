@@ -288,50 +288,52 @@ trait Monad<T> {
 **構文:**
 
 ```ebnf
-LambdaExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? "=" Expression
+LambdaExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? (":" ReturnType)? Expression
 ParamList ::= "(" (Param ("," Param)*)? ")"
 EffectParamList ::= "(" (EffectParam ("," EffectParam)*)? ")"
 ImplicitParamList ::= "(" "with" Param ("," Param)* ")"
 Param ::= Identifier (":" Type)?
 EffectParam ::= "effect" Identifier ":" TypeRef
+ReturnType ::= Type | "Unit" // (Type の定義は他を参照)
 ```
 
 - `fn`: ラムダ式の開始を示すキーワード。
 - `ParamList?`: 通常のパラメータリスト（オプション）。`()` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。
 - `EffectParamList?`: Effect パラメータリスト（オプション）。`()` で囲み、カンマ区切りで `effect identifier: TypeRef` を記述します。関数が依存する効果インターフェースを指定します。
 - `ImplicitParamList?`: Implicit パラメータリスト（オプション）。`(with ...)` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。コンテキストから暗黙的に渡される値を指定します（Scala の implicit parameter list に類似）。
-- `= Expression`: 関数本体。単一の式である必要があります。複数の文を実行したい場合はブロック式 `{...}` を使用します。
+- `(":" ReturnType)?`: 戻り値の型注釈（オプション）。コロン `:` に続けて戻り値の型 (`ReturnType`) を記述します。
+- `Expression`: 関数本体。パラメータリストや型注釈の後に直接続きます。単一の式である必要があります。複数の文を実行したい場合はブロック式 `{...}` を使用します。
 
 **具体例:**
 
 ```protorun
 // 通常のパラメータのみ
-let add = fn (a: Int, b: Int): Int = a + b
-let square = fn x = x * x // 型推論
+let add = fn (a: Int, b: Int): Int a + b
+let square = fn x x * x // 型推論
 
 // Effect パラメータを持つラムダ式
-let logOperation = fn (data: Data) (effect logger: Logger) = {
+let logOperation = fn (data: Data) (effect logger: Logger) {
   logger.log(s"Processing $data")
   process(data)
 }
 
 // Implicit パラメータを持つラムダ式
-let greet = fn (name: String) (with context: Context) = {
+let greet = fn (name: String) (with context: Context) {
   s"${context.greeting}, $name!"
 }
 
 // 複数のパラメータリストを持つラムダ式
-let complexCalc = fn (x: Int) (effect state: State<Int>) (with config: Config) = {
+let complexCalc = fn (x: Int) (effect state: State<Int>) (with config: Config) {
   let current = state.get()
   state.set(current + x * config.multiplier)
   state.get()
 }
 
 // パラメータなしのラムダ式
-let getMeaning = fn = 42
+let getMeaning = fn 42
 
 // ブロック式を本体に持つラムダ式
-let process = fn (input: String) = {
+let process = fn (input: String) {
   let trimmed = input.trim()
   println(s"Processing: $trimmed")
   trimmed.toUpperCase() // ブロックの最後の式が返り値
@@ -340,7 +342,7 @@ let process = fn (input: String) = {
 
 **特徴:**
 
-- **統一された関数定義**: `let` 束縛と組み合わせることで、名前付き関数も無名関数も同じ `fn ... = ...` 形式で表現されます ([4.2.2 `let` による関数定義](04-declarations.md#let-による関数定義) を参照)。
+- **統一された関数定義**: `let` 束縛と組み合わせることで、名前付き関数も無名関数も同じ `fn ...` 形式で表現されます ([4.2.2 `let` による関数定義](04-declarations.md#let-による関数定義) を参照)。
 - **パラメータリストの柔軟性**: 通常、Effect、Implicit の3種類のパラメータリストを任意の順序（ただし、各種類は1回まで）で記述できます（※注: 現在のパーサー実装では `ParamList? EffectParamList? ImplicitParamList?` の順序のみサポート）。これにより、カリー化や依存性の注入を表現豊かに行えます。
 - **式ベース**: ラムダ式の本体は常に単一の式です。
 

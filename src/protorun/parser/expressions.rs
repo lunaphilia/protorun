@@ -720,9 +720,6 @@ pub fn lambda_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'
         )
     )(input)?;
 
-    // '='
-    let (input, _) = cut(ws_comments(char('=')))(input)?;
-
     // 本体
     println!("--- lambda_expr: before body expression ---"); dbg!(input); // Debug print
     let (input, body) = cut(|i| expression(i, original_input))(input)?;
