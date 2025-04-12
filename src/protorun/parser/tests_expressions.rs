@@ -48,6 +48,101 @@ fn test_parse_block_expr() {
 }
 
 #[test]
+fn test_parse_assignment_expr() {
+    // 単純な代入
+    {
+        let input = "x = 42";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+
+        match expr {
+            Expr::Assignment { lvalue, rvalue, .. } => {
+                match *lvalue {
+                    Expr::Identifier(name, _) => assert_eq!(name, "x"),
+                    _ => panic!("Expected Identifier lvalue"),
+                }
+                match *rvalue {
+                    Expr::IntLiteral(val, _) => assert_eq!(val, 42),
+                    _ => panic!("Expected IntLiteral rvalue"),
+                }
+            },
+            _ => panic!("Expected Assignment expression"),
+        }
+    }
+
+    // メンバーアクセスへの代入
+    {
+        let input = "obj.field = \"hello\"";
+        let mut parser = Parser::new(None);
+        let expr = parser.parse_expression(input).unwrap();
+
+        match expr {
+            Expr::Assignment { lvalue, rvalue, .. } => {
+                match *lvalue {
+                    Expr::MemberAccess { object, member, .. } => {
+                         match *object {
+                             Expr::Identifier(name, _) => assert_eq!(name, "obj"),
+                             _ => panic!("Expected Identifier object in MemberAccess"),
+                         }
+                         assert_eq!(member, "field");
+                    },
+                    _ => panic!("Expected MemberAccess lvalue"),
+                }
+                match *rvalue {
+                    Expr::StringLiteral(s, _) => assert_eq!(s, "hello"),
+                    _ => panic!("Expected StringLiteral rvalue"),
+                }
+            },
+            _ => panic!("Expected Assignment expression"),
+        }
+    }
+
+    // 右結合性の確認 (a = b = 5 は a = (b = 5) とパースされる)
+    {
+         let input = "a = b = 5";
+         let mut parser = Parser::new(None);
+         let expr = parser.parse_expression(input).unwrap();
+
+         match expr {
+             Expr::Assignment { lvalue: l1, rvalue: r1, .. } => {
+                 match *l1 {
+                     Expr::Identifier(name, _) => assert_eq!(name, "a"),
+                     _ => panic!("Expected Identifier 'a'"),
+                 }
+                 match *r1 {
+                     Expr::Assignment { lvalue: l2, rvalue: r2, .. } => {
+                         match *l2 {
+                             Expr::Identifier(name, _) => assert_eq!(name, "b"),
+                             _ => panic!("Expected Identifier 'b'"),
+                         }
+                         match *r2 {
+                             Expr::IntLiteral(val, _) => assert_eq!(val, 5),
+                             _ => panic!("Expected IntLiteral 5"),
+                         }
+                     },
+                     _ => panic!("Expected nested Assignment"),
+                 }
+             },
+             _ => panic!("Expected outer Assignment"),
+         }
+    }
+
+    // 代入不可な左辺値 (リテラル)
+    {
+        let input = "42 = x";
+        let mut parser = Parser::new(None);
+        assert!(parser.parse_expression(input).is_err());
+    }
+
+    // 代入不可な左辺値 (二項演算)
+    {
+        let input = "x + 1 = y";
+        let mut parser = Parser::new(None);
+        assert!(parser.parse_expression(input).is_err());
+    }
+}
+
+#[test]
 fn test_parse_nested_block_expr() {
     let input = "{ let x = 10 \n { let y = 20 \n x + y } }";
     let mut parser = Parser::new(None);

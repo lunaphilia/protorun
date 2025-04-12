@@ -160,6 +160,12 @@ pub enum Expr {
         // final_expr フィールドを削除
         span: Span,
     },
+    /// 代入式
+    Assignment {
+        lvalue: Box<Expr>, // 左辺値 (Identifier or MemberAccess)
+        rvalue: Box<Expr>, // 右辺値
+        span: Span,
+    },
 }
 
 /// ブロック内の要素（宣言、文、または式）
@@ -203,6 +209,80 @@ pub enum Decl {
     // TODO: 他の宣言タイプ (Type, Trait, Impl, Effect, Handler, Export, Enum) も
     // ここに追加するか、Program 構造体で別々に管理するか検討が必要。
     // 今回はまず Let/Var の移動に集中する。
+    HandlerDecl(HandlerDecl), // HandlerDecl を Decl に追加
+}
+
+/// ハンドラ宣言
+#[derive(Debug, Clone, PartialEq)]
+pub struct HandlerDecl {
+    pub name: String,
+    pub generic_params: Option<Vec<GenericParam>>,
+    pub effect_type: Type,
+    pub members: Vec<HandlerMember>,
+    pub span: Span,
+}
+
+/// ハンドラメンバー (フィールド宣言 or ハンドラ関数束縛)
+#[derive(Debug, Clone, PartialEq)]
+pub enum HandlerMember {
+    Field(FieldDecl),
+    Function(LetHandlerFunction),
+}
+
+/// ハンドラ内のフィールド宣言
+#[derive(Debug, Clone, PartialEq)]
+pub struct FieldDecl {
+    pub is_mutable: bool, // var か let か
+    pub name: String,
+    pub type_annotation: Type,
+    pub span: Span,
+}
+
+/// ハンドラ内の関数束縛 (let name = ...)
+#[derive(Debug, Clone, PartialEq)]
+pub struct LetHandlerFunction {
+    pub name: String,
+    pub generic_params: Option<Vec<GenericParam>>, // ハンドラ関数固有のジェネリクス
+    pub body: HandlerFunctionBody, // 関数本体の形式
+    pub span: Span,
+}
+
+/// ハンドラ関数本体の形式
+#[derive(Debug, Clone, PartialEq)]
+pub enum HandlerFunctionBody {
+    Function(Expr), // 通常の FunctionExpr
+    ResumeFunction(ResumeFunctionExpr),
+    NoResumeFunction(NoResumeFunctionExpr),
+    // MultiResumeFunction(MultiResumeFunctionExpr), // 必要なら追加
+}
+
+/// resume 付きハンドラ関数
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResumeFunctionExpr {
+    pub parameters: Vec<Parameter>, // 通常パラメータ (必須)
+    // pub resume_type: ResumeType, // resume の型 (文法変更により削除)
+    pub return_type: Option<Type>, // オプションの戻り値型
+    pub body: Box<Expr>,
+    pub span: Span,
+}
+
+/// noresume 付きハンドラ関数
+#[derive(Debug, Clone, PartialEq)]
+pub struct NoResumeFunctionExpr {
+    pub parameters: Vec<Parameter>, // 通常パラメータ (必須)
+    pub return_type: Option<Type>, // 戻り値型 (オプションに変更)
+    pub body: Box<Expr>,
+    pub span: Span,
+}
+
+// TODO: MultiResumeFunctionExpr も必要なら定義
+
+/// ジェネリックパラメータ
+#[derive(Debug, Clone, PartialEq)]
+pub struct GenericParam {
+    pub name: String,
+    pub constraints: Option<Type>, // 型制約を保持するフィールドを追加 (Option<Type> とする)
+    pub span: Span,
 }
 
 /// 関数パラメータ
@@ -220,6 +300,15 @@ pub struct EffectParameter {
     pub effect_type: Type, // 型は Type を使う
     pub span: Span,
 }
+
+// /// Resume 型 (ハンドラ用) (文法変更により削除)
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct ResumeType {
+//     pub parameters: Vec<Type>,
+//     pub return_type: Box<Type>,
+//     pub span: Span,
+// }
+
 
 /// 型の表現
 #[derive(Debug, Clone, PartialEq)]
@@ -309,21 +398,21 @@ pub enum TypeDecl {
     /// レコード型宣言
     Record {
         name: String,
-        type_parameters: Vec<String>,
+        type_parameters: Vec<GenericParam>, // Changed from Vec<String>
         fields: Vec<(String, Type)>,
         span: Span,
     },
     /// 代数的データ型（enum）宣言
     Enum {
         name: String,
-        type_parameters: Vec<String>,
+        type_parameters: Vec<GenericParam>, // Changed from Vec<String>
         variants: Vec<EnumVariant>,
         span: Span,
     },
     /// 型エイリアス
     Alias {
         name: String,
-        type_parameters: Vec<String>,
+        type_parameters: Vec<GenericParam>, // Changed from Vec<String>
         aliased_type: Type,
         span: Span,
     },
@@ -333,7 +422,7 @@ pub enum TypeDecl {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TraitDecl {
     pub name: String,
-    pub type_parameters: Vec<String>,
+    pub type_parameters: Vec<GenericParam>, // Changed from Vec<String>
     pub super_trait: Option<Type>,
     pub methods: Vec<Decl>,
     pub span: Span,
@@ -342,7 +431,7 @@ pub struct TraitDecl {
 /// トレイト実装のAST
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImplDecl {
-    pub type_parameters: Vec<String>,
+    pub type_parameters: Vec<GenericParam>, // Changed from Vec<String>
     pub target_type: Type,
     pub trait_type: Type,
     pub methods: Vec<Decl>,

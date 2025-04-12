@@ -120,7 +120,14 @@ fn decl_to_string(decl: &Decl) -> String {
             };
             format!("var {}{} = {}", name, type_str, expr_to_string(value))
         },
-        // TODO: 他の Decl バリアントも追加する必要があるかもしれない
+        Decl::HandlerDecl(handler_decl) => {
+            // ハンドラ宣言の簡易的な文字列表現
+            format!("handler {} : {} {{ ... members ... }}",
+                handler_decl.name,
+                type_to_string(&handler_decl.effect_type)
+                // TODO: メンバーの表示も実装する
+            )
+        }
     }
 }
 
@@ -361,6 +368,9 @@ fn expr_to_string(expr: &Expr) -> String {
             }).collect();
             // final_expr はないので、items を結合するだけ
             format!("{{ {} }}", items_str.join(" ")) // 区切りは空白にする
+        },
+        Expr::Assignment { lvalue, rvalue, .. } => {
+            format!("{} = {}", expr_to_string(lvalue), expr_to_string(rvalue))
         },
     }
 }

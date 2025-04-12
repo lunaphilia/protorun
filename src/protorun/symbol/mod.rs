@@ -1,26 +1,23 @@
 // Protorun言語のシンボルテーブル
 
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::cell::RefCell;
 use crate::protorun::ast::{Span, Type};
 
 /// シンボルの種類
 #[derive(Debug, Clone, PartialEq)]
 pub enum SymbolKind {
-    Variable,
-    Function,
-    Type,
-    Parameter,
+    // Variable, // 未使用
+    // Function, // 未使用
+    Type, // register_type_symbol で使用されているため残す
+    // Parameter, // 未使用
 }
 
 /// 型の種類
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeKind {
-    Struct,
-    Enum,
-    Trait,
-    TypeAlias,
+    // Struct, // 未使用
+    // Enum, // 未使用
+    // Trait, // 未使用
+    // TypeAlias, // 未使用
 }
 
 /// 型定義の詳細情報
@@ -43,11 +40,11 @@ pub struct TypeInfo {
 /// スコープの種類
 #[derive(Debug, Clone, PartialEq)]
 pub enum ScopeKind {
-    Global,
-    Module,
-    Function,
-    Block,
-    Loop,
+    // Global, // 未使用
+    // Module, // 未使用
+    // Function, // 未使用
+    // Block, // 未使用
+    // Loop, // 未使用
 }
 
 /// シンボル情報
@@ -69,135 +66,135 @@ pub struct Symbol {
     pub is_used: bool,
 }
 
-/// シンボルテーブル
-#[derive(Debug, Clone)]
-pub struct SymbolTable {
-    /// シンボルのマップ
-    symbols: HashMap<String, Symbol>,
-    /// 親スコープ
-    parent: Option<Rc<RefCell<SymbolTable>>>,
-    /// スコープの種類
-    scope_kind: ScopeKind,
-}
+// /// シンボルテーブル (未使用のためコメントアウト)
+// #[derive(Debug, Clone)]
+// pub struct SymbolTable {
+//     /// シンボルのマップ
+//     symbols: HashMap<String, Symbol>,
+//     /// 親スコープ
+//     parent: Option<Rc<RefCell<SymbolTable>>>,
+//     /// スコープの種類
+//     scope_kind: ScopeKind,
+// }
 
-impl SymbolTable {
-    /// 新しいシンボルテーブルを作成
-    pub fn new(scope_kind: ScopeKind) -> Self {
-        Self {
-            symbols: HashMap::new(),
-            parent: None,
-            scope_kind,
-        }
-    }
+// impl SymbolTable {
+//     /// 新しいシンボルテーブルを作成
+//     pub fn new(scope_kind: ScopeKind) -> Self {
+//         Self {
+//             symbols: HashMap::new(),
+//             parent: None,
+//             scope_kind,
+//         }
+//     }
     
-    /// 親スコープを持つシンボルテーブルを作成
-    pub fn with_parent(scope_kind: ScopeKind, parent: Rc<RefCell<SymbolTable>>) -> Self {
-        Self {
-            symbols: HashMap::new(),
-            parent: Some(parent),
-            scope_kind,
-        }
-    }
+//     /// 親スコープを持つシンボルテーブルを作成
+//     pub fn with_parent(scope_kind: ScopeKind, parent: Rc<RefCell<SymbolTable>>) -> Self {
+//         Self {
+//             symbols: HashMap::new(),
+//             parent: Some(parent),
+//             scope_kind,
+//         }
+//     }
     
-    /// シンボルを追加
-    pub fn add_symbol(&mut self, symbol: Symbol) -> bool {
-        if self.symbols.contains_key(&symbol.name) {
-            return false; // 既に存在する場合は追加失敗
-        }
-        self.symbols.insert(symbol.name.clone(), symbol);
-        true
-    }
+//     /// シンボルを追加
+//     pub fn add_symbol(&mut self, symbol: Symbol) -> bool {
+//         if self.symbols.contains_key(&symbol.name) {
+//             return false; // 既に存在する場合は追加失敗
+//         }
+//         self.symbols.insert(symbol.name.clone(), symbol);
+//         true
+//     }
     
-    /// 現在のスコープでシンボルを検索
-    pub fn lookup_symbol(&self, name: &str) -> Option<&Symbol> {
-        self.symbols.get(name)
-    }
+//     /// 現在のスコープでシンボルを検索
+//     pub fn lookup_symbol(&self, name: &str) -> Option<&Symbol> {
+//         self.symbols.get(name)
+//     }
     
-    /// 現在のスコープから親スコープへ遡ってシンボルを検索
-    pub fn lookup_symbol_recursive(&self, name: &str) -> Option<Symbol> {
-        if let Some(symbol) = self.symbols.get(name) {
-            return Some(symbol.clone());
-        }
+//     /// 現在のスコープから親スコープへ遡ってシンボルを検索
+//     pub fn lookup_symbol_recursive(&self, name: &str) -> Option<Symbol> {
+//         if let Some(symbol) = self.symbols.get(name) {
+//             return Some(symbol.clone());
+//         }
         
-        if let Some(parent) = &self.parent {
-            return parent.borrow().lookup_symbol_recursive(name);
-        }
+//         if let Some(parent) = &self.parent {
+//             return parent.borrow().lookup_symbol_recursive(name);
+//         }
         
-        None
-    }
+//         None
+//     }
     
-    /// スコープの種類を取得
-    pub fn scope_kind(&self) -> ScopeKind {
-        self.scope_kind.clone()
-    }
+//     /// スコープの種類を取得
+//     pub fn scope_kind(&self) -> ScopeKind {
+//         self.scope_kind.clone()
+//     }
     
-    /// 親スコープを取得
-    pub fn parent(&self) -> Option<Rc<RefCell<SymbolTable>>> {
-        self.parent.clone()
-    }
+//     /// 親スコープを取得
+//     pub fn parent(&self) -> Option<Rc<RefCell<SymbolTable>>> {
+//         self.parent.clone()
+//     }
     
-    /// シンボルの使用をマークするメソッド
-    pub fn mark_symbol_used(&mut self, name: &str) -> bool {
-        if let Some(symbol) = self.symbols.get_mut(name) {
-            symbol.is_used = true;
-            return true;
-        }
+//     /// シンボルの使用をマークするメソッド
+//     pub fn mark_symbol_used(&mut self, name: &str) -> bool {
+//         if let Some(symbol) = self.symbols.get_mut(name) {
+//             symbol.is_used = true;
+//             return true;
+//         }
         
-        // 親スコープで再帰的に検索
-        if let Some(parent) = &self.parent {
-            return parent.borrow_mut().mark_symbol_used(name);
-        }
+//         // 親スコープで再帰的に検索
+//         if let Some(parent) = &self.parent {
+//             return parent.borrow_mut().mark_symbol_used(name);
+//         }
         
-        false
-    }
+//         false
+//     }
     
-    /// 未使用シンボルを検出するメソッド
-    pub fn find_unused_symbols(&self) -> Vec<&Symbol> {
-        self.symbols.values()
-            .filter(|symbol| !symbol.is_used)
-            .collect()
-    }
+//     /// 未使用シンボルを検出するメソッド
+//     pub fn find_unused_symbols(&self) -> Vec<&Symbol> {
+//         self.symbols.values()
+//             .filter(|symbol| !symbol.is_used)
+//             .collect()
+//     }
     
-    /// 特定の種類のシンボルを検索するメソッド
-    pub fn find_symbols_by_kind(&self, kind: SymbolKind) -> Vec<&Symbol> {
-        self.symbols.values()
-            .filter(|symbol| symbol.kind == kind)
-            .collect()
-    }
+//     /// 特定の種類のシンボルを検索するメソッド
+//     pub fn find_symbols_by_kind(&self, kind: SymbolKind) -> Vec<&Symbol> {
+//         self.symbols.values()
+//             .filter(|symbol| symbol.kind == kind)
+//             .collect()
+//     }
     
-    /// スコープ内のすべてのシンボルを取得するメソッド
-    pub fn get_all_symbols(&self) -> Vec<&Symbol> {
-        self.symbols.values().collect()
-    }
-}
+//     /// スコープ内のすべてのシンボルを取得するメソッド
+//     pub fn get_all_symbols(&self) -> Vec<&Symbol> {
+//         self.symbols.values().collect()
+//     }
+// }
 
-/// 型定義のシンボル登録ヘルパー関数
-pub fn register_type_symbol(
-    symbol_table: &mut SymbolTable,
-    name: &str,
-    kind: TypeKind,
-    type_parameters: Vec<String>,
-    span: Span
-) -> bool {
-    let symbol = Symbol {
-        name: name.to_string(),
-        kind: SymbolKind::Type,
-        type_annotation: None,
-        declaration_span: span,
-        is_mutable: false,
-        type_info: Some(TypeInfo {
-            kind,
-            type_parameters,
-            fields: None,
-            variants: None,
-            super_trait: None,
-            aliased_type: None,
-        }),
-        is_used: false,
-    };
+// /// 型定義のシンボル登録ヘルパー関数 (未使用のためコメントアウト)
+// pub fn register_type_symbol(
+//     symbol_table: &mut SymbolTable,
+//     name: &str,
+//     kind: TypeKind,
+//     type_parameters: Vec<String>,
+//     span: Span
+// ) -> bool {
+//     let symbol = Symbol {
+//         name: name.to_string(),
+//         kind: SymbolKind::Type,
+//         type_annotation: None,
+//         declaration_span: span,
+//         is_mutable: false,
+//         type_info: Some(TypeInfo {
+//             kind,
+//             type_parameters,
+//             fields: None,
+//             variants: None,
+//             super_trait: None,
+//             aliased_type: None,
+//         }),
+//         is_used: false,
+//     };
     
-    symbol_table.add_symbol(symbol)
-}
+//     symbol_table.add_symbol(symbol)
+// }
 
 #[cfg(test)]
 mod tests;

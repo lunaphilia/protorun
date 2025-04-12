@@ -282,34 +282,7 @@ pub fn term<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr
     Ok((input, result))
 }
 
-/// 比較演算をパース
-pub fn comparison<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
-    let (input, first) = term(input, original_input)?;
-    
-    let (input, rest) = many0(
-        pair(
-            ws_comments(alt((
-                // 2文字演算子を先に試す
-                value(BinaryOperator::Lte, tag("<=")),
-                value(BinaryOperator::Gte, tag(">=")),
-                // 1文字演算子は後
-                value(BinaryOperator::Lt, tag("<")),
-                value(BinaryOperator::Gt, tag(">"))
-            ))),
-            |i| term(i, original_input)
-        )
-    )(input)?;
-    
-    Ok((input, rest.into_iter().fold(first, |acc, (op, right)| {
-        let span = calculate_span(original_input, input);
-        Expr::BinaryOp {
-            left: Box::new(acc),
-            operator: op,
-            right: Box::new(right),
-            span,
-        }
-    })))
-}
+// Removed duplicate comparison function definition
 
 /// 等価演算をパース
 pub fn equality<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
@@ -382,6 +355,80 @@ pub fn logical_or<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a
     Ok((input, result))
 }
 
+/// 代入式をパース (右結合性)
+/// LValue = Expression
+fn assignment_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+    // 代入は右結合性を持つため、まず右辺をパースしようとするのではなく、
+    // 左辺値候補 (logical_or) をパースし、次に '=' と右辺 (assignment_expr) をパースする
+    let (input_after_left, left) = logical_or(input, original_input)?;
+
+
+    // '=' が続くかチェック
+    if let Ok((input_after_eq, _)) = ws_comments(tag("="))(input_after_left) {
+        // '=' があれば、右辺の式を再帰的にパース (右結合性のため assignment_expr を呼ぶ)
+        let (input_after_right, right) = assignment_expr(input_after_eq, original_input)?;
+
+        // 左辺が代入可能かチェック (Identifier or MemberAccess)
+        match &left {
+            Expr::Identifier(..) | Expr::MemberAccess { .. } => {
+                let span = calculate_span(original_input, input_after_right); // スパンは全体をカバー
+                Ok((input_after_right, Expr::Assignment {
+                    lvalue: Box::new(left),
+                    rvalue: Box::new(right),
+                    span,
+                }))
+            }
+            _ => {
+                // 代入不可能な式への代入エラー
+                use nom::error::VerboseErrorKind;
+                Err(nom::Err::Error(nom::error::VerboseError{ errors: vec![(input, VerboseErrorKind::Context("Invalid assignment target"))]}))
+            }
+        }
+    } else {
+        // '=' がなければ、左辺の式をそのまま返し、入力も左辺パース後のものを使う
+        Ok((input_after_left, left))
+    }
+}
+
+/// 比較演算をパース
+pub fn comparison<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+    let (input_after_first, first) = term(input, original_input)?;
+
+    let (input_after_rest, rest) = many0(
+        pair(
+            ws_comments(alt((
+                // 2文字演算子を先に試す
+                value(BinaryOperator::Lte, tag("<=")),
+                value(BinaryOperator::Gte, tag(">=")),
+                // 1文字演算子は後
+                value(BinaryOperator::Lt, tag("<")),
+                value(BinaryOperator::Gt, tag(">"))
+            ))),
+            |i| term(i, original_input)
+        )
+    )(input_after_first)?; // Use input_after_first
+
+    let result = rest.into_iter().fold(first, |acc, (op, right)| {
+        let span = calculate_span(original_input, input_after_rest); // Use input_after_rest for span end
+        Expr::BinaryOp {
+            left: Box::new(acc),
+            operator: op,
+            right: Box::new(right),
+            span,
+        }
+    });
+
+    Ok((input_after_rest, result)) // Return input_after_rest
+}
+
+/// ガード節内の式をパース (代入式を含まない)
+/// logical_or を開始点とする
+pub fn parse_guard_expression<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+    // 代入式を含まないため、logical_or から開始する
+    logical_or(input, original_input)
+}
+
+
 /// if式をパース: if condition { then_branch } [elif condition { elif_branch }]* [else { else_branch }]?
 /// すべての分岐本体はブロック式である必要がある
 pub fn if_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
@@ -428,14 +475,17 @@ pub fn match_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a
     let (input, _) = ws_comments(tag("match"))(input)?;
     let (input, scrutinee) = expression(input, original_input)?;
     let (input, _) = ws_comments(char('{'))(input)?;
-    let (input, cases) = separated_list0(
+
+    let (input_after_cases, cases) = separated_list0(
         ws_comments(char(',')),
         |i| super::patterns::match_case(i, original_input, expression)
     )(input)?;
-    let (input, _) = opt(ws_comments(char(',')))(input)?;  // 末尾のカンマはオプション
-    let (input, _) = cut(ws_comments(char('}')))(input)?;
+
+    let (input_after_opt_comma, _) = opt(ws_comments(char(',')))(input_after_cases)?;  // 末尾のカンマはオプション
+
+    let (input, _) = cut(ws_comments(char('}')))(input_after_opt_comma)?; // Use input_after_opt_comma
     
-    let span = calculate_span(original_input, input);
+    let span = calculate_span(original_input, input); // Use final input
     
     Ok((input, Expr::MatchExpr {
         scrutinee: Box::new(scrutinee),
@@ -784,6 +834,12 @@ pub fn expression<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a
         // |i| lambda_expr(i, original_input), // 古い位置から削除
         |i| collection_literal(i, original_input),
         |i| collection_comprehension(i, original_input),
-        |i| logical_or(i, original_input)
+        // 代入式 (logical_or より優先度が低い)
+        |i| assignment_expr(i, original_input),
+        // logical_or は assignment_expr の中で最初に呼ばれるため、
+        // ここで logical_or を直接呼ぶ必要はない。
+        // ただし、代入式でない場合は logical_or 以下の式が直接パースされる必要があるため、
+        // assignment_expr が '=' を見つけられなかった場合に logical_or の結果を返すようにする。
+        // 現在の assignment_expr の実装はそうなっているので、これで良いはず。
     ))(input)
 }

@@ -7,7 +7,7 @@ use nom::{
     bytes::complete::{tag, take_while1},
     character::complete::{alpha1, alphanumeric1, char, multispace1},
     combinator::{cut, map, opt, recognize, value}, // opt を追加
-    error::{context, ErrorKind, VerboseError},
+    error::{ErrorKind, VerboseError},
     multi::{many0, separated_list0},
     sequence::{delimited, pair, preceded, terminated},
     IResult,
@@ -141,16 +141,28 @@ where
     )
 }
 
-/// コンテキスト付きのパーサー
-pub fn with_context<'a, F, O>(
-    ctx: &'static str,
-    parser: F
-) -> impl FnMut(&'a str) -> ParseResult<'a, O>
-where
-    F: FnMut(&'a str) -> ParseResult<'a, O>,
-{
-    context(ctx, parser)
+// /// コンテキスト付きのパーサー (未使用のため削除)
+// pub fn with_context<'a, F, O>(
+//     ctx: &'static str,
+//     parser: F
+// ) -> impl FnMut(&'a str) -> ParseResult<'a, O>
+// where
+//     F: FnMut(&'a str) -> ParseResult<'a, O>,
+// {
+//     context(ctx, parser)
+// }
+
+/// 空白とコメントを消費するパーサー
+pub fn consume_ws_comments<'a>(input: &'a str) -> ParseResult<'a, ()> {
+    value(
+        (), // 成功したらユニット値を返す
+        many0(alt((
+            value((), multispace1),
+            value((), skip_comment),
+        )))
+    )(input)
 }
+
 
 /// パラメータをパース (declarations.rs から移動)
 pub fn parameter<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Parameter> {

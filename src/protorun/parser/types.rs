@@ -12,16 +12,16 @@ use nom::{
 use crate::protorun::ast::Type;
 use super::common::{ParseResult, ws_comments, identifier_string, calculate_span};
 
-/// 単純型をパース
-pub fn simple_type<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Type> {
-    map(
-        ws_comments(identifier_string),
-        move |name| {
-            let span = calculate_span(original_input, input);
-            Type::Simple { name, span }
-        }
-    )(input)
-}
+// /// 単純型をパース (未使用のため削除)
+// pub fn simple_type<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Type> {
+//     map(
+//         ws_comments(identifier_string),
+//         move |name| {
+//             let span = calculate_span(original_input, input);
+//             Type::Simple { name, span }
+//         }
+//     )(input)
+// }
 
 /// ジェネリック型引数をパース
 pub fn generic_args<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Vec<Type>> {

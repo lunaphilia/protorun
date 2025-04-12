@@ -9,9 +9,10 @@ use nom::{
     sequence::{delimited, pair, preceded},
 };
 
-use crate::protorun::ast::{Pattern, LiteralValue};
-use super::common::{ParseResult, ws_comments, identifier_string, calculate_span};
+use crate::protorun::ast::{Pattern, LiteralValue, Expr}; // Expr をインポート
+use super::common::{ParseResult, ws_comments, identifier_string, calculate_span, consume_ws_comments}; // consume_ws_comments をインポート
 use super::literals::{literal_pattern_value};
+use super::expressions::parse_guard_expression; // parse_guard_expression をインポート
 
 /// パターンをパース
 pub fn pattern<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Pattern> {
@@ -108,17 +109,26 @@ pub fn match_case<'a, F>(
     expression_parser: F
 ) -> ParseResult<'a, (Pattern, Option<crate::protorun::ast::Expr>, crate::protorun::ast::Expr)> 
 where
-    F: Fn(&'a str, &'a str) -> ParseResult<'a, crate::protorun::ast::Expr>
+    F: Fn(&'a str, &'a str) -> ParseResult<'a, Expr> // crate::protorun::ast::Expr を Expr に
 {
-    let (input, pat) = pattern(input, original_input)?;
-    let (input, guard) = opt(
+    let (input_after_pat, pat) = pattern(input, original_input)?;
+
+    let (input_after_guard, guard) = opt(
         preceded(
             ws_comments(tag("if")),
-            |i| expression_parser(i, original_input)
+            |i| {
+                // ガード節のパースには専用のパーサーを使用
+                parse_guard_expression(i, original_input)
+            }
         )
-    )(input)?;
-    let (input, _) = ws_comments(tag("=>"))(input)?;
-    let (input, expr) = expression_parser(input, original_input)?;
-    
-    Ok((input, (pat, guard, expr)))
+    )(input_after_pat)?; // Use input_after_pat
+
+    let (input_after_arrow, _) = ws_comments(tag("=>"))(input_after_guard)?; // Use input_after_guard
+
+    let (input_after_expr, expr) = expression_parser(input_after_arrow, original_input)?; // Use input_after_arrow
+
+    // 式の後の空白/コメントを消費する
+    let (input_after_ws, _) = consume_ws_comments(input_after_expr)?;
+
+    Ok((input_after_ws, (pat, guard, expr))) // Return input_after_ws
 }

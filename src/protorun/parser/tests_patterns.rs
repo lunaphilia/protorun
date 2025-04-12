@@ -213,7 +213,7 @@ fn test_parse_nested_pattern() {
 
 #[test]
 fn test_parse_pattern_with_guard() {
-    let input = "match x { n if n > 0 => n * 2, _ => 0 }";
+    let input = "match x { n if n > 0 => n * 2, _ => 0 }"; // Added comma between cases
     let mut parser = Parser::new(None);
     let expr = parser.parse_expression(input).unwrap();
     

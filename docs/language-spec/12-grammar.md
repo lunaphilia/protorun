@@ -40,8 +40,8 @@ HandlerFunctionBody ::= FunctionExpr
                       | ResumeFunctionExpr
                       | NoResumeFunctionExpr
 
-ResumeFunctionExpr ::= "fn" ParamList "," "resume" ":" ResumeType (":" ReturnType)? "=>" Expression
-NoResumeFunctionExpr ::= "fn" ParamList ":" "noresume" ReturnType "=>" Expression
+ResumeFunctionExpr ::= "fn" ParamList "resume" (":" ReturnType)? "=>" Expression
+NoResumeFunctionExpr ::= "fn" ParamList "noresume" (":" ReturnType)? "=>" Expression
 
 EnumDecl ::= "enum" Identifier GenericParams? "{" (EnumVariant ("," EnumVariant)*)? "}"
 EnumVariant ::= Identifier ("(" Type ("," Type)* ")")?
@@ -87,8 +87,6 @@ FunctionType ::= "(" (Type ("," Type)*)? ")" "->" Type
 
 ArrayType ::= "[" Type "]"
 
-ResumeType ::= "(" (Type ("," Type)*)? ")" "->" ReturnType
-
 ReturnType ::= Type | "Unit"
 
 LetDecl ::= "let" Pattern (":" Type)? "=" Expression
@@ -112,11 +110,12 @@ Expression ::= LiteralExpr
              | EffectOperationCallExpr
              | WithExpr
              | RangeExpr
-             | TupleExpr         // Added: Tuple literal (N>=2)
-             | GroupedExpr       // Added: Grouping expression
+             | AssignmentExpr
+             | TupleExpr
+             | GroupedExpr
              | PartialApplicationExpr
 
-LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral // UnitLiteral is ()
+LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral
               | ListLiteral | MapLiteral | SetLiteral
 
 ListLiteral ::= "[" (Expression ("," Expression)*)? "]"
@@ -125,9 +124,9 @@ MapLiteral ::= "{" (Expression "->" Expression ("," Expression "->" Expression)*
 
 SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
 
-TupleExpr ::= "(" Expression "," (Expression ",")* Expression ")" // N >= 2
+TupleExpr ::= "(" Expression "," (Expression ",")* Expression ")"
 
-GroupedExpr ::= "(" Expression ")" // N = 1
+GroupedExpr ::= "(" Expression ")"
 
 IdentifierExpr ::= Identifier
 
@@ -164,6 +163,9 @@ WithExpr ::= "with" WithBinding ("," WithBinding)* (":" TypeRef ("," TypeRef)*)?
 WithBinding ::= Identifier "=" Expression
 
 RangeExpr ::= Expression ".." Expression
+
+AssignmentExpr ::= LValue "=" Expression
+LValue ::= IdentifierExpr | MemberAccessExpr
 
 Pattern ::= LiteralPattern
           | IdentifierPattern

@@ -439,6 +439,7 @@ fn test_decl_function_as_let_lambda() { // 関数名を変更し、let + lambda 
             }
         },
         Decl::Var { .. } => panic!("期待される let 宣言ではありません (Var)"),
+        Decl::HandlerDecl(_) => panic!("期待される let 宣言ではありません (HandlerDecl)"), // Added HandlerDecl arm
     }
 }
 

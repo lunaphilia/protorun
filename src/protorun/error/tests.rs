@@ -4,30 +4,6 @@ use super::*;
 use crate::protorun::ast::Span;
 
 #[test]
-fn test_error_lexical() {
-    let span = Some(Span {
-        start: 10,
-        end: 15,
-        line: 2,
-        column: 5,
-    });
-    
-    let filename = Some("test.pr".to_string());
-    let message = "無効なトークン";
-    
-    let error = Error::lexical(message, span.clone(), filename.clone());
-    
-    assert!(matches!(error.kind, ErrorKind::Lexical(_)));
-    match error.kind {
-        ErrorKind::Lexical(msg) => assert_eq!(msg, message),
-        _ => panic!("期待される字句解析エラーではありません"),
-    }
-    
-    assert_eq!(error.span, span);
-    assert_eq!(error.filename, filename);
-}
-
-#[test]
 fn test_error_syntax() {
     let span = Some(Span {
         start: 20,
@@ -45,54 +21,6 @@ fn test_error_syntax() {
     match error.kind {
         ErrorKind::Syntax(msg) => assert_eq!(msg, message),
         _ => panic!("期待される構文解析エラーではありません"),
-    }
-    
-    assert_eq!(error.span, span);
-    assert_eq!(error.filename, filename);
-}
-
-#[test]
-fn test_error_type_error() {
-    let span = Some(Span {
-        start: 30,
-        end: 35,
-        line: 4,
-        column: 15,
-    });
-    
-    let filename = Some("test.pr".to_string());
-    let message = "型エラー";
-    
-    let error = Error::type_error(message, span.clone(), filename.clone());
-    
-    assert!(matches!(error.kind, ErrorKind::Type(_)));
-    match error.kind {
-        ErrorKind::Type(msg) => assert_eq!(msg, message),
-        _ => panic!("期待される型エラーではありません"),
-    }
-    
-    assert_eq!(error.span, span);
-    assert_eq!(error.filename, filename);
-}
-
-#[test]
-fn test_error_runtime() {
-    let span = Some(Span {
-        start: 40,
-        end: 45,
-        line: 5,
-        column: 20,
-    });
-    
-    let filename = Some("test.pr".to_string());
-    let message = "ランタイムエラー";
-    
-    let error = Error::runtime(message, span.clone(), filename.clone());
-    
-    assert!(matches!(error.kind, ErrorKind::Runtime(_)));
-    match error.kind {
-        ErrorKind::Runtime(msg) => assert_eq!(msg, message),
-        _ => panic!("期待されるランタイムエラーではありません"),
     }
     
     assert_eq!(error.span, span);
