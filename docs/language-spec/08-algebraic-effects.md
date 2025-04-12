@@ -66,8 +66,8 @@ handler HandlerName: EffectType {
   let mutable field2: Type2
   // ...
 
-  // 効果操作の実装 (メソッド定義)
-  fn operation1(args...): ReturnType = {
+  // 効果操作の実装 (let 束縛 + 関数式)
+  let operation1 = fn (args...): ReturnType => {
     // self を使ってフィールドにアクセス可能
     // 継続 (resume) を扱える (後述)
     // ... 実装 ...
@@ -78,8 +78,8 @@ handler HandlerName: EffectType {
 
 * `handler HandlerName: EffectType { ... }` は、`HandlerName` という名前の新しい型を定義します。この型は `EffectType` インターフェースを実装します。
 * **フィールド定義:** ハンドラが状態や設定を保持するために、内部にフィールドを定義できます。フィールド定義の構文は、通常の `type` 宣言（レコード形式など）と同じです。
-* **効果操作の実装:** `EffectType` で定義された各操作に対応するメソッド実装を記述します。メソッド内では `self` を通じてインスタンスのフィールドにアクセスできます。
-* **継続制御:** ハンドラのメソッド実装は、代数的効果システムの核となる **継続 (`resume`)** を扱う特別な能力を持ちます。これにより、計算の中断、再開、破棄などを制御できます（詳細は 8.7 節）。
+* **効果操作の実装:** `EffectType` で定義された各操作に対応する実装を、`let operationName = fn (...) => ...` の形式で記述します。関数式内では `self` を通じてインスタンスのフィールドにアクセスできます。
+* **継続制御:** ハンドラ関数式の本体は、代数的効果システムの核となる **継続 (`resume`)** を扱う特別な能力を持ちます。これにより、計算の中断、再開、破棄などを制御できます（詳細は 8.6 節）。
 
 **ハンドラインスタンスの生成:**
 
@@ -90,8 +90,8 @@ handler HandlerName: EffectType {
 handler ConsoleHandler: Console {
   // フィールドなし
 
-  fn log(message: String): Unit = { println(message) }
-  fn readLine(): String = { readLineFromStdio() } // 仮の関数
+  let log = fn (message: String): Unit => { println(message) }
+  let readLine = fn (): String => { readLineFromStdio() } // 仮の関数
 }
 // インスタンス生成 (フィールドがないので空のレコードリテラル)
 let consoleHandlerInstance = ConsoleHandler {}
@@ -101,9 +101,9 @@ handler StateHandler<S>: State<S> {
   let mutable state: S // フィールド定義
 
   // 効果操作の実装
-  fn get(): S = self.state
-  fn set(newState: S): Unit = { self.state = newState }
-  fn modify(f: (S) -> S): Unit = { self.state = f(self.state) }
+  let get = fn (): S => self.state
+  let set = fn (newState: S): Unit => { self.state = newState }
+  let modify = fn (f: (S) -> S): Unit => { self.state = f(self.state) }
 }
 // インスタンス生成 (フィールドを初期化)
 let stateHandlerInstance = StateHandler<Int> { state: 0 }
@@ -112,7 +112,7 @@ let stateHandlerInstance = StateHandler<Int> { state: 0 }
 handler LocalFileHandler: FileSystem {
   let basePath: String // 設定フィールド
 
-  fn open(path: String, mode: FileMode): Result<own FileHandle, IOError> = {
+  let open = fn (path: String, mode: FileMode): Result<own FileHandle, IOError> => {
     let fullPath = self.basePath + "/" + path // フィールドを使用
     // ... fullPath を使ってファイルを開く処理 ...
   }
@@ -236,13 +236,13 @@ with localFs = LocalFileHandler { basePath: localConfig },
 
 ### 8.6.1 暗黙的な継続（デフォルト）
 
-ハンドラのメソッド実装で継続を明示的に扱わない場合、デフォルトの動作として、メソッドの実行が完了した後に暗黙的に継続が **1回だけ** 呼び出され、メソッドの戻り値が継続に渡されます。
+ハンドラ関数式の本体で継続を明示的に扱わない場合、デフォルトの動作として、関数式の評価が完了した後に暗黙的に継続が **1回だけ** 呼び出され、関数式の評価結果が継続に渡されます。
 
 ```protorun
 handler SimpleStateHandler<S>: State<S> {
   let mutable state: S
-  fn get(): S = self.state // 戻り値 state が暗黙的に継続に渡される
-  fn set(newState: S): Unit = {
+  let get = fn (): S => self.state // 戻り値 state が暗黙的に継続に渡される
+  let set = fn (newState: S): Unit => {
     self.state = newState
     // 何も返さない (Unit) が、暗黙的に継続が呼び出される
   }
@@ -253,18 +253,18 @@ handler SimpleStateHandler<S>: State<S> {
 
 ### 8.6.2 明示的な継続
 
-継続をより細かく制御したい場合、ハンドラのメソッド実装は継続を明示的にパラメータとして受け取ることができます。継続の型は、残りの計算が期待する入力と出力を反映します。
+継続をより細かく制御したい場合、ハンドラ関数式は継続を明示的にパラメータとして受け取ることができます。継続の型は、残りの計算が期待する入力と出力を反映します。
 
 ```protorun
 handler ExplicitConsoleHandler: Console {
   // log 操作は Unit を返す計算の継続を受け取る
-  fn log(message: String, resume: () -> Unit): Unit = {
+  let log = fn (message: String, resume: () -> Unit): Unit => {
     println(message)
     resume() // 明示的に継続を呼び出す
   }
 
   // readLine 操作は String を受け取る計算の継続を受け取る
-  fn readLine(resume: (String) -> Unit): Unit = {
+  let readLine = fn (resume: (String) -> Unit): Unit => {
     let input = readLineFromStdio() // 仮の関数
     resume(input) // 読み取った値を継続に渡して再開
   }
@@ -275,16 +275,16 @@ handler ExplicitConsoleHandler: Console {
 
 ### 8.6.3 特殊な継続制御 (`noresume`, `multiresume`)
 
-ハンドラは、継続の呼び出し方をさらに特殊化できます。
+ハンドラ関数式は、継続の呼び出し方をさらに特殊化できます。これは、関数式のシグネチャ（戻り値型）で指定します。
 
-* **継続を呼び出さない (`noresume`)**: 例外処理（大域脱出）のように、残りの計算を実行せずに処理を終了する場合に使います。メソッドの戻り値型に `noresume` (またはそれに類する表現) を付けます。
+* **継続を呼び出さない (`noresume`)**: 例外処理（大域脱出）のように、残りの計算を実行せずに処理を終了する場合に使います。関数式の戻り値型に `noresume` (またはそれに類する表現) を付けます。
 
     ```protorun
     effect Exception<E> { fn raise<T>(error: E): T } // T は任意の型
 
     handler ExceptionHandler<E>: Exception<E> {
       // raise が呼ばれたら継続を破棄し、Result.Err を返す
-      fn raise<T>(error: E): noresume Result<T, E> = {
+      let raise = fn <T>(error: E): noresume Result<T, E> => {
         Result.Err(error) // resume() を呼び出さない
       }
     }
@@ -298,14 +298,14 @@ handler ExplicitConsoleHandler: Console {
     }
     ```
 
-* **継続を複数回呼び出す (`multiresume`)**: 非決定性計算（バックトラック）のように、残りの計算を異なる状態で複数回試す場合に使います。メソッドの戻り値型に `multiresume` (またはそれに類する表現) を付けます。
+* **継続を複数回呼び出す (`multiresume`)**: 非決定性計算（バックトラック）のように、残りの計算を異なる状態で複数回試す場合に使います。関数式の戻り値型に `multiresume` (またはそれに類する表現) を付けます。
 
     ```protorun
     effect Choice { fn choose<T>(options: [T]): T }
 
     handler ChoiceHandler: Choice {
       // choose が呼ばれたら、各選択肢で継続を試す
-      fn choose<T>(options: [T]): multiresume T = {
+      let choose = fn <T>(options: [T]): multiresume T => {
         for option in options {
           // 各選択肢で継続を呼び出し、結果を試す (Result<T, ResumeAgain> のような型が必要か？)
           let result = resume(option)

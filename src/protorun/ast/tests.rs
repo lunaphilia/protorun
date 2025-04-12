@@ -394,7 +394,7 @@ fn test_decl_function_as_let_lambda() { // 関数名を変更し、let + lambda 
 
     let body = Box::new(Expr::Identifier("x".to_string(), span_body));
 
-    let lambda_expr = Expr::LambdaExpr {
+    let function_expr = Expr::FunctionExpr { // Renamed from LambdaExpr
         parameters: Some(vec![parameter]), // Option<Vec<Parameter>> に変更
         effect_parameters: None, // 追加
         implicit_parameters: None, // 追加
@@ -407,7 +407,7 @@ fn test_decl_function_as_let_lambda() { // 関数名を変更し、let + lambda 
     let decl = Decl::Let {
         pattern,
         type_annotation: None,
-        value: lambda_expr,
+        value: function_expr, // Use the renamed variable
         span: span_let.clone(),
     };
 
@@ -422,7 +422,7 @@ fn test_decl_function_as_let_lambda() { // 関数名を変更し、let + lambda 
             }
 
             match value {
-                Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, span: lambda_span } => {
+                Expr::FunctionExpr { parameters, effect_parameters, implicit_parameters, body, span: lambda_span } => { // Renamed from LambdaExpr
                     assert_eq!(lambda_span, span_lambda);
                     assert!(parameters.is_some());
                     assert_eq!(parameters.as_ref().unwrap().len(), 1);
@@ -435,7 +435,7 @@ fn test_decl_function_as_let_lambda() { // 関数名を変更し、let + lambda 
                         _ => panic!("期待される識別子ではありません"),
                     }
                 },
-                _ => panic!("期待されるラムダ式ではありません"),
+                _ => panic!("期待される関数式ではありません"), // Message updated
             }
         },
         Decl::Var { .. } => panic!("期待される let 宣言ではありません (Var)"),

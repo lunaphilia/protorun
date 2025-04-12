@@ -32,6 +32,17 @@ HandlerDecl ::= "handler" Identifier GenericParams? ":" TypeRef "{" HandlerMembe
 ExportDecl ::= "export" (FunctionDecl | TypeDecl | TraitDecl | EffectDecl | HandlerDecl | ExportList)
 ExportList ::= "{" (Identifier ("," Identifier)*)? "}"
 
+HandlerMember ::= LetHandlerFunction | FieldDecl
+
+LetHandlerFunction ::= "let" Identifier GenericParams? "=" HandlerFunctionBody
+
+HandlerFunctionBody ::= FunctionExpr
+                      | ResumeFunctionExpr
+                      | NoResumeFunctionExpr
+
+ResumeFunctionExpr ::= "fn" ParamList "," "resume" ":" ResumeType (":" ReturnType)? "=>" Expression
+NoResumeFunctionExpr ::= "fn" ParamList ":" "noresume" ReturnType "=>" Expression
+
 EnumDecl ::= "enum" Identifier GenericParams? "{" (EnumVariant ("," EnumVariant)*)? "}"
 EnumVariant ::= Identifier ("(" Type ("," Type)* ")")?
 
@@ -40,13 +51,6 @@ RecordType ::= "{" (Identifier ":" Type ("," Identifier ":" Type)*)? "}"
 TraitMember ::= FunctionDecl
 
 ImplMember ::= FunctionDecl
-
-HandlerMember ::= HandlerFunction | FieldDecl
-
-HandlerFunction ::= "fn" Identifier GenericParams? ParamList (":" ReturnType)? "=" Expression
-                  | "fn" Identifier GenericParams? ParamList "," "resume" ":" ResumeType (":" ReturnType)? "=" Expression
-                  | "fn" Identifier GenericParams? ParamList ":" "noresume" ReturnType "=" Expression
-                  | "fn" Identifier GenericParams? ParamList ":" "multiresume" ReturnType "=" Expression
 
 FieldDecl ::= ("let" | "var") Identifier ":" Type
 
@@ -100,7 +104,7 @@ Expression ::= LiteralExpr
              | MatchExpr
              | CollectionComprehensionExpr
              | BindExpr
-             | LambdaExpr
+             | FunctionExpr
              | CallExpr
              | MemberAccessExpr
              | BinaryExpr
@@ -110,6 +114,7 @@ Expression ::= LiteralExpr
              | RangeExpr
              | TupleExpr         // Added: Tuple literal (N>=2)
              | GroupedExpr       // Added: Grouping expression
+             | PartialApplicationExpr
 
 LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral // UnitLiteral is ()
               | ListLiteral | MapLiteral | SetLiteral
@@ -143,9 +148,9 @@ SetComprehension ::= "#{" Expression "for" Pattern "<-" Expression ("if" Express
 
 BindExpr ::= "bind" "{" (Pattern "<-" Expression)* Expression "}"
 
-LambdaExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? (":" ReturnType)? Expression
+FunctionExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? (":" ReturnType)? "=>" Expression
 
-CallExpr ::= Expression "(" (Expression ("," Expression)*)? ")"
+CallExpr ::= Expression "(" ((Expression | "_") ("," (Expression | "_"))*)? ")"
 
 MemberAccessExpr ::= Expression "." Identifier
 
@@ -194,7 +199,7 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 - **トレイト宣言（TraitDecl）**: インターフェースを定義します。
 - **実装宣言（ImplDecl）**: トレイトの実装を定義します。
 - **効果宣言（EffectDecl）**: 代数的効果を定義します。効果は他の効果（例：`LifecycleEffect<R>`）を継承することができます。
-- **ハンドラ宣言（HandlerDecl）**: 効果ハンドラを定義します。
+- **ハンドラ宣言（HandlerDecl）**: 効果ハンドラを定義します。ハンドラ内の関数は `let func_name = fn ... => ...` の形式で定義されます。詳細は `HandlerMember` の定義を参照してください。
 - **変数束縛宣言（LetDecl, VarDecl）**: `let` または `var` キーワードを使用して、イミュータブルまたはミュータブルな変数を宣言し、初期値を束縛します。
 
 ### 12.3.3 型システム
@@ -221,7 +226,7 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 - **パターンマッチング式（MatchExpr）**: 値をパターンと照合して異なる式を評価します。
 - **コレクション内包表記式（CollectionComprehensionExpr）**: コレクションを反復処理して新しいコレクションを生成します。リスト、マップ、セットの内包表記をサポートします。
 - **バインド式（BindExpr）**: モナド連鎖のための式です。
-- **ラムダ式（LambdaExpr）**: 無名関数です。
+- **関数式（FunctionExpr）**: 無名関数です。`fn (...) => ...` の形式を取ります。
 - **関数呼び出し式（CallExpr）**: 関数を呼び出します。
 - **メンバーアクセス式（MemberAccessExpr）**: オブジェクトのメンバーにアクセスします。
 - **二項演算式（BinaryExpr）**: 二つの式を演算子で結合します。
@@ -232,6 +237,7 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 - **範囲式（RangeExpr）**: 範囲を表現します。
 - **タプル式（TupleExpr）**: `(式1, 式2, ...)` 形式で、要素数2以上のタプルを生成します。
 - **グループ化式（GroupedExpr）**: `(式)` 形式で、式の評価順序を制御します。これはタプルではありません。
+- **PartialApplicationExpr**: 部分適用式
 
 ### 12.3.6 パターン (Pattern)
 

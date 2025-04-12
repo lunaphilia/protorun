@@ -109,28 +109,28 @@ fn example_scope() {
 
 **`let` による関数定義:**
 
-Protorun では、関数は `let` 束縛とラムダ式 ([6.3.3 ラムダ式](06-expressions.md#633-ラムダ式)) を組み合わせて定義します。これにより、関数も他の値と同様に扱われ、言語の一貫性が保たれます。
+Protorun では、関数は `let` 束縛と関数式 ([6.3.3 関数式](06-expressions.md#633-関数式)) を組み合わせて定義します。これにより、関数も他の値と同様に扱われ、言語の一貫性が保たれます。
 
 ```protorun
 // 基本的な関数定義
-let add = fn (a: Int, b: Int): Int = a + b
+let add = fn (a: Int, b: Int): Int => a + b
 
 // 型推論を利用
-let square = fn x = x * x
+let square = fn x => x * x
 
 // Effect パラメータを持つ関数
-let log = fn (message: String) (effect console: Console): Unit = console.log(message)
+let log = fn (message: String) (effect console: Console): Unit => console.log(message)
 
 // ジェネリック関数
-let identity = fn <T> (x: T): T = x
+let identity = fn <T> (x: T): T => x
 ```
 
 **暗黙的な再帰:**
 
-`let` で束縛されたラムダ式は、自身の名前を再帰的に参照できます。特別なキーワード (`rec` など) は不要です。
+`let` で束縛された関数式は、自身の名前を再帰的に参照できます。特別なキーワード (`rec` など) は不要です。
 
 ```protorun
-let factorial = fn (n: Int): Int = {
+let factorial = fn (n: Int): Int => {
   if n <= 1 {
     1
   } else {

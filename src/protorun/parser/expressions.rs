@@ -721,8 +721,8 @@ fn parse_implicit_parameter_list<'a>(input: &'a str, original_input: &'a str) ->
     )(input)
 }
 
-/// ラムダ式をパース: fn ParamList? EffectParamList? ImplicitParamList? (: ReturnType)? = Expression
-pub fn lambda_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+/// 関数式（旧ラムダ式）をパース: fn ParamList? EffectParamList? ImplicitParamList? (: ReturnType)? => Expression
+pub fn function_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
 
     let start_pos = input.as_ptr() as usize - original_input.as_ptr() as usize; // Span計算用
 
@@ -752,14 +752,16 @@ pub fn lambda_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'
         )
     )(input)?;
 
-    // 本体
+    // '=>' トークン
+    let (input, _) = cut(ws_comments(tag("=>")))(input)?;
 
+    // 本体
     let (input, body) = cut(|i| expression(i, original_input))(input)?;
 
     let end_pos = input.as_ptr() as usize - original_input.as_ptr() as usize; // Span計算用
     let span = calculate_span(original_input, &original_input[start_pos..end_pos]);
 
-    Ok((input, Expr::LambdaExpr {
+    Ok((input, Expr::FunctionExpr { // ASTバリアント名を変更
         parameters,
         effect_parameters,
         implicit_parameters,
@@ -772,9 +774,9 @@ pub fn lambda_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'
 pub fn expression<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
 
     // 特殊な式と論理OR演算（最も優先度の低い演算子）をパース
-    // lambda_expr は 'fn' で始まるため、他のキーワードベースの式と同様に alt の先頭に配置
+    // function_expr は 'fn' で始まるため、他のキーワードベースの式と同様に alt の先頭に配置
     alt((
-        |i| lambda_expr(i, original_input), // lambda_expr を先頭に移動
+        |i| function_expr(i, original_input), // function_expr に変更
         |i| if_expr(i, original_input),
         |i| match_expr(i, original_input),
         |i| bind_expr(i, original_input),

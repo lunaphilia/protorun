@@ -7,8 +7,8 @@ use crate::protorun::ast::{ExportDecl, ImportDecl, Decl, Pattern, Expr}; // Decl
 fn test_parse_module() {
     let input = r#"
         module Math {
-            export let add = fn (x: Int, y: Int): Int x + y // Comma added between parameters
-            export let multiply = fn (x: Int, y: Int): Int x * y // Comma added between parameters
+            export let add = fn (x: Int, y: Int): Int => x + y // Changed to =>
+            export let multiply = fn (x: Int, y: Int): Int => x * y // Changed to =>
         }
     "#;
     let mut parser = Parser::new(None);
@@ -39,8 +39,8 @@ fn test_parse_module() {
                 _ => panic!("Expected identifier pattern for add"),
             }
             match value {
-                Expr::LambdaExpr { .. } => (), // ラムダ式であることを確認
-                _ => panic!("Expected lambda expression for add"),
+                Expr::FunctionExpr { .. } => (), // FunctionExpr に変更
+                _ => panic!("Expected function expression for add"), // メッセージ変更
             }
         },
         _ => panic!("Expected let declaration for add"),
@@ -52,8 +52,8 @@ fn test_parse_module() {
                 _ => panic!("Expected identifier pattern for multiply"),
             }
              match value {
-                Expr::LambdaExpr { .. } => (), // ラムダ式であることを確認
-                _ => panic!("Expected lambda expression for multiply"),
+                Expr::FunctionExpr { .. } => (), // FunctionExpr に変更
+                _ => panic!("Expected function expression for multiply"), // メッセージ変更
             }
         },
         _ => panic!("Expected let declaration for multiply"),
@@ -64,7 +64,7 @@ fn test_parse_module() {
 fn test_parse_export() {
     let input = r#"
         module Test {
-            export let test = fn () 42 // 関数宣言を let + fn に変更
+            export let test = fn () => 42 // Changed to =>
             export {
                 add,
                 multiply

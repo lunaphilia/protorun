@@ -281,14 +281,14 @@ trait Monad<T> {
 }
 ```
 
-### 6.3.3 ラムダ式 (Lambda Expressions)
+### 6.3.3 関数式 (Function Expressions)
 
-ラムダ式（無名関数）は、関数をその場で定義するための構文です。`fn` キーワードで始まり、パラメータリスト（複数種類あり、すべてオプション）、そして `=` の後に続く関数本体（式）で構成されます。
+関数式（以前のラムダ式）は、無名関数をその場で定義するための構文です。`fn` キーワードで始まり、パラメータリスト（複数種類あり、すべてオプション）、オプションの戻り値型、そして `=>` の後に続く関数本体（式）で構成されます。
 
 **構文:**
 
 ```ebnf
-LambdaExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? (":" ReturnType)? Expression
+FunctionExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? (":" ReturnType)? "=>" Expression
 ParamList ::= "(" (Param ("," Param)*)? ")"
 EffectParamList ::= "(" (EffectParam ("," EffectParam)*)? ")"
 ImplicitParamList ::= "(" "with" Param ("," Param)* ")"
@@ -297,43 +297,44 @@ EffectParam ::= "effect" Identifier ":" TypeRef
 ReturnType ::= Type | "Unit" // (Type の定義は他を参照)
 ```
 
-- `fn`: ラムダ式の開始を示すキーワード。
+- `fn`: 関数式の開始を示すキーワード。
 - `ParamList?`: 通常のパラメータリスト（オプション）。`()` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。
 - `EffectParamList?`: Effect パラメータリスト（オプション）。`()` で囲み、カンマ区切りで `effect identifier: TypeRef` を記述します。関数が依存する効果インターフェースを指定します。
 - `ImplicitParamList?`: Implicit パラメータリスト（オプション）。`(with ...)` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。コンテキストから暗黙的に渡される値を指定します（Scala の implicit parameter list に類似）。
 - `(":" ReturnType)?`: 戻り値の型注釈（オプション）。コロン `:` に続けて戻り値の型 (`ReturnType`) を記述します。
-- `Expression`: 関数本体。パラメータリストや型注釈の後に直接続きます。単一の式である必要があります。複数の文を実行したい場合はブロック式 `{...}` を使用します。
+- `=>`: パラメータリスト/型注釈と関数本体を区切るキーワード。
+- `Expression`: 関数本体。`=>` の後に直接続きます。単一の式である必要があります。複数の文を実行したい場合はブロック式 `{...}` を使用します。
 
 **具体例:**
 
 ```protorun
 // 通常のパラメータのみ
-let add = fn (a: Int, b: Int): Int a + b
-let square = fn x x * x // 型推論
+let add = fn (a: Int, b: Int): Int => a + b
+let square = fn x => x * x // 型推論
 
-// Effect パラメータを持つラムダ式
-let logOperation = fn (data: Data) (effect logger: Logger) {
+// Effect パラメータを持つ関数式
+let logOperation = fn (data: Data) (effect logger: Logger) => {
   logger.log(s"Processing $data")
   process(data)
 }
 
-// Implicit パラメータを持つラムダ式
-let greet = fn (name: String) (with context: Context) {
+// Implicit パラメータを持つ関数式
+let greet = fn (name: String) (with context: Context) => {
   s"${context.greeting}, $name!"
 }
 
-// 複数のパラメータリストを持つラムダ式
-let complexCalc = fn (x: Int) (effect state: State<Int>) (with config: Config) {
+// 複数のパラメータリストを持つ関数式
+let complexCalc = fn (x: Int) (effect state: State<Int>) (with config: Config) => {
   let current = state.get()
   state.set(current + x * config.multiplier)
   state.get()
 }
 
-// パラメータなしのラムダ式
-let getMeaning = fn 42
+// パラメータなしの関数式
+let getMeaning = fn => 42
 
-// ブロック式を本体に持つラムダ式
-let process = fn (input: String) {
+// ブロック式を本体に持つ関数式
+let process = fn (input: String) => {
   let trimmed = input.trim()
   println(s"Processing: $trimmed")
   trimmed.toUpperCase() // ブロックの最後の式が返り値
@@ -342,9 +343,9 @@ let process = fn (input: String) {
 
 **特徴:**
 
-- **統一された関数定義**: `let` 束縛と組み合わせることで、名前付き関数も無名関数も同じ `fn ...` 形式で表現されます ([4.2.2 `let` による関数定義](04-declarations.md#let-による関数定義) を参照)。
+- **統一された関数定義**: `let` 束縛と組み合わせることで、名前付き関数も無名関数も同じ `fn ... => ...` 形式で表現されます ([4.2.2 `let` による関数定義](04-declarations.md#let-による関数定義) を参照)。
 - **パラメータリストの柔軟性**: 通常、Effect、Implicit の3種類のパラメータリストを任意の順序（ただし、各種類は1回まで）で記述できます（※注: 現在のパーサー実装では `ParamList? EffectParamList? ImplicitParamList?` の順序のみサポート）。これにより、カリー化や依存性の注入を表現豊かに行えます。
-- **式ベース**: ラムダ式の本体は常に単一の式です。
+- **式ベース**: 関数式の本体は常に単一の式です。
 
 ### 6.3.4 with式
 
@@ -538,3 +539,57 @@ let simple_group = (5)     // これは Int 型の 5 であり、タプルでは
 **要素数1のタプル:**
 
 - Protorun言語の現在の仕様では、**要素数1のタプルを生成するためのリテラル構文は存在しません**。`(式)` は常にグループ化として解釈されます。これはSwift言語と同様の仕様であり、実用上問題になることは稀であると考えられています。もし要素が1つのコンテナが必要な場合は、構造体 (struct) などを定義することを検討してください。
+
+## 6.8 部分適用式
+
+部分適用式は、関数の一部の引数を事前に適用し、残りの引数を取る新しい関数を生成するための構文です。プレースホルダー `_` を使用して、後で適用される引数を示します。
+
+**構文:**
+
+```ebnf
+PartialApplicationExpr ::= Expression "(" ((Expression | "_") ("," (Expression | "_"))*)? ")"
+```
+
+- `Expression`: 部分適用される関数を表す式。
+- `( ... )`: 引数リスト。
+- `Expression`: 事前に適用される引数。
+- `_`: 後で適用される引数を示すプレースホルダー。
+
+**意味:**
+
+部分適用式は以下の動作を行います。
+
+1. 左辺の `Expression` を評価し、関数 `f` を取得します。
+2. 引数リスト内の `Expression` を評価し、事前に適用される引数の値を取得します。
+3. 関数 `f`、事前に適用された引数の値、およびプレースホルダー `_` の位置情報を含む新しい関数（クロージャ）を生成します。
+4. この新しい関数が部分適用式全体の値となります。
+
+**具体例:**
+
+```protorun
+// 2引数関数
+let add = fn (a: Int, b: Int): Int = a + b
+
+// 部分適用: 最初の引数に 1 を適用
+let add_one = add(1, _) // add_one は Int -> Int 型の関数
+
+// 部分適用された関数の呼び出し
+let result = add_one(5) // result は 6
+
+// 部分適用: 2番目の引数に 10 を適用
+let add_ten = add(_, 10) // add_ten は Int -> Int 型の関数
+let result2 = add_ten(3) // result2 は 13
+
+// 複数のプレースホルダー
+let multiply = fn (a: Int, b: Int, c: Int): Int = a * b * c
+let multiply_by_two = multiply(_, 2, _) // multiply_by_two は (Int, Int) -> Int 型の関数
+let result3 = multiply_by_two(3, 4) // result3 は 24 (3 * 2 * 4)
+```
+
+**特徴:**
+
+- **カリー化の促進**: 関数を段階的に適用することが容易になります。
+- **コードの再利用**: 特定の引数が固定された関数を簡単に作成できます。
+- **高階関数との連携**: 高階関数に渡す関数をその場で生成するのに便利です。
+
+部分適用は、関数型プログラミングにおける重要なテクニックであり、コードの抽象化と再利用性を高めます。

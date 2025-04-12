@@ -78,11 +78,11 @@ fn test_nested_block_scope_management() {
 fn test_function_scope_management() {
     // 関数スコープの管理を確認
     let input = "
-    let add = fn (a, b) {
+    let add = fn (a, b) => {
         let result = a + b 
         result
     }
-    "; // fn add(...) を let add = fn (...) に変更
+    "; // Changed to =>
     
     let mut parser = Parser::new(None);
     let program = parser.parse_program(input).unwrap();
@@ -97,16 +97,16 @@ fn test_function_scope_management() {
                 crate::protorun::ast::Pattern::Identifier(name, _) => assert_eq!(name, "add"),
                 _ => panic!("期待される識別子パターンではありません"),
             }
-            // 値（ラムダ式）のチェック
+            // 値（関数式）のチェック
             match value {
-                Expr::LambdaExpr { parameters, .. } => {
+                Expr::FunctionExpr { parameters, .. } => { // Renamed from LambdaExpr
                     assert!(parameters.is_some());
                     let params = parameters.as_ref().unwrap();
                     assert_eq!(params.len(), 2);
                     assert_eq!(params[0].name, "a");
                     assert_eq!(params[1].name, "b");
                 },
-                _ => panic!("期待されるラムダ式ではありません"),
+                _ => panic!("期待される関数式ではありません"), // Message updated
             }
         },
         _ => panic!("期待される let 宣言ではありません"),

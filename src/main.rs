@@ -319,8 +319,8 @@ fn expr_to_string(expr: &Expr) -> String {
                 expr_to_string(body)
             )
         },
-        // 重複していた古い LambdaExpr アームを削除し、新しい形式に修正
-        Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+        // FunctionExpr の表示処理
+        Expr::FunctionExpr { parameters, effect_parameters, implicit_parameters, body, .. } => { // Renamed from LambdaExpr
             let params_str = parameters.as_ref().map_or("".to_string(), |params| { // パラメータなしの場合は空文字列
                 let p_strs: Vec<String> = params.iter()
                     .map(|p| {
@@ -343,7 +343,7 @@ fn expr_to_string(expr: &Expr) -> String {
                 format!("({})", p_strs.join(", "))
             });
 
-            format!("fn {}{}{} = {}",
+            format!("fn {}{}{} => {}", // Changed = to =>
                 params_str,
                 effect_params_str,
                 implicit_params_str,

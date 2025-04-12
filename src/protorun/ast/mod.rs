@@ -81,8 +81,8 @@ pub enum Expr {
         elements: Vec<Expr>, // 要素数は2以上であることが保証される
         span: Span,
     },
-    /// ラムダ式
-    LambdaExpr {
+    /// 関数式 (旧 LambdaExpr)
+    FunctionExpr {
         parameters: Option<Vec<Parameter>>, // 通常のパラメータリスト (Option)
         effect_parameters: Option<Vec<EffectParameter>>, // Effectパラメータリスト (Option)
         implicit_parameters: Option<Vec<Parameter>>, // Implicitパラメータリスト (Option)

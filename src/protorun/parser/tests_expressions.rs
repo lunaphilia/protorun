@@ -1263,15 +1263,15 @@ fn test_parse_nested_collections() {
 }
 
 #[test]
-fn test_parse_lambda_expr() {
-    // 基本的なラムダ式
+fn test_parse_function_expr() { // Renamed test
+    // 基本的な関数式
     {
-        let input = "fn (x) x + 1";
+        let input = "fn (x) => x + 1"; // Added =>
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
         match expr {
-            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+            Expr::FunctionExpr { parameters, effect_parameters, implicit_parameters, body, .. } => { // Renamed variant
                 assert!(parameters.is_some());
                 let params = parameters.as_ref().unwrap();
                 assert_eq!(params.len(), 1);
@@ -1286,18 +1286,18 @@ fn test_parse_lambda_expr() {
                     _ => panic!("期待される二項演算ではありません"),
                 }
             },
-            _ => panic!("期待されるラムダ式ではありません"),
+            _ => panic!("期待される関数式ではありません"), // Message updated
         }
     }
     
-    // 型注釈付きのパラメータを持つラムダ式
+    // 型注釈付きのパラメータを持つ関数式
     {
-        let input = "fn (x: Int) x * 2";
+        let input = "fn (x: Int) => x * 2"; // Added =>
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
         match expr {
-            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+            Expr::FunctionExpr { parameters, effect_parameters, implicit_parameters, body, .. } => { // Renamed variant
                 assert!(parameters.is_some());
                 let params = parameters.as_ref().unwrap();
                 assert_eq!(params.len(), 1);
@@ -1322,18 +1322,18 @@ fn test_parse_lambda_expr() {
                     _ => panic!("期待される二項演算ではありません"),
                 }
             },
-            _ => panic!("期待されるラムダ式ではありません"),
+            _ => panic!("期待される関数式ではありません"), // Message updated
         }
     }
     
-    // 複数のパラメータを持つラムダ式
+    // 複数のパラメータを持つ関数式
     {
-        let input = "fn (x: Int, y: Int) x + y";
+        let input = "fn (x: Int, y: Int) => x + y"; // Added =>
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
         match expr {
-            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+            Expr::FunctionExpr { parameters, effect_parameters, implicit_parameters, body, .. } => { // Renamed variant
                 assert!(parameters.is_some());
                 let params = parameters.as_ref().unwrap();
                 assert_eq!(params.len(), 2);
@@ -1348,18 +1348,18 @@ fn test_parse_lambda_expr() {
                     _ => panic!("期待される二項演算ではありません"),
                 }
             },
-            _ => panic!("期待されるラムダ式ではありません"),
+            _ => panic!("期待される関数式ではありません"), // Message updated
         }
     }
     
-    // パラメータなしのラムダ式
+    // パラメータなしの関数式
     {
-        let input = "fn 42";
+        let input = "fn => 42"; // Added =>
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
         match expr {
-            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+            Expr::FunctionExpr { parameters, effect_parameters, implicit_parameters, body, .. } => { // Renamed variant
                 // パラメータリストがない場合は None になるはず
                 assert!(parameters.is_none());
                 assert!(effect_parameters.is_none());
@@ -1370,18 +1370,18 @@ fn test_parse_lambda_expr() {
                     _ => panic!("期待される整数リテラルではありません"),
                 }
             },
-            _ => panic!("期待されるラムダ式ではありません"),
+            _ => panic!("期待される関数式ではありません"), // Message updated
         }
     }
     
-    // ブロック式を本体に持つラムダ式
+    // ブロック式を本体に持つ関数式
     {
-        let input = "fn (x) { let y = x * 2 \n y + 1 }";
+        let input = "fn (x) => { let y = x * 2 \n y + 1 }"; // Added =>
         let mut parser = Parser::new(None);
         let expr = parser.parse_expression(input).unwrap();
 
         match expr {
-            Expr::LambdaExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
+            Expr::FunctionExpr { parameters, effect_parameters, implicit_parameters, body, .. } => { // Renamed variant
                 assert!(parameters.is_some());
                 let params = parameters.as_ref().unwrap();
                 assert_eq!(params.len(), 1);
@@ -1397,16 +1397,16 @@ fn test_parse_lambda_expr() {
                             BlockItem::Expression(expr) => {
                                 match expr {
                                      Expr::BinaryOp { operator, .. } => assert_eq!(*operator, BinaryOperator::Add), // y + 1
-                                     _ => panic!("Lambda body final item is not BinaryOp"),
+                                     _ => panic!("Function body final item is not BinaryOp"), // Message updated
                                 }
                             },
-                            _ => panic!("Lambda body final item is not Expression"),
+                            _ => panic!("Function body final item is not Expression"), // Message updated
                         }
                     },
-                    _ => panic!("Lambda body is not BlockExpr"),
+                    _ => panic!("Function body is not BlockExpr"), // Message updated
                 }
             },
-            _ => panic!("期待されるラムダ式ではありません"),
+            _ => panic!("期待される関数式ではありません"), // Message updated
         }
     }
     // TODO: Effect パラメータ、Implicit パラメータを含むテストケースを追加する
