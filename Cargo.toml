@@ -18,11 +18,4 @@ path = "src/lib.rs"
 [[bin]]
 name = "protorun"
 path = "src/main.rs"
-
-[[bin]]
-name = "test_parse"
-path = "src/test_parse.rs"
-
-[[bin]]
-name = "debug_unexpected_eof"
-path = "src/debug_unexpected_eof.rs"
+test = false
