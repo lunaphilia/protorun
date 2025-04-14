@@ -16,7 +16,7 @@ pub mod modules;
 
 use nom::Finish;
 
-use super::ast::{Program, Expr, Type}; // Expr, Type を再追加
+use super::ast::Program;
 use super::error::Result;
 use common::to_syntax_error;
 
@@ -42,7 +42,7 @@ impl Parser {
 
     /// 式をパース (テスト用)
     #[cfg(test)]
-    pub fn parse_expression(&mut self, input: &str) -> Result<Expr> {
+    pub fn parse_expression(&mut self, input: &str) -> Result<super::ast::Expr> {
         match expressions::expression(input, input).finish() {
             Ok((_, expr)) => Ok(expr),
             Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
@@ -51,7 +51,7 @@ impl Parser {
     
     /// 型をパース (テスト用)
     #[cfg(test)]
-    pub fn parse_type(&mut self, input: &str) -> Result<Type> {
+    pub fn parse_type(&mut self, input: &str) -> Result<super::ast::Type> {
         match types::parse_type(input, input).finish() {
             Ok((_, ty)) => Ok(ty),
             Err(error) => Err(to_syntax_error(input, error, self.filename.clone())),
