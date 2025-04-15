@@ -27,21 +27,14 @@ ImplDecl ::= "impl" GenericParams? TypeRef ":" TypeRef "{" ImplMember* "}"
 
 EffectDecl ::= "effect" Identifier GenericParams? "{" EffectOperation* "}"
 
-HandlerDecl ::= "handler" Identifier GenericParams? ":" TypeRef "{" HandlerMember* "}"
+HandlerDecl ::= "handler" TypeRef "for" TypeRef "{" HandlerMember* "}"
 
 ExportDecl ::= "export" (FunctionDecl | TypeDecl | TraitDecl | EffectDecl | HandlerDecl | ExportList)
 ExportList ::= "{" (Identifier ("," Identifier)*)? "}"
 
-HandlerMember ::= LetHandlerFunction | FieldDecl
+HandlerMember ::= LetHandlerFunction
 
-LetHandlerFunction ::= "let" Identifier GenericParams? "=" HandlerFunctionBody
-
-HandlerFunctionBody ::= FunctionExpr
-                      | ResumeFunctionExpr
-                      | NoResumeFunctionExpr
-
-ResumeFunctionExpr ::= "fn" ParamList "resume" (":" ReturnType)? "=>" Expression
-NoResumeFunctionExpr ::= "fn" ParamList "noresume" (":" ReturnType)? "=>" Expression
+LetHandlerFunction ::= "let" Identifier GenericParams? "=" FunctionExpr
 
 EnumDecl ::= "enum" Identifier GenericParams? "{" (EnumVariant ("," EnumVariant)*)? "}"
 EnumVariant ::= Identifier ("(" Type ("," Type)* ")")?
@@ -159,8 +152,8 @@ BinaryExpr ::= Expression Operator Expression
 
 UnaryExpr ::= Operator Expression
 
-WithExpr ::= "with" WithBinding ("," WithBinding)* (":" TypeRef ("," TypeRef)*)? BlockExpr
-WithBinding ::= Identifier "=" Expression
+WithExpr ::= "with" WithBinding ("," WithBinding)* BlockExpr
+WithBinding ::= Identifier "=" Expression (":" TypeRef)?
 
 RangeExpr ::= Expression ".." Expression
 

@@ -234,17 +234,16 @@ pub fn parse_module<'a>(input: &'a str, original_input: &'a str) -> ParseResult<
                     let name_span_opt: Option<(String, crate::protorun::ast::Span)> = match &decl {
                         Decl::Let { pattern, span, .. } => match pattern {
                             Pattern::Identifier(name, _) => Some((name.clone(), span.clone())),
-                            _ => None, // Identifier 以外のパターンはエクスポート不可
+                            _ => None,
                         },
                         Decl::Var { name, span, .. } => Some((name.clone(), span.clone())),
-                        Decl::HandlerDecl(h) => Some((h.name.clone(), h.span.clone())),
-                        // 他の Decl バリアントが追加された場合も考慮 (現状は Let/Var/HandlerDecl のみ)
-                        // _ => None, // 将来的な拡張用。現状は不要だが網羅性のために残しても良い
+                        Decl::HandlerDecl(_) => None, // HandlerDecl は単一の名前を持たないため None を返す
                     };
 
                     if let Some((name, span)) = name_span_opt {
                         exports.push(ExportDecl::Single { name, span });
-                    } else if is_exported {
+                    // HandlerDecl の場合は is_exported が true でも name_span_opt は None になるので警告しない
+                    } else if is_exported && !matches!(decl, Decl::HandlerDecl(_)) {
                          // is_exported が true なのに name_span_opt が None の場合
                          // (例: export let (a, b) = ...)
                          eprintln!("Warning: export keyword used with non-exportable declaration pattern.");

@@ -274,9 +274,9 @@ type Point = (Float, Float)
 
 型エイリアスは、特にジェネリック型や関数型など、型シグネチャが長くなりがちな場合にコードを整理し、理解しやすくするのに有効です。
 
-## 4.4 効果インターフェースとハンドラ型の定義 // セクション番号を更新
+## 4.4 効果インターフェース定義とハンドラ実装
 
-効果インターフェース (`effect`) とハンドラ型 (`handler`) は、代数的効果システムの中核となる宣言です。
+効果インターフェース (`effect`) とハンドラ実装 (`handler`) は、代数的効果システムの中核となる宣言です。
 
 ```protorun
 // 効果インターフェース定義
@@ -285,13 +285,15 @@ effect MyEffect {
   // ...
 }
 
-// ハンドラ型定義 (状態を持つ例)
-handler MyHandler: MyEffect {
-  let state: StateType // フィールド定義
-
+// ハンドラ実装 (特定の型 MyHandler に対して MyEffect を実装)
+// MyHandler は別途 type で定義され、状態を持つことができる
+type MyHandler {
+  let state: StateType
+}
+handler MyEffect for MyHandler {
   // 操作の実装
-  fn operation1(arg: Type1): ReturnType1 = {
-    // self.state を使った処理
+  let operation1 = fn (self, arg: Type1): ReturnType1 => {
+    // self を通じて MyHandler インスタンスの state にアクセス
     // 継続 (resume) の処理
   }
   // ...
@@ -299,7 +301,7 @@ handler MyHandler: MyEffect {
 ```
 
 - **`effect`**: 計算効果が提供する操作のシグネチャ（インターフェース）を定義します。
-- **`handler`**: `effect` インターフェースを実装する新しい型を定義します。この型は内部にフィールド（状態）を持つことができ、そのインスタンスが効果処理を担当します。フィールド定義やインスタンス生成は通常の `type` と同様の構文に従います。
+- **`handler`**: 特定の型 (`MyHandler`) に対して、特定の効果インターフェース (`MyEffect`) の操作を実装します。ハンドラ実装自体は状態を持たず、操作対象の状態は実装対象の型 (`MyHandler`) のインスタンス (`self`) が保持します。
 
 これらの宣言の詳細は [8. 代数的効果](08-algebraic-effects.md) で説明されています。
 

@@ -54,21 +54,17 @@ type IOError { /* ... */ }
 * 操作シグネチャは、所有権 (`own`, `&`, `&mut`) を含む通常の関数シグネチャと同じルールに従います。
 * **重要:** 効果インターフェースの操作定義には、通常、ハンドラ固有の設定データ（例: ファイルパス、データベース接続文字列）は含めません。これらはハンドラ自身が保持します。
 
-## 8.3 ハンドラ型の定義 (`handler`)
+## 8.3 効果ハンドラの実装 (`handler`)
 
-ハンドラ型は、特定の効果インターフェース (`EffectType`) の操作を実装し、かつ自身の状態や設定データを保持できる新しい型を定義します。`handler` キーワードを用いて定義します。
+効果ハンドラは、特定の効果インターフェース (`EffectName`) の操作を、特定の型 (`HandlerName`) に対して実装します。Rust の `impl Trait for Type` に似た構文 `handler` を用います。ハンドラ実装自体は通常状態を持たず、操作対象のデータ (`self`) は実装対象の型 (`HandlerName`) のインスタンスとなります。
 
 ```protorun
-// ハンドラ型定義の基本構文
-handler HandlerName: EffectType {
-  // フィールド定義 (通常の type と同じ構文)
-  let field1: Type1
-  let mutable field2: Type2
-  // ...
-
+// 効果ハンドラ実装の基本構文
+handler EffectName for HandlerName {
   // 効果操作の実装 (let 束縛 + 関数式)
-  let operation1 = fn (args...): ReturnType => {
-    // self を使ってフィールドにアクセス可能
+  // 関数式内では 'self' を通じて HandlerName のインスタンスにアクセス可能
+  let operation1 = fn (self, args...): ReturnType => {
+    // self を使って HandlerName のフィールドやメソッドにアクセス
     // 継続 (resume) を扱える (後述)
     // ... 実装 ...
   }
@@ -76,68 +72,80 @@ handler HandlerName: EffectType {
 }
 ```
 
-* `handler HandlerName: EffectType { ... }` は、`HandlerName` という名前の新しい型を定義します。この型は `EffectType` インターフェースを実装します。
-* **フィールド定義:** ハンドラが状態や設定を保持するために、内部にフィールドを定義できます。フィールド定義の構文は、通常の `type` 宣言（レコード形式など）と同じです。
-* **効果操作の実装:** `EffectType` で定義された各操作に対応する実装を、`let operationName = fn (...) => ...` の形式で記述します。関数式内では `self` を通じてインスタンスのフィールドにアクセスできます。
+* `handler EffectName for HandlerName { ... }` は、型 `HandlerName` が効果インターフェース `EffectName` を実装することを宣言します。
+* **状態の保持:** ハンドラ実装自体は状態を持ちません。状態や設定は、実装対象の型 `HandlerName` がフィールドとして保持します。
+* **効果操作の実装:** `EffectName` で定義された各操作に対応する実装を、`let operationName = fn (self, ...) => ...` の形式で記述します。最初の引数 `self` は `HandlerName` のインスタンス（操作対象のデータ）を受け取ります。
 * **継続制御:** ハンドラ関数式の本体は、代数的効果システムの核となる **継続 (`resume`)** を扱う特別な能力を持ちます。これにより、計算の中断、再開、破棄などを制御できます（詳細は 8.6 節）。
 
-**ハンドラインスタンスの生成:**
-
-ハンドラ型のインスタンスは、通常の `type` と同じ **レコードリテラル構文** を使って生成・初期化します。
-
 ```protorun
-// 状態を持たないハンドラ型の例
-handler ConsoleHandler: Console {
-  // フィールドなし
-
-  let log = fn (message: String): Unit => { println(message) }
-  let readLine = fn (): String => { readLineFromStdio() } // 仮の関数
+// 状態を持つ型の定義
+type Counter {
+  let mutable count: Int
 }
-// インスタンス生成 (フィールドがないので空のレコードリテラル)
-let consoleHandlerInstance = ConsoleHandler {}
 
-// 状態を持つハンドラ型の例
-handler StateHandler<S>: State<S> {
-  let mutable state: S // フィールド定義
-
-  // 効果操作の実装
-  let get = fn (): S => self.state
-  let set = fn (newState: S): Unit => { self.state = newState }
-  let modify = fn (f: (S) -> S): Unit => { self.state = f(self.state) }
+// 効果インターフェース (再掲)
+effect State<S> {
+  fn get(): S
+  fn set(newState: S): Unit
 }
-// インスタンス生成 (フィールドを初期化)
-let stateHandlerInstance = StateHandler<Int> { state: 0 }
 
-// 設定を持つハンドラ型の例
-handler LocalFileHandler: FileSystem {
-  let basePath: String // 設定フィールド
+// Counter 型に対して State<Int> 効果を実装
+handler State<Int> for Counter {
+  let get = fn (self): Int => self.count
+  let set = fn (self, newState: Int): Unit => { self.count = newState }
+  // modify は State<S> にはないが、もしあれば同様に実装
+  // let modify = fn (self, f: (Int) -> Int): Unit => { self.count = f(self.count) }
+}
 
-  let open = fn (path: String, mode: FileMode): Result<own FileHandle, IOError> => {
-    let fullPath = self.basePath + "/" + path // フィールドを使用
+// 状態を持たない効果の例
+effect Logger {
+  fn log(message: String): Unit
+}
+// 状態を持たない型 (例: Unit 型や空の構造体) に対して実装
+type ConsoleLogger {} // ダミーの型
+handler Logger for ConsoleLogger {
+  let log = fn (self, message: String): Unit => { println(message) }
+}
+
+// 設定を持つ型の例
+type FileSystemConfig {
+  let basePath: String
+}
+effect FileSystem {
+  fn open(path: String, mode: FileMode): Result<own FileHandle, IOError>
+  // ...
+}
+handler FileSystem for FileSystemConfig {
+  let open = fn (self, path: String, mode: FileMode): Result<own FileHandle, IOError> => {
+    let fullPath = self.basePath + "/" + path // self は FileSystemConfig インスタンス
     // ... fullPath を使ってファイルを開く処理 ...
   }
-  // ... 他の操作の実装 (close, read, write) ...
+  // ...
 }
-// インスタンス生成 (設定を渡して初期化)
-let localFsHandlerInstance = LocalFileHandler { basePath: "/tmp/data" }
+
+// インスタンス生成 (通常の型インスタンス生成)
+let counterInstance = Counter { count: 0 }
+let loggerInstance = ConsoleLogger {}
+let fsConfigInstance = FileSystemConfig { basePath: "/tmp/data" }
+// これらのインスタンスを `with` 構文で使用する (後述)
 ```
 
-このように、`handler` は状態と振る舞い（効果実装）をカプセル化した型を定義し、そのインスタンスが実際の効果処理を担当します。
+このように、`handler` は特定の型 (`HandlerName`) に対して効果インターフェース (`EffectName`) の操作を実装します。実際の状態や設定は `HandlerName` 型のインスタンスが保持し、ハンドラ実装は `self` を通じてそれにアクセスします。
 
 ## 8.4 Effect パラメータによる効果の宣言
 
 関数が特定の効果操作を実行する可能性があること、および対応するハンドラ実装に依存することを宣言するために、**Effect パラメータ** 構文を使用します。
 
 ```protorun
-// 関数定義: 'console' という名前で Console 効果の実装に依存することを宣言
-fn greet(name: String)(effect console: Console): Unit {
+// 関数定義: 'logger' という名前で Logger 効果の実装に依存することを宣言
+fn greet(name: String)(effect logger: Logger): Unit {
   // パラメータ名を使って効果操作を呼び出す
-  console.log(s"こんにちは、${name}さん！")
+  logger.log(s"こんにちは、${name}さん！")
 }
 
 // 複数の Effect パラメータを持つ関数
-// 'log' という名前で Console 効果、'state' という名前で State<Int> 効果に依存
-fn counter(effect log: Console, effect state: State<Int>): Int {
+// 'log' という名前で Logger 効果、'state' という名前で State<Int> 効果に依存
+fn counter(effect log: Logger, effect state: State<Int>): Int {
   let current = state.get()
   log.log(s"現在の値: $current")
   state.set(current + 1)
@@ -145,14 +153,14 @@ fn counter(effect log: Console, effect state: State<Int>): Int {
 }
 
 // ファイル操作の例 (異なる実装に依存)
-// 'localFs' と 'remoteFs' という名前で FileEffect の異なる実装に依存
-fn processFiles(effect localFs: FileEffect, effect remoteFs: FileEffect): Result<Unit, Error> {
-  let handle1 = localFs.open("local.txt", FileMode.Read)? // localFs に束縛されたハンドラが使われる
-  let content = localFs.read(&handle1)?
-  localFs.close(handle1)?
+// 'localFs' と 'remoteFs' という名前で FileSystem の異なる実装に依存
+fn processFiles(effect localFs: FileSystem, effect remoteFs: FileSystem): Result<Unit, Error> {
+  let handle1 = localFs.open("local.txt", FileMode.Read)? // localFs に束縛されたハンドラ実装が使われる
+  let content = localFs.read(&handle1)? // read 操作も定義されていると仮定
+  localFs.close(handle1)? // close 操作も定義されていると仮定
 
-  let handle2 = remoteFs.open("remote/data.zip", FileMode.Write)? // remoteFs に束縛されたハンドラが使われる
-  remoteFs.write(&mut handle2, content)?
+  let handle2 = remoteFs.open("remote/data.zip", FileMode.Write)? // remoteFs に束縛されたハンドラ実装が使われる
+  remoteFs.write(&mut handle2, content)? // write 操作も定義されていると仮定
   remoteFs.close(handle2)?
 
   Result.Ok(())
@@ -162,164 +170,196 @@ fn processFiles(effect localFs: FileEffect, effect remoteFs: FileEffect): Result
 **Effect パラメータ (`effect alias: EffectType`) の意味:**
 
 1. **効果発生の可能性:** この関数は、`alias` という名前を通じて `EffectType` で定義された操作を実行する可能性があります。
-2. **ハンドラ依存性:** この関数を呼び出す際には、`alias` という名前に対して `EffectType` を実装するハンドラインスタンスが提供されている必要があります。
-3. **効果操作の呼び出し:** 関数内では、`alias.operation(...)` という構文で効果操作を呼び出します。この呼び出しは、定義により **代数的効果のメカニズム（中断と継続処理）** を起動します。
+2. **ハンドラ依存性:** この関数を呼び出す際には、`alias` という名前に対して `EffectType` を実装するハンドラを持つインスタンスが `with` 構文によって提供されている必要があります。
+3. **効果操作の呼び出し:** 関数内では、`alias.operation(...)` という構文で効果操作を呼び出します。この呼び出しは、対応する `with` 構文で提供されたハンドラ実装を通じて **代数的効果のメカニズム（中断と継続処理）** を起動します。
 
-この Effect パラメータ構文により、関数が必要とする名前付きの効果実装への依存性が明確になり、従来の `& EffectType` という戻り値型への注釈は不要になります。
+この Effect パラメータ構文により、関数が必要とする名前付きの効果実装への依存性が明確になります。
 
-## 8.5 効果ハンドラインスタンスの提供 (`with` 構文)
+## 8.5 効果ハンドラの提供 (`with` 構文)
 
-関数が必要とする Effect パラメータに対して、具体的なハンドラインスタンスを提供（注入）するために `with` 構文を使用します。`with` 構文は、特定のスコープ内でハンドラを有効にします。
+関数が必要とする Effect パラメータに対して、具体的なハンドラ実装を持つインスタンスを提供（注入）するために `with` 構文を使用します。`with` 構文は、特定のスコープ内でハンドラを有効にします。
 
 **`with` 構文:**
 
 ```protorun
-with alias1 = handlerInstance1: EffectType1,
-     alias2 = handlerInstance2: EffectType2,
+// 型注釈を省略した場合 (型推論される)
+with alias1 = instance1,
+     alias2 = instance2,
      ...
 {
   // このブロック内で、指定されたエイリアスに対応するハンドラが有効になる
+  // instance1 は alias1 に対応する EffectType を実装するハンドラを持つ必要がある
+  // ... Effect パラメータを持つ関数を呼び出すコード ...
+}
+
+// 型注釈を明示した場合
+with alias1 = instance1: EffectType1,
+     alias2 = instance2: EffectType2,
+     ...
+{
+  // このブロック内で、指定されたエイリアスに対応するハンドラが有効になる
+  // instance1 は EffectType1 を実装するハンドラを持つ必要がある
   // ... Effect パラメータを持つ関数を呼び出すコード ...
 }
 ```
 
-* `alias = handlerInstance: EffectType`:
-  * `handlerInstance`: 提供するハンドラ型のインスタンス（値）。`HandlerType { field: value }` のようにその場で生成することも、既存の変数を使うこともできます。
-  * `alias`: このハンドラインスタンスを束縛する名前（エイリアス）。関数側の Effect パラメータのエイリアスと対応します。
-  * `EffectType`: このハンドラが実装する効果インターフェース。型チェックに使われます。
+* `alias = instance`:
+  * `instance`: 提供するインスタンス（値）。
+  * `alias`: このインスタンスをハンドラとして束縛する名前（エイリアス）。関数側の Effect パラメータのエイリアスと対応します。
+* `: EffectType`: **省略可能な型注釈**。このインスタンスをどの効果インターフェース (`EffectType`) のハンドラとして使用するかを明示的に指定します。省略された場合、`alias` に対応する Effect パラメータと `instance` の型から型推論によって決定されます。インスタンスが複数の効果インターフェースを実装している場合など、曖昧さを排除するために明示的な注釈が役立ちます。
 * カンマ区切りで複数のハンドラを同時に指定できます。これによりネストが深くなるのを防ぎます。
-* **スコープ:** `with` ブロック `{ ... }` 内で、指定されたエイリアスに対応する Effect パラメータを持つ関数が呼び出されると、束縛されたハンドラインスタンスが効果処理のために使用されます。
+* **スコープ:** `with` ブロック `{ ... }` 内で、指定されたエイリアスに対応する Effect パラメータを持つ関数が呼び出されると、束縛されたインスタンス (`instance`) に関連付けられたハンドラ実装（型注釈があればそれに従う）が効果処理のために使用されます。
 
 **使用例:**
 
 ```protorun
-// ハンドラ型定義 (再掲)
-handler ConsoleHandler: Console { /* ... */ }
-handler StateHandler<S>: State<S> { let mutable state: S }
+// 型定義 (再掲)
+type Counter { let mutable count: Int }
+type ConsoleLogger {}
+type FileSystemConfig { let basePath: String }
+type S3Config { let bucket: String, let region: String }
+
+// ハンドラ実装 (再掲)
+handler State<Int> for Counter { /* ... */ }
+handler Logger for ConsoleLogger { /* ... */ }
+handler FileSystem for FileSystemConfig { /* ... */ }
+// S3 用のハンドラ実装 (仮)
+handler FileSystem for S3Config { /* ... */ }
 
 // 関数定義 (再掲)
-fn counter(effect log: Console, effect state: State<Int>): Int { /* ... */ }
+fn counter(effect log: Logger, effect state: State<Int>): Int { /* ... */ }
+fn processFiles(effect localFs: FileSystem, effect remoteFs: FileSystem): Result<Unit, Error> { /* ... */ }
 
-// with を使ってハンドラインスタンスを提供・注入
-with log = ConsoleHandler {}, // ConsoleHandler インスタンスを 'log' に束縛
-     state = StateHandler<Int> { state: 0 } // StateHandler インスタンスを 'state' に束縛
-     : Console, State<Int> // 型を明示 (省略可能か？要検討)
+// インスタンス生成
+let logger = ConsoleLogger {}
+let counterState = Counter { count: 0 }
+let localFsConfig = FileSystemConfig { basePath: "/tmp/data" }
+let s3FsConfig = S3Config { bucket: "my-app-bucket", region: "us-east-1" }
+
+// with を使ってインスタンスを提供・注入 (型注釈なし、推論される)
+with log = logger,
+     state = counterState
 {
-  let val1 = counter() // counter は log と state ハンドラを使って実行される
+  let val1 = counter()
   let val2 = counter()
   println(s"最終値: ${val2}")
 }
 
-// 別の例: ファイルシステム
-handler LocalFileHandler: FileSystem { let basePath: String }
-handler S3FileHandler: FileSystem { let bucket: String, let region: String }
-fn processFiles(effect localFs: FileEffect, effect remoteFs: FileEffect): Result<Unit, Error> { /* ... */ }
-
-let localConfig = "/tmp/data"
-let s3Config = ("my-app-bucket", "us-east-1")
-
-with localFs = LocalFileHandler { basePath: localConfig },
-     remoteFs = S3FileHandler { bucket: s3Config.0, region: s3Config.1 }
-     : FileEffect // 同じ EffectType に複数のハンドラを異なるエイリアスで束縛
+// 別の例: ファイルシステム (型注釈を明示)
+with localFs = localFsConfig: FileSystem, // FileSystem として使用することを明示
+     remoteFs = s3FsConfig: FileSystem // FileSystem として使用することを明示
 {
   processFiles()?
 }
+
+// 型注釈が必要になるかもしれない例 (仮)
+// もし `myInstance` が `EffectA` と `EffectB` の両方を実装していた場合
+// fn foo(effect a: EffectA) { ... }
+// fn bar(effect b: EffectB) { ... }
+// with fx = myInstance: EffectA { // EffectA として使うことを明示
+//   foo()
+// }
+// with fx = myInstance: EffectB { // EffectB として使うことを明示
+//   bar()
+// }
 ```
 
-この `with` 構文により、効果を使うコード（関数）と効果を実装するコード（ハンドラ）を分離し、合成点（`with` ブロック）で依存性を注入するという、疎結合な設計が可能になります。
+この `with` 構文により、効果を使うコード（関数）と効果を実装するコード（ハンドラ）を分離し、合成点（`with` ブロック）で依存性を注入するという、疎結合な設計が可能になります。型推論により簡潔に記述できますが、必要に応じて型注釈で明示性を提供することもできます。
 
 ## 8.6 継続制御
 
-代数的効果の核心は、ハンドラが **継続 (`resume`)** を制御できる点にあります。効果操作 (`alias.operation()`) が呼び出されると、計算は中断され、制御が対応するハンドラのメソッド実装に移ります。このとき、ハンドラは中断箇所からの「残りの計算」を表す継続を受け取ります。
+代数的効果の核心は、ハンドラが **継続 (`resume`)** を制御できる点にあります。効果操作 (`alias.operation()`) が呼び出されると、計算は中断され、制御が `with` で提供されたインスタンスに対応するハンドラのメソッド実装に移ります。このとき、ハンドラは中断箇所からの「残りの計算」を表す継続を受け取ります。
 
 ハンドラのメソッド実装は、この継続をどう扱うかを決定できます。
 
-### 8.6.1 暗黙的な継続（デフォルト）
+### 8.6.1 暗黙的な継続呼び出し (デフォルト)
 
-ハンドラ関数式の本体で継続を明示的に扱わない場合、デフォルトの動作として、関数式の評価が完了した後に暗黙的に継続が **1回だけ** 呼び出され、関数式の評価結果が継続に渡されます。
+ハンドラ関数が継続 (`resume`) をパラメータとして受け取らない場合、デフォルトの動作として、関数本体の評価が完了した後に暗黙的に継続が **1回だけ** 呼び出され、関数本体の評価結果が継続に渡されます。
 
 ```protorun
-handler SimpleStateHandler<S>: State<S> {
-  let mutable state: S
-  let get = fn (): S => self.state // 戻り値 state が暗黙的に継続に渡される
-  let set = fn (newState: S): Unit => {
-    self.state = newState
-    // 何も返さない (Unit) が、暗黙的に継続が呼び出される
+// Counter 型は State<Int> を実装すると仮定
+handler State<Int> for Counter {
+  // get は resume パラメータを受け取らない
+  let get = fn (self): Int => self.count
+  // => 実行後、暗黙的に resume(self.count) が呼び出される
+
+  // set は resume パラメータを受け取らない
+  let set = fn (self, newState: Int): Unit => {
+    self.count = newState
+    // => 実行後、暗黙的に resume(()) が呼び出される
   }
 }
 ```
 
-このスタイルは、単純な状態変更や副作用の実行に適しており、コードが簡潔になります。
+このスタイルは、単純な状態変更や副作用の実行に適しており、ハンドラの実装を簡潔にします。ハンドラ関数自体の戻り値型 `R` は、継続に渡される値の型となります。
 
-### 8.6.2 明示的な継続
+### 8.6.2 明示的な継続呼び出し
 
-継続をより細かく制御したい場合、ハンドラ関数式は継続を明示的にパラメータとして受け取ることができます。継続の型は、残りの計算が期待する入力と出力を反映します。
+継続をより細かく制御したい場合、ハンドラ関数は継続を明示的にパラメータとして受け取ることができます。継続の型は `(R) -> S` の形式で、`R` は継続に渡す値の型、`S` は `with` 式全体の最終的な結果の型を表します。
 
 ```protorun
-handler ExplicitConsoleHandler: Console {
+// ConsoleLogger 型は Logger を実装すると仮定
+handler Logger for ConsoleLogger {
   // log 操作は Unit を返す計算の継続を受け取る
-  let log = fn (message: String, resume: () -> Unit): Unit => {
+  // ハンドラ関数自体の戻り値は Unit (継続呼び出し後の値ではない)
+  let log = fn (self, message: String, resume: (Unit) -> S): Unit => {
     println(message)
-    resume() // 明示的に継続を呼び出す
+    resume(()) // 明示的に継続を呼び出す。結果は S 型。
   }
+}
 
-  // readLine 操作は String を受け取る計算の継続を受け取る
-  let readLine = fn (resume: (String) -> Unit): Unit => {
-    let input = readLineFromStdio() // 仮の関数
-    resume(input) // 読み取った値を継続に渡して再開
+// Reader 効果の例
+effect Reader<Env> { fn ask(): Env }
+// EnvProvider<Env> 型は Reader<Env> を実装すると仮定
+handler Reader<Env> for EnvProvider<Env> {
+  // ask 操作は Env を受け取る計算の継続を受け取る
+  // ハンドラ関数自体の戻り値は Unit
+  let ask = fn (self, resume: (Env) -> S): Unit => {
+    let env = self.environment // EnvProvider が environment フィールドを持つと仮定
+    resume(env) // 環境の値を継続に渡して再開。結果は S 型。
   }
 }
 ```
 
-明示的な継続スタイルは、非同期処理や、継続の呼び出しタイミングを制御したい場合に有用です。
+明示的な継続スタイルは、継続の呼び出しタイミングを制御したり、継続に渡す値を操作したりする場合に有用です。ハンドラ関数自体の戻り値型は、`with` 式全体の型 `S` とは通常異なります。
 
-### 8.6.3 特殊な継続制御 (`noresume`, `multiresume`)
+### 8.6.3 継続を呼び出さない (大域脱出)
 
-ハンドラ関数式は、継続の呼び出し方をさらに特殊化できます。これは、関数式のシグネチャ（戻り値型）で指定します。
+ハンドラ関数が継続 `resume` を呼び出さずに値を返す場合、その値が `with` 式全体の最終的な結果となります。この場合、ハンドラ関数の戻り値型は `with` 式が期待する型 `S` と一致する必要があります。残りの計算は破棄されます。これは例外処理などで利用されます。
 
-* **継続を呼び出さない (`noresume`)**: 例外処理（大域脱出）のように、残りの計算を実行せずに処理を終了する場合に使います。関数式の戻り値型に `noresume` (またはそれに類する表現) を付けます。
+```protorun
+// 効果インターフェース
+effect Exception<E> { fn raise<T>(error: E): T } // T は任意の型
 
-    ```protorun
-    effect Exception<E> { fn raise<T>(error: E): T } // T は任意の型
+// ハンドラ実装 (状態は持たない例)
+type ExceptionHandler<E> {} // ダミー型
+handler Exception<E> for ExceptionHandler<E> {
+  // raise が呼ばれたら継続を破棄し、Result.Err を返す。
+  // このハンドラ関数自体の戻り値型は Result<T, E> であり、
+  // これは with 式全体の期待する型と一致する必要がある。
+  let raise = fn <T>(self, error: E, resume: (Nothing) -> Result<T, E>): Result<T, E> => {
+    // resume の引数型が Nothing なのは、この継続が呼び出せないことを示す慣習。
+    // 実際に resume() を呼び出さずに Result<T, E> 型の値を返す。
+    Result.Err(error)
+  }
+}
 
-    handler ExceptionHandler<E>: Exception<E> {
-      // raise が呼ばれたら継続を破棄し、Result.Err を返す
-      let raise = fn <T>(error: E): noresume Result<T, E> => {
-        Result.Err(error) // resume() を呼び出さない
-      }
-    }
+// 使用例
+fn runWithException<T, E>(action: (effect exc: Exception<E>) -> T): Result<T, E> = {
+  let handlerInstance = ExceptionHandler<E> {}
+  // この with 式は Result<T, E> 型の値を返す
+  with exc = handlerInstance {
+    // action() 内で exc.raise が呼ばれると、ハンドラの raise が実行され、
+    // resume が呼び出されずに Result.Err(error) が with 式の結果となる。
+    // action() が正常終了した場合、その結果 T が Result.Ok で包まれて返る。
+    let result: T = action() // action の戻り値型は T
+    Result.Ok(result) // 正常終了時の結果も Result<T, E> 型
+  }
+}
+```
+継続を呼び出さないことを示すために、`resume` パラメータの引数型として `Nothing` 型（または他のボトム型）を使用することが推奨されますが、必須ではありません。重要なのは、ハンドラ関数が `resume` を呼び出さずに、`with` 式が期待する型 `S` の値を返すことです。
 
-    // 使用例
-    fn runWithException<T, E>(action: (effect exc: Exception<E>) -> T): Result<T, E> = {
-      with exc = ExceptionHandler<E>(): Exception<E> {
-        // action() 内で exc.raise が呼ばれると、この with ブロック全体が Err を返す
-        Result.Ok(action(effect exc = exc))
-      }
-    }
-    ```
-
-* **継続を複数回呼び出す (`multiresume`)**: 非決定性計算（バックトラック）のように、残りの計算を異なる状態で複数回試す場合に使います。関数式の戻り値型に `multiresume` (またはそれに類する表現) を付けます。
-
-    ```protorun
-    effect Choice { fn choose<T>(options: [T]): T }
-
-    handler ChoiceHandler: Choice {
-      // choose が呼ばれたら、各選択肢で継続を試す
-      let choose = fn <T>(options: [T]): multiresume T => {
-        for option in options {
-          // 各選択肢で継続を呼び出し、結果を試す (Result<T, ResumeAgain> のような型が必要か？)
-          let result = resume(option)
-          // もし result が成功ならそれを返し、そうでなければ次の選択肢へ
-          // ... (詳細なメカニズムは要検討) ...
-        }
-        // すべて失敗した場合の処理
-      }
-    }
-    ```
-
-    (`multiresume` の正確なセマンティクスと型付けは複雑であり、さらなる検討が必要です。)
-
-これらの継続制御能力により、代数的効果は非常に表現力の高い計算効果管理メカニズムとなります。
+継続の扱いは、ハンドラ関数のシグネチャ（`resume` パラメータの有無と型）と、関数本体での `resume` の呼び出し方によって決まります。
 
 ## 8.7 ライフサイクル管理効果
 
@@ -337,12 +377,14 @@ effect ManagedResource<R> {
   fn release(resource: R): Result<Unit, Error> // 明示的な解放？
 }
 
-// ハンドラ型 (リソースと状態を保持)
-handler ResourceManager<R>: ManagedResource<R> {
+// ハンドラが実装される型 (リソースと状態を保持)
+type ResourceManager<R> {
   let resourceConfig: ResourceConfig // リソース生成に必要な設定
   let mutable resourceInstance: Option<R> = None // 保持するリソースインスタンス
-
-  fn acquire(): Result<R, Error> = {
+}
+// ハンドラ実装
+handler ManagedResource<R> for ResourceManager<R> {
+  fn acquire(self): Result<R, Error> = {
     if self.resourceInstance.isSome() {
       // 既に獲得済みの場合のエラー処理など
     }
@@ -370,14 +412,14 @@ handler ResourceManager<R>: ManagedResource<R> {
 
 C++ の RAII や Rust の `Drop` トレイトのように、スコープを抜けたら自動的にリソースが解放される仕組みと代数的効果をどう連携させるかは重要な設計課題です。
 
-* **`with` ブロックと連動:** `with alias = handlerInstance: EffectType { ... }` ブロックを抜ける際に、`handlerInstance` が持つリソース（例えば `release` メソッドを持つフィールド）を自動的に解放する、というルールを導入することが考えられます。
+* **`with` ブロックと連動:** `with alias = instance: EffectType { ... }` または `with alias = instance { ... }` ブロックを抜ける際に、`instance` が持つリソース（例えば `release` メソッドを持つフィールドや、`Drop` のような特別なトレイトを実装している場合）を自動的に解放する、というルールを導入することが考えられます。
 * **`LifecycleEffect` のような規約:** 特定のインターフェース（例: `acquire`/`release` を持つ `LifecycleEffect`）をハンドラが実装していれば、`with` が自動解放を試みる、という方法も考えられます。
 
 この領域は、所有権システムとの連携も含め、さらなる詳細な設計が必要です。
 
 ## 8.8 Effect パラメータと依存性注入 (再掲)
 
-Effect パラメータ (`effect alias: EffectType`) と拡張された `with` 構文 (`with alias = Handler(): EffectType, ...`) は、依存性注入パターンを型安全かつ明示的に実現するための主要なメカニズムとなります。
+Effect パラメータ (`effect alias: EffectType`) と `with` 構文 (`with alias = instance: EffectType` または `with alias = instance`) は、依存性注入パターンを型安全かつ明示的に実現するための主要なメカニズムとなります。
 
 これにより、関数は抽象的な効果インターフェースにのみ依存し、具体的な実装（ハンドラ）は呼び出し側（`with` ブロック）で注入されるため、疎結合でテストしやすいコードを書くことができます。
 
@@ -386,11 +428,11 @@ Effect パラメータ (`effect alias: EffectType`) と拡張された `with` �
 代数的効果とハンドラを設計する際には、以下の点を考慮することが重要です：
 
 1. **効果の粒度**: 効果インターフェースは適切な粒度で設計し、関連する操作をグループ化します。
-2. **ハンドラの責務**: ハンドラは効果の実装と、必要な状態や設定の管理を担当します。状態を持つハンドラと持たないハンドラを適切に使い分けます。
-3. **データと効果の分離**: 効果インターフェースの操作シグネチャには、ハンドラ固有のデータを含めず、抽象性を保ちます。データはハンドラインスタンスが保持するか、操作の引数として渡されるべきかを慎重に検討します（通常はハンドラが保持する方が疎結合）。
-4. **継続制御の選択**: ハンドラの各操作実装において、継続をどう扱うか（暗黙的、明示的、`noresume`, `multiresume`）を適切に選択します。
-5. **合成可能性**: 異なる効果やハンドラを `with` 構文で容易に組み合わせられるように設計します。
-6. **型安全性**: Effect パラメータと `with` 構文により、ハンドラの依存関係と提供が型レベルでチェックされることを保証します。
+2. **ハンドラの責務**: ハンドラ実装は効果の操作ロジックを担当します。必要な状態や設定は、ハンドラが実装される型 (`HandlerName`) のインスタンスが管理します。
+3. **データと効果の分離**: 効果インターフェースの操作シグネチャには、ハンドラ固有のデータを含めず、抽象性を保ちます。データはハンドラが実装される型のインスタンス (`self`) が保持するか、操作の引数として渡されるべきかを慎重に検討します（通常は `self` が保持する方がカプセル化に適しています）。
+4. **継続制御の選択**: ハンドラの各操作実装において、継続をどう扱うか（暗黙的、明示的、呼び出さない）を、関数のシグネチャと `resume` の呼び出し方によって適切に表現します。
+5. **合成可能性**: 異なる効果を持つインスタンスを `with` 構文で容易に組み合わせられるように設計します。
+6. **型安全性**: Effect パラメータと `with` 構文（およびオプションの型注釈）により、ハンドラ実装を持つインスタンスの依存関係と提供が型レベルでチェックされることを保証します。
 7. **パフォーマンス**: （言語実装の課題として）効果処理メカニズム（中断、継続キャプチャ、ハンドラ呼び出し）のオーバーヘッドを最小限に抑える最適化が重要です。
 
 代数的効果は、計算効果を構造化し、型安全に管理するための強力なツールであり、関数型プログラミングの純粋性と命令型プログラミングの表現力や状態管理を組み合わせるための有望なアプローチです。

@@ -11,8 +11,8 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated},
 };
 
-// EffectParameter をインポート
-use crate::protorun::ast::{Expr, BinaryOperator, UnaryOperator, ComprehensionKind, BlockItem, EffectParameter, Parameter};
+// EffectParameter, Parameter, WithBinding をインポート
+use crate::protorun::ast::{Expr, BinaryOperator, UnaryOperator, ComprehensionKind, BlockItem, EffectParameter, Parameter, WithBinding};
 // keyword, parameter をインポート
 use super::common::{ParseResult, ws_comments, identifier_string, delimited_list, calculate_span, keyword, parameter};
 use super::literals::{int_literal_expr, float_literal_expr, string_literal_expr, bool_literal_expr, unit_literal_expr};
@@ -631,30 +631,49 @@ pub fn bind_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a,
     }))
 }
 
-/// with式をパース
-pub fn with_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
-    let (input, _) = ws_comments(tag("with"))(input)?;
-
-    // ハンドラ式をパース (alt と HandlerSpec を削除)
-    let (input, handler_expr) = logical_or(input, original_input)?;
-    let handler = Box::new(handler_expr);
-
-    // オプションの効果型
-    let (input, effect_type) = opt(
+/// with 式の束縛をパース: Identifier "=" Expression (":" TypeRef)?
+fn parse_with_binding<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, WithBinding> {
+    let start_pos = input.as_ptr() as usize - original_input.as_ptr() as usize;
+    let (input, alias) = ws_comments(identifier_string)(input)?;
+    let (input, _) = ws_comments(char('='))(input)?;
+    let (input, instance) = expression(input, original_input)?;
+    let (input, type_annotation) = opt(
         preceded(
             ws_comments(char(':')),
             |i| parse_type(i, original_input)
         )
     )(input)?;
-    
+    let end_pos = input.as_ptr() as usize - original_input.as_ptr() as usize;
+    let span = calculate_span(original_input, &original_input[start_pos..end_pos]);
+
+    Ok((input, WithBinding {
+        alias,
+        instance,
+        type_annotation,
+        span,
+    }))
+}
+
+
+/// with式をパース: with WithBinding ("," WithBinding)* BlockExpr
+pub fn with_expr<'a>(input: &'a str, original_input: &'a str) -> ParseResult<'a, Expr> {
+    let start_pos = input.as_ptr() as usize - original_input.as_ptr() as usize;
+    let (input, _) = keyword("with")(input)?;
+
+    // 複数の束縛をパース
+    let (input, bindings) = separated_list0(
+        ws_comments(char(',')),
+        |i| parse_with_binding(i, original_input)
+    )(input)?;
+
     // 本体（ブロック式）
     let (input, body) = block_expr(input, original_input)?;
-    
-    let span = calculate_span(original_input, input);
-    
+
+    let end_pos = input.as_ptr() as usize - original_input.as_ptr() as usize;
+    let span = calculate_span(original_input, &original_input[start_pos..end_pos]);
+
     Ok((input, Expr::WithExpr {
-        handler,
-        effect_type,
+        bindings,
         body: Box::new(body),
         span,
     }))

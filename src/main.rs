@@ -121,10 +121,10 @@ fn decl_to_string(decl: &Decl) -> String {
             format!("var {}{} = {}", name, type_str, expr_to_string(value))
         },
         Decl::HandlerDecl(handler_decl) => {
-            // ハンドラ宣言の簡易的な文字列表現
-            format!("handler {} : {} {{ ... members ... }}",
-                handler_decl.name,
-                type_to_string(&handler_decl.effect_type)
+            // 変更: 新しいハンドラ宣言の文字列表現
+            format!("handler {} for {} {{ ... members ... }}",
+                type_to_string(&handler_decl.effect_type),
+                type_to_string(&handler_decl.target_type)
                 // TODO: メンバーの表示も実装する
             )
         }
@@ -310,24 +310,30 @@ fn expr_to_string(expr: &Expr) -> String {
                 expr_to_string(final_expr)
             )
         },
-        Expr::WithExpr { handler, effect_type, body, .. } => {
-            // handler は Box<Expr> なので直接 expr_to_string を呼ぶ
-            let handler_str = expr_to_string(handler);
+        Expr::WithExpr { bindings, body, .. } => {
+            // 変更: 複数の束縛を表示
+            let bindings_str: Vec<String> = bindings.iter()
+                .map(|binding| {
+                    let type_str = if let Some(t) = &binding.type_annotation {
+                        format!(": {}", type_to_string(t))
+                    } else {
+                        String::new()
+                    };
+                    format!("{} = {}{}",
+                        binding.alias,
+                        expr_to_string(&binding.instance),
+                        type_str
+                    )
+                })
+                .collect();
 
-            let effect_str = if let Some(effect) = effect_type {
-                format!(": {}", type_to_string(effect))
-            } else {
-                String::new()
-            };
-            
-            format!("with {}{}{}",
-                handler_str,
-                effect_str,
+            format!("with {} {}",
+                bindings_str.join(", "),
                 expr_to_string(body)
             )
         },
         // FunctionExpr の表示処理
-        Expr::FunctionExpr { parameters, effect_parameters, implicit_parameters, body, .. } => { // Renamed from LambdaExpr
+        Expr::FunctionExpr { parameters, effect_parameters, implicit_parameters, body, .. } => {
             let params_str = parameters.as_ref().map_or("".to_string(), |params| { // パラメータなしの場合は空文字列
                 let p_strs: Vec<String> = params.iter()
                     .map(|p| {

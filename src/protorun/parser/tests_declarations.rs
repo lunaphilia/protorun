@@ -3,7 +3,7 @@
 use super::*;
 // 必要な AST ノードをインポート
 use crate::protorun::ast::{
-    Decl, TypeDecl, Type, HandlerMember, HandlerFunctionBody, Expr,
+    Decl, TypeDecl, Type, Expr,
 };
 
 #[test]
@@ -154,10 +154,11 @@ fn test_parse_impl_declaration() {
 
 #[test]
 fn test_parse_handler_declaration_simple() {
+    // 変更: 新しい構文に合わせた入力文字列
     let input = r#"
-        handler ConsoleHandler: Console {
-            let log = fn (msg: String) => println(msg)
-            let read = fn () => readLine()
+        handler Console for ConsoleHandler {
+            let log = fn (self, msg: String) => println(msg)
+            let read = fn (self) => readLine()
         }
     "#;
     let mut parser = Parser::new(None);
@@ -166,41 +167,38 @@ fn test_parse_handler_declaration_simple() {
     assert_eq!(program.declarations.len(), 1);
     match &program.declarations[0] {
         Decl::HandlerDecl(decl) => {
-            assert_eq!(decl.name, "ConsoleHandler");
-            assert!(decl.generic_params.is_none());
             match &decl.effect_type {
-                Type::Simple { name, .. } => assert_eq!(name, "Console"),
-                _ => panic!("Expected simple effect type"),
+                Type::Simple { name, .. } => assert_eq!(name, "Console"), // EffectType は Console
+                _ => panic!("Expected simple effect type Console"),
+            }
+            match &decl.target_type {
+                Type::Simple { name, .. } => assert_eq!(name, "ConsoleHandler"), // TargetType は ConsoleHandler
+                _ => panic!("Expected simple target type ConsoleHandler"),
             }
             assert_eq!(decl.members.len(), 2);
-            match &decl.members[0] {
-                HandlerMember::Function(f) => {
-                    assert_eq!(f.name, "log");
-                    assert!(f.generic_params.is_none());
-                    match &f.body {
-                        HandlerFunctionBody::Function(Expr::FunctionExpr { parameters, .. }) => {
-                             assert!(parameters.is_some());
-                             assert_eq!(parameters.as_ref().unwrap().len(), 1);
-                             assert_eq!(parameters.as_ref().unwrap()[0].name, "msg");
-                        }
-                        _ => panic!("Expected Function body"),
-                    }
+
+            let f0 = &decl.members[0];
+            assert_eq!(f0.name, "log");
+            assert!(f0.generic_params.is_none());
+            match &f0.body {
+                Expr::FunctionExpr { parameters, .. } => {
+                    assert!(parameters.is_some());
+                    assert_eq!(parameters.as_ref().unwrap().len(), 2); // self, msg
+                    assert_eq!(parameters.as_ref().unwrap()[0].name, "self");
+                    assert_eq!(parameters.as_ref().unwrap()[1].name, "msg");
                 }
-                _ => panic!("Expected Function member"),
+                _ => panic!("Expected FunctionExpr body for log"),
             }
-             match &decl.members[1] {
-                 HandlerMember::Function(f) => {
-                    assert_eq!(f.name, "read");
-                     match &f.body {
-                        HandlerFunctionBody::Function(Expr::FunctionExpr { parameters, .. }) => {
-                             // パラメータがない場合は Some(vec![]) になるはず
-                             assert!(parameters.is_some());
-                             assert!(parameters.as_ref().unwrap().is_empty());
-                        }
-                        _ => panic!("Expected Function body"),
-                    }
+
+            let f1 = &decl.members[1];
+            assert_eq!(f1.name, "read");
+            match &f1.body {
+                Expr::FunctionExpr { parameters, .. } => {
+                    assert!(parameters.is_some());
+                    assert_eq!(parameters.as_ref().unwrap().len(), 1); // self
+                    assert_eq!(parameters.as_ref().unwrap()[0].name, "self");
                 }
-                _ => panic!("Expected Function member"),
+                _ => panic!("Expected FunctionExpr body for read"),
             }
         }
         _ => panic!("Expected HandlerDecl"),
@@ -210,54 +208,9 @@ fn test_parse_handler_declaration_simple() {
 #[test]
 fn test_parse_handler_declaration_with_state() {
     let input = r#"
-        handler StateHandler<S>: State<S> {
-            var state: S
-            let get = fn () => self.state
-            let set = fn (new_state: S) => { self.state = new_state }
-        }
-    "#;
-     let mut parser = Parser::new(None);
-    let program = parser.parse_program(input).unwrap();
-
-    assert_eq!(program.declarations.len(), 1);
-     match &program.declarations[0] {
-        Decl::HandlerDecl(decl) => {
-            assert_eq!(decl.name, "StateHandler");
-            assert!(decl.generic_params.is_some());
-            assert_eq!(decl.generic_params.as_ref().unwrap().len(), 1);
-            assert_eq!(decl.generic_params.as_ref().unwrap()[0].name, "S");
-            assert_eq!(decl.members.len(), 3); // var state, let get, let set
-
-            match &decl.members[0] {
-                HandlerMember::Field(f) => {
-                    assert!(f.is_mutable);
-                    assert_eq!(f.name, "state");
-                 match &f.type_annotation {
-                        Type::Simple{ name, .. } => assert_eq!(name, "S"),
-                        _ => panic!("Expected simple type S for state"),
-                    }
-                }
-                _ => panic!("Expected Field member for state"),
-            }
-             match &decl.members[1] {
-                HandlerMember::Function(f) => assert_eq!(f.name, "get"),
-                _ => panic!("Expected Function member for get"),
-            }
-             match &decl.members[2] { // Assertion for 'set'
-                HandlerMember::Function(f) => assert_eq!(f.name, "set"),
-                _ => panic!("Expected Function member for set"),
-             }
-        }
-        _ => panic!("Expected HandlerDecl"),
-    }
-}
-
-#[test]
-fn test_parse_handler_with_resume_noresume() {
-    let input = r#"
-        handler AsyncHandler: Async {
-            let await = fn (promise: Promise<T>) resume : R => promise.then(resume) // カンマとResumeTypeを削除し、戻り値型をresumeの後ろに移動
-            let fail = fn (err: Error) noresume : Void => raise(err) // コロンをnoresumeの後ろに移動
+        handler State<S> for StateHandler<S> {
+            let get = fn (self) => self.state
+            let set = fn (self, new_state: S) => { self.state = new_state }
         }
     "#;
     let mut parser = Parser::new(None);
@@ -266,43 +219,51 @@ fn test_parse_handler_with_resume_noresume() {
     assert_eq!(program.declarations.len(), 1);
     match &program.declarations[0] {
         Decl::HandlerDecl(decl) => {
-            assert_eq!(decl.name, "AsyncHandler");
+            match &decl.effect_type {
+                Type::Generic { base_type, type_arguments, .. } => {
+                    assert_eq!(base_type, "State");
+                    assert_eq!(type_arguments.len(), 1);
+                    match &type_arguments[0] {
+                        Type::Simple { name, .. } => assert_eq!(name, "S"),
+                        _ => panic!("Expected generic argument S"),
+                    }
+                },
+                _ => panic!("Expected generic effect type State<S>"),
+            }
+            match &decl.target_type {
+                Type::Generic { base_type, type_arguments, .. } => {
+                    assert_eq!(base_type, "StateHandler");
+                    assert_eq!(type_arguments.len(), 1);
+                     match &type_arguments[0] {
+                        Type::Simple { name, .. } => assert_eq!(name, "S"),
+                        _ => panic!("Expected generic argument S"),
+                    }
+                },
+                _ => panic!("Expected generic target type StateHandler<S>"),
+            }
             assert_eq!(decl.members.len(), 2);
 
-            // Test 'await' function (resume)
-            match &decl.members[0] {
-                HandlerMember::Function(f) => {
-                    assert_eq!(f.name, "await");
-                    match &f.body {
-                        HandlerFunctionBody::ResumeFunction(rf) => {
-                            assert_eq!(rf.parameters.len(), 1);
-                            assert_eq!(rf.parameters[0].name, "promise");
-                            // TODO: Add more detailed checks for resume_type and return_type if needed
-                        }
-                        _ => panic!("Expected ResumeFunction body for 'await'"),
-                    }
+            let f0 = &decl.members[0];
+            assert_eq!(f0.name, "get");
+            match &f0.body {
+                Expr::FunctionExpr { parameters, .. } => {
+                    assert!(parameters.is_some());
+                    assert_eq!(parameters.as_ref().unwrap().len(), 1);
+                    assert_eq!(parameters.as_ref().unwrap()[0].name, "self");
                 }
-                _ => panic!("Expected Function member for 'await'"),
+                _ => panic!("Expected FunctionExpr body for get"),
             }
 
-            // Test 'fail' function (noresume)
-            match &decl.members[1] {
-                HandlerMember::Function(f) => {
-                    assert_eq!(f.name, "fail");
-                    match &f.body {
-                        HandlerFunctionBody::NoResumeFunction(nrf) => {
-                            assert_eq!(nrf.parameters.len(), 1);
-                            assert_eq!(nrf.parameters[0].name, "err");
-                            assert!(nrf.return_type.is_some()); // 戻り値型が存在することを確認
-                            match nrf.return_type.as_ref().unwrap() { // Option をアンラップして比較
-                                Type::Simple { name, .. } => assert_eq!(name, "Void"),
-                                _ => panic!("Expected Void return type for 'fail'"),
-                            }
-                        }
-                         _ => panic!("Expected NoResumeFunction body for 'fail'"),
-                    }
+            let f1 = &decl.members[1];
+            assert_eq!(f1.name, "set");
+            match &f1.body {
+                Expr::FunctionExpr { parameters, .. } => {
+                    assert!(parameters.is_some());
+                    assert_eq!(parameters.as_ref().unwrap().len(), 2);
+                    assert_eq!(parameters.as_ref().unwrap()[0].name, "self");
+                    assert_eq!(parameters.as_ref().unwrap()[1].name, "new_state");
                 }
-                _ => panic!("Expected Function member for 'fail'"),
+                _ => panic!("Expected FunctionExpr body for set"),
             }
         }
         _ => panic!("Expected HandlerDecl"),

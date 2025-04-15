@@ -149,8 +149,7 @@ pub enum Expr {
     },
     /// with式
     WithExpr {
-        handler: Box<Expr>, // HandlerSpec から Box<Expr> に変更
-        effect_type: Option<Type>,
+        bindings: Vec<WithBinding>, // 変更: 単一ハンドラから複数束縛へ
         body: Box<Expr>,
         span: Span,
     },
@@ -212,70 +211,31 @@ pub enum Decl {
     HandlerDecl(HandlerDecl), // HandlerDecl を Decl に追加
 }
 
-/// ハンドラ宣言
+/// ハンドラ宣言 (handler Effect for Type { ... })
 #[derive(Debug, Clone, PartialEq)]
 pub struct HandlerDecl {
-    pub name: String,
-    pub generic_params: Option<Vec<GenericParam>>,
-    pub effect_type: Type,
-    pub members: Vec<HandlerMember>,
+    pub effect_type: Type, // 実装する効果インターフェース
+    pub target_type: Type, // 実装対象の型
+    // generic_params は target_type に含まれる
+    pub members: Vec<LetHandlerFunction>, // 変更: HandlerMember enum を削除し、関数束縛のみに
     pub span: Span,
 }
 
-/// ハンドラメンバー (フィールド宣言 or ハンドラ関数束縛)
-#[derive(Debug, Clone, PartialEq)]
-pub enum HandlerMember {
-    Field(FieldDecl),
-    Function(LetHandlerFunction),
-}
-
-/// ハンドラ内のフィールド宣言
-#[derive(Debug, Clone, PartialEq)]
-pub struct FieldDecl {
-    pub is_mutable: bool, // var か let か
-    pub name: String,
-    pub type_annotation: Type,
-    pub span: Span,
-}
+// HandlerMember enum を削除
+// FieldDecl struct を削除 (ハンドラ内にフィールドは持たない)
 
 /// ハンドラ内の関数束縛 (let name = ...)
 #[derive(Debug, Clone, PartialEq)]
 pub struct LetHandlerFunction {
     pub name: String,
     pub generic_params: Option<Vec<GenericParam>>, // ハンドラ関数固有のジェネリクス
-    pub body: HandlerFunctionBody, // 関数本体の形式
+    pub body: Expr, // 変更: HandlerFunctionBody enum を削除し、直接 Expr を持つ
     pub span: Span,
 }
 
-/// ハンドラ関数本体の形式
-#[derive(Debug, Clone, PartialEq)]
-pub enum HandlerFunctionBody {
-    Function(Expr), // 通常の FunctionExpr
-    ResumeFunction(ResumeFunctionExpr),
-    NoResumeFunction(NoResumeFunctionExpr),
-    // MultiResumeFunction(MultiResumeFunctionExpr), // 必要なら追加
-}
-
-/// resume 付きハンドラ関数
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResumeFunctionExpr {
-    pub parameters: Vec<Parameter>, // 通常パラメータ (必須)
-    // pub resume_type: ResumeType, // resume の型 (文法変更により削除)
-    pub return_type: Option<Type>, // オプションの戻り値型
-    pub body: Box<Expr>,
-    pub span: Span,
-}
-
-/// noresume 付きハンドラ関数
-#[derive(Debug, Clone, PartialEq)]
-pub struct NoResumeFunctionExpr {
-    pub parameters: Vec<Parameter>, // 通常パラメータ (必須)
-    pub return_type: Option<Type>, // 戻り値型 (オプションに変更)
-    pub body: Box<Expr>,
-    pub span: Span,
-}
-
-// TODO: MultiResumeFunctionExpr も必要なら定義
+// HandlerFunctionBody enum を削除
+// ResumeFunctionExpr struct を削除
+// NoResumeFunctionExpr struct を削除
 
 /// ジェネリックパラメータ
 #[derive(Debug, Clone, PartialEq)]
@@ -301,13 +261,14 @@ pub struct EffectParameter {
     pub span: Span,
 }
 
-// /// Resume 型 (ハンドラ用) (文法変更により削除)
-// #[derive(Debug, Clone, PartialEq)]
-// pub struct ResumeType {
-//     pub parameters: Vec<Type>,
-//     pub return_type: Box<Type>,
-//     pub span: Span,
-// }
+/// with 式の束縛 (alias = instance [: Type])
+#[derive(Debug, Clone, PartialEq)]
+pub struct WithBinding {
+    pub alias: String,
+    pub instance: Expr,
+    pub type_annotation: Option<Type>, // オプションの型注釈
+    pub span: Span,
+}
 
 
 /// 型の表現

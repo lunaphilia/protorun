@@ -105,11 +105,19 @@ bind {
   validEmail
 }
 
-// with式（ハンドラインスタンスの提供）
-with alias1 = handlerInstance1: EffectType1,
-     alias2 = handlerInstance2: EffectType2, ...
+// with式（ハンドラ実装を持つインスタンスの提供）
+// 型注釈なし (推論される)
+with alias1 = instance1,
+     alias2 = instance2,
+     ...
 {
-  // ブロック内で alias1 や alias2 に対応する効果操作を呼び出す
+  // ...
+}
+// 型注釈あり
+with alias1 = instance1: EffectType1,
+     alias2 = instance2: EffectType2,
+     ...
+{
   // ...
 }
 ```
@@ -150,7 +158,7 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 
 - **bind式**: モナド的な計算の連鎖を簡潔に表現するための構文です。（詳細は [6.3.2 bind式](#632-bind式) を参照）
 
-- **with式**: 特定のスコープ内で効果ハンドラインスタンスを有効にするための式です。`with alias1 = handlerInstance1: EffectType1, alias2 = handlerInstance2: EffectType2, ... { bodyExpr }` の形式を取ります。カンマ区切りで複数のハンドラを同時に指定でき、ネストを回避できます。`bodyExpr` の評価結果が `with` 式全体の値となります。（詳細は [6.3.5 with式](#635-with式) を参照）
+- **with式**: 特定のスコープ内で、効果ハンドラ実装を持つインスタンスを有効にするための式です。`with alias = instance` または `with alias = instance: EffectType` の形式でハンドラを束縛し、カンマ区切りで複数指定できます。型注釈 `: EffectType` は省略可能で、省略時は型推論されます。本体のブロック式 `bodyExpr` の評価結果が `with` 式全体の値となります。（詳細は [6.3.4 with式](#634-with式) を参照）
 
 ### 6.3.1 コレクションリテラル内包表記
 
@@ -349,75 +357,94 @@ let process = fn (input: String) => {
 
 ### 6.3.4 with式
 
-`with` 式は、特定のスコープ内で効果ハンドラインスタンスを適用するために使用されます。`with alias = handlerInstance: EffectType, ... { bodyExpr }` の形式を取り、`bodyExpr` の評価結果を返します。
+`with` 式は、特定のスコープ内で、効果ハンドラ実装を持つインスタンスを適用するために使用されます。`with alias = instance` または `with alias = instance: EffectType` の形式でハンドラを束縛し、カンマ区切りで複数指定できます。本体のブロック式 `bodyExpr` の評価結果を返します。
 
-```
-// with式の返り値を変数に代入
-let result = with log = ConsoleHandler {}: Console {
+```protorun
+// 型定義とハンドラ実装 (8章より再掲)
+type ConsoleLogger {}
+handler Logger for ConsoleLogger { /* ... */ }
+type Counter { let mutable count: Int }
+handler State<Int> for Counter { /* ... */ }
+
+// インスタンス生成
+let logger = ConsoleLogger {}
+let counterState = Counter { count: 0 }
+
+// with式の返り値を変数に代入 (型注釈なし)
+let result = with log = logger, state = counterState {
   log.log("計算を開始します")
-  let x = complexCalculation()
-  log.log("計算結果: " + x.toString())
-  x  // この値がwith式の返り値となる
+  let x = complexCalculation(state.get()) // 仮の関数
+  state.set(x)
+  log.log(s"計算結果: $x")
+  x * 2 // この値がwith式の返り値となる
 }
 
-// with式の返り値を関数の引数として使用
-processResult(with st = StateHandler<Int> { state: 0 }: State<Int> {
+// with式の返り値を関数の引数として使用 (型注釈あり)
+processResult(with st = counterState: State<Int> {
   let current = st.get()
-  st.modify(c => c + 1)
-  current * 2  // この値がwith式の返り値となる
+  st.set(current + 1)
+  current * 2 // この値がwith式の返り値となる
 })
 ```
 
-with式の返り値を使用することには、以下のような実用的な価値があります：
+`with` 式が値を返すことには、以下のような実用的な価値があります：
 
-1. **効果の局所化と結果の取得**: 効果の使用を特定のスコープに限定しながら、その結果を外部で利用できます。
+1.  **効果の局所化と結果の取得**: 効果の使用を特定のスコープに限定しながら、その結果を外部で利用できます。
 
-   ```
-   // リソース管理と結果の取得 (ハンドラがリソースを管理する想定)
-   let fileContents = with fs = LocalFileHandler { basePath: "/data" }: FileSystem {
-     let handle = fs.open("data.txt", FileMode.Read)?
-     let content = fs.read(&handle)?
-     fs.close(handle)?
-     processData(content) // 処理結果を返す
-     // fs インスタンスの破棄時にリソースが解放される (RAII連携、詳細は8.7節)
-   }
-   // fileContents には処理済みデータが格納される
-   ```
+    ```protorun
+    // リソース管理と結果の取得 (ハンドラがリソースを管理する想定)
+    type FileSystemConfig { let basePath: String }
+    handler FileSystem for FileSystemConfig { /* ... open, read, close ... */ }
+    let fsConfig = FileSystemConfig { basePath: "/data" }
 
-2. **合成性の向上**: `with` 式を他の式（`if`, `match` など）と自然に組み合わせることができます。
+    let fileContents = with fs = fsConfig { // 型推論される
+      let handle = fs.open("data.txt", FileMode.Read)?
+      let content = fs.read(&handle)?
+      fs.close(handle)?
+      processData(content) // 処理結果を返す
+      // fsConfig インスタンスのライフサイクルは with スコープとは独立
+      // リソース解放はハンドラ実装や Drop トレイト等で管理 (詳細は8.7節)
+    }
+    // fileContents には処理済みデータが格納される
+    ```
 
-   ```
-   // 条件分岐での使用
-   let result = if condition {
-     with log = ConsoleHandler {}: Console {
-       log.log("条件が真の場合の処理")
-       computeForTrue()
-     }
-   } else {
-     with log = FileLogger { path: "/log/false.log" }: Console {
-       log.log("条件が偽の場合の処理")
-       computeForFalse()
-     }
-   }
-   ```
+2.  **合成性の向上**: `with` 式を他の式（`if`, `match` など）と自然に組み合わせることができます。
 
-3. **効果の組み合わせと結果の合成**: 拡張された `with` 構文により、複数の効果を組み合わせ、その結果を合成できます。
+    ```protorun
+    // 条件分岐での使用
+    let result = if condition {
+      with log = logger { // ConsoleLogger インスタンス
+        log.log("条件が真の場合の処理")
+        computeForTrue()
+      }
+    } else {
+      type FileLoggerConfig { let path: String }
+      handler Logger for FileLoggerConfig { /* ... */ }
+      let fileLoggerConfig = FileLoggerConfig { path: "/log/false.log" }
+      with log = fileLoggerConfig: Logger { // Logger として使うことを明示
+        log.log("条件が偽の場合の処理")
+        computeForFalse()
+      }
+    }
+    ```
 
-   ```
-   // 複数の効果と結果の合成
-   let combinedResult = with log = ConsoleHandler {}: Console,
-                            st = StateHandler<Int> { state: 0 }: State<Int>
-                       {
-                         log.log("最初の処理")
-                         let result1 = computeFirst()
-                         st.set(result1)
-                         log.log("次の処理")
-                         let result2 = computeSecond(st.get())
-                         combineResults(result1, result2) // ブロックの結果
-                       }
-   ```
+3.  **効果の組み合わせと結果の合成**: 複数の効果を組み合わせ、その結果を合成できます。
 
-`with` 式が値を返す式として設計されていることは、Protorun の式ベースの設計原則に沿っており、言語全体の一貫性と表現力を向上させます。これにより、効果の制御と計算の結果を自然に組み合わせることができ、より簡潔で読みやすいコードを書くことが可能になります。詳細は [8.5 効果ハンドラインスタンスの提供 (`with` 構文)](08-algebraic-effects.md#85-効果ハンドラインスタンスの提供-with-構文) を参照してください。
+    ```protorun
+    // 複数の効果と結果の合成
+    let combinedResult = with log = logger, // ConsoleLogger
+                             state = counterState // Counter
+                        {
+                          log.log("最初の処理")
+                          let result1 = computeFirst()
+                          state.set(result1)
+                          log.log("次の処理")
+                          let result2 = computeSecond(state.get())
+                          combineResults(result1, result2) // ブロックの結果
+                        }
+    ```
+
+`with` 式が値を返す式として設計されていることは、Protorun の式ベースの設計原則に沿っており、言語全体の一貫性と表現力を向上させます。これにより、効果の制御と計算の結果を自然に組み合わせることができ、より簡潔で読みやすいコードを書くことが可能になります。詳細は [8.5 効果ハンドラの提供 (`with` 構文)](08-algebraic-effects.md#85-効果ハンドラの提供-with-構文) を参照してください。
 
 ## 6.4 パターンマッチング
 
