@@ -28,8 +28,6 @@ Protorun言語で使用されるキーワードは以下の通りです。これ
 | `let`         | 不変（イミュータブル）な変数を束縛します。                         | `LetDecl` ([4. 宣言](04-declarations.md))                                                              |
 | `match`       | パターンマッチ式を開始します。                                     | `MatchExpr` ([6. 式](06-expressions.md))                                                               |
 | `mut`         | 可変性（ミュータビリティ）を示します（例: `&mut`）。               | `TypeRef` ([3. 型システム](03-type-system.md))                                                         |
-| `noresume`    | 効果ハンドラ内で、操作が値を返さず再開しないことを示します。       | `HandlerFunction` ([8. 代数的効果](08-algebraic-effects.md))                                           |
-| `multiresume` | 効果ハンドラ内で、操作が複数回再開する可能性があることを示します。 | `HandlerFunction` ([8. 代数的効果](08-algebraic-effects.md))                                           |
 | `own`         | 所有権を持つ型を示します。                                         | `TypeRef` ([7. 所有権](07-ownership.md))                                                               |
 | `resume`      | 効果ハンドラ内で、操作の再開ポイントを示します。                   | `HandlerFunction` ([8. 代数的効果](08-algebraic-effects.md))                                           |
 | `return`      | 現在の関数から値を返します。                                       | `ReturnStatement` ([5. 文](05-statements.md))                                                          |

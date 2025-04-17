@@ -180,55 +180,66 @@ module Result {
 
 // I/O効果
 effect IO {
-  // ファイル操作
   fn readFile(path: String): Result<String, IOError>
   fn writeFile(path: String, content: String): Result<Unit, IOError>
   fn fileExists(path: String): Bool
   fn deleteFile(path: String): Result<Unit, IOError>
 
-  // コンソール操作
   fn println(message: String): Unit
   fn print(message: String): Unit
   fn readLine(): String
 
-  // 環境変数
   fn getEnv(name: String): Option<String>
   fn setEnv(name: String, value: String): Result<Unit, IOError>
 }
 
-// I/O効果のハンドラ
-handler IOHandler: IO { // "for" を ":" に修正
-  // ファイル操作の実装
-  fn readFile(path: String): Result<String, IOError> = {
+handler IO for IOHandler {
+  let readFile = fn (self, path: String): Result<String, IOError> => {
     // プラットフォーム固有の実装
   }
 
-  fn writeFile(path: String, content: String): Result<Unit, IOError> = {
+  let writeFile = fn (self, path: String, content: String): Result<Unit, IOError> => {
     // プラットフォーム固有の実装
   }
 
-  // コンソール操作の実装
-  fn println(message: String): Unit = {
+  let fileExists = fn (self, path: String): Bool => {
     // プラットフォーム固有の実装
   }
 
-  fn readLine(): String = {
+  let deleteFile = fn (self, path: String): Result<Unit, IOError> => {
     // プラットフォーム固有の実装
   }
 
-  // 他のI/O操作の実装...
+  let println = fn (self, message: String): Unit => {
+    // プラットフォーム固有の実装
+  }
+
+  let print = fn (self, message: String): Unit => {
+    // プラットフォーム固有の実装
+  }
+
+  let readLine = fn (self): String => {
+    // プラットフォーム固有の実装
+  }
+
+  let getEnv = fn (self, name: String): Option<String> => {
+    // プラットフォーム固有の実装
+  }
+
+  let setEnv = fn (self, name: String, value: String): Result<Unit, IOError> => {
+    // プラットフォーム固有の実装
+  }
 }
 
-// 使用例
-fn processFile(path: String): Result<String, IOError> & IO = { // "with" を "&" に修正 (効果の宣言)
-  if IO.fileExists(path) {
-    let content = IO.readFile(path)?
+fn processFile(path: String) (effect io: IO): Result<String, IOError> = {
+  if io.fileExists(path) {
+    let content = io.readFile(path)?
     let processed = processContent(content)
-    IO.writeFile(path + ".processed", processed)?
-    IO.println(s"ファイル $path を処理しました")
+    io.writeFile(path + ".processed", processed)?
+    io.println(s"ファイル $path を処理しました")
     Result.Ok(processed)
   } else {
-    IO.println(s"ファイル $path が見つかりません")
+    io.println(s"ファイル $path が見つかりません")
     Result.Err(IOError.FileNotFound(path))
   }
 }
@@ -243,52 +254,57 @@ fn processFile(path: String): Result<String, IOError> & IO = { // "with" を "&"
 
 // 非同期効果
 effect Async {
-  // タスク管理
   fn spawn<T>(task: () -> T): Task<T>
   fn await<T>(task: Task<T>): T
   fn sleep(duration: Duration): Unit
 
-  // 並行制御
   fn withTimeout<T>(duration: Duration, task: () -> T): Result<T, TimeoutError>
   fn race<T>(tasks: List<() -> T>): T
   fn all<T>(tasks: List<() -> T>): List<T>
 }
 
-// 非同期効果のハンドラ
-handler AsyncHandler: Async { // "for" を ":" に修正
-  // タスク管理の実装
-  fn spawn<T>(task: () -> T, resume: (Task<T>) -> Unit): Unit = {
-    // プラットフォーム固有の実装
+handler Async for AsyncHandler {
+  let spawn = fn <T> (self, task: () -> T, resume: (Task<T>) -> Unit): Unit => {
     let taskHandle = createTask(task)
     resume(taskHandle)
   }
 
-  fn await<T>(task: Task<T>, resume: (T) -> Unit): Unit = {
-    // プラットフォーム固有の実装
+  let await = fn <T> (self, task: Task<T>, resume: (T) -> Unit): Unit => {
     task.onComplete(result => resume(result))
   }
 
-  // 他の非同期操作の実装...
+  let sleep = fn (self, duration: Duration): Unit => {
+    // プラットフォーム固有の実装
+  }
+
+  let withTimeout = fn <T> (self, duration: Duration, task: () -> T): Result<T, TimeoutError> => {
+    // 実装
+  }
+
+  let race = fn <T> (self, tasks: List<() -> T>): T => {
+    // 実装
+  }
+
+  let all = fn <T> (self, tasks: List<() -> T>): List<T> => {
+    // 実装
+  }
 }
 
-// 使用例
-fn fetchData(url: String): Result<String, NetworkError> & Async & IO = { // "with" を "&" に修正
-  IO.println(s"データを取得中: $url")
+fn fetchData(url: String) (effect async: Async, effect io: IO): Result<String, NetworkError> = {
+  io.println(s"データを取得中: $url")
 
-  let task = Async.spawn(() => {
-    // ネットワークリクエストの実行
+  let task = async.spawn(() => {
     networkRequest(url)
   })
 
-  // タイムアウト付きで結果を待機
-  Async.withTimeout(Duration.ofSeconds(10), () => {
-    let result = Async.await(task)?
-    IO.println(s"データ取得完了: ${result.length} バイト")
+  async.withTimeout(Duration.ofSeconds(10), () => {
+    let result = async.await(task)?
+    io.println(s"データ取得完了: ${result.length} バイト")
     Result.Ok(result)
   }) match {
     Result.Ok(data) => Result.Ok(data),
     Result.Err(_) => {
-      IO.println("タイムアウトしました")
+      io.println("タイムアウトしました")
       Result.Err(NetworkError.Timeout)
     }
   }
