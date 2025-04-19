@@ -28,21 +28,21 @@ let Expr = enum {
 
 // 例外効果インターフェース
 let Exception = effect<E> {
-  fn raise<T>(error: E): T // T は任意の型 (脱出するため)
+  let raise: fn<T>(error: E) -> T // T は任意の型 (脱出するため)
 }
 
 // 例外ハンドラ実装 (特定の型に対して実装)
 let ExceptionHandler = type<E> {} // 状態を持たないダミー型
 let ExceptionHandlerImpl = handler Exception<E> for ExceptionHandler<E> {
   // raise は継続を呼び出さず、with 式の結果となる Result<T, E> を返す
-  let raise = fn <T>(self, error: E, resume: (Nothing) -> Result<T, E>): Result<T, E> => {
+  let raise = fn <T>(self, error: E, resume: (Nothing) -> Result<T, E>) -> Result<T, E> => {
     Result.Err(error)
   }
 }
 
 // 式の評価 (Effect パラメータを使用)
 // evaluate の戻り値型 Result<Int, String> は、runWithException の with 式の期待する型と一致
-let evaluate = fn (expr: Expr)(effect exc: Exception<String>): Int => {
+let evaluate = fn (expr: Expr)(effect exc: Exception<String>) -> Int => {
   match expr {
     Expr.Number(value) => value, // 正常終了時は Int を返す
 
@@ -81,7 +81,7 @@ let evaluate = fn (expr: Expr)(effect exc: Exception<String>): Int => {
 }
 
 // runWithException ヘルパー関数 (新しい構文を使用)
-let runWithException = fn <T, E>(action: (effect exc: Exception<E>) -> T): Result<T, E> => {
+let runWithException = fn <T, E>(action: (effect exc: Exception<E>) -> T) -> Result<T, E> => {
   // ハンドラ実装を持つインスタンスを生成
   let handlerInstance = ExceptionHandler<E> {}
   // with 式でハンドラを注入
@@ -95,7 +95,7 @@ let runWithException = fn <T, E>(action: (effect exc: Exception<E>) -> T): Resul
 
 
 // 使用例
-let main = fn ()(effect console: Console): Unit => {
+let main = fn ()(effect console: Console) -> Unit => {
   let expr = Expr.Add(
     Expr.Number(10),
     Expr.Multiply(
@@ -126,7 +126,7 @@ let main = fn ()(effect console: Console): Unit => {
 // ConsoleHandler も新しい構文で定義されている必要がある
 // let Console = effect { fn log(String): Unit } // 仮定義
 // let ConsoleLogger = type {} // 仮定義
-// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) => println(msg) } // 仮定義
+// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
 // let consoleHandlerInstance = ConsoleLogger {} // 仮
 // with console = consoleHandlerInstance {
 //   main()
@@ -152,9 +152,9 @@ let main = fn ()(effect console: Console): Unit => {
 ```protorun
 // 状態効果インターフェース (再掲)
 let State = effect<S> {
-  fn get(): S
-  fn set(newState: S): Unit
-  fn modify(f: (S) -> S): Unit
+  let get: fn() -> S
+  let set: fn(newState: S) -> Unit
+  let modify: fn(f: (S) -> S) -> Unit
 }
 
 // 状態を保持する型
@@ -164,24 +164,24 @@ let StateContainer = type<S> {
 // StateContainer に対して State<S> 効果を実装
 let StateContainerHandler = handler State<S> for StateContainer<S> {
   // get は暗黙的に継続を呼び出す
-  let get = fn (self): S => self.state
+  let get = fn (self) -> S => self.state
   // set は暗黙的に継続を呼び出す
-  let set = fn (self, newState: S): Unit => { self.state = newState }
+  let set = fn (self, newState: S) -> Unit => { self.state = newState }
   // modify は暗黙的に継続を呼び出す
-  let modify = fn (self, f: (S) -> S): Unit => { self.state = f(self.state) }
+  let modify = fn (self, f: (S) -> S) -> Unit => { self.state = f(self.state) }
 }
 
 
 // カウンターの実装 (Effect パラメータを使用)
 // この関数自体は状態を持たず、State<Int> 効果に依存する
-let counterTick = fn (effect state: State<Int>): Int => {
-  let current = state.get()
-  state.modify(count => count + 1)
+let counterTick = fn (effect state: State<Int>) -> Int => {
+  let current = state.get();
+  state.modify(count => count + 1);
   current // インクリメント前の値を返す
 }
 
 // runWithState ヘルパー関数 (新しい構文を使用)
-let runWithState = fn <S, T>(initialState: S, action: (effect st: State<S>) -> T): (T, S) => {
+let runWithState = fn <S, T>(initialState: S, action: (effect st: State<S>) -> T) -> (T, S) => {
   // ハンドラ実装を持つインスタンスを生成
   let stateContainer = StateContainer<S> { state: initialState }
   // with 式でハンドラを注入
@@ -195,7 +195,7 @@ let runWithState = fn <S, T>(initialState: S, action: (effect st: State<S>) -> T
 
 
 // 使用例
-let main = fn ()(effect console: Console): Unit => {
+let main = fn ()(effect console: Console) -> Unit => {
 
   // runWithState を使ってカウンターを実行
   let (result1, state1) = runWithState(0, (effect st) => {
@@ -227,7 +227,7 @@ let main = fn ()(effect console: Console): Unit => {
 // ConsoleHandler も新しい構文で定義されている必要がある
 // let Console = effect { fn log(String): Unit } // 仮定義
 // let ConsoleLogger = type {} // 仮定義
-// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) => println(msg) } // 仮定義
+// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
 // let consoleHandlerInstance = ConsoleLogger {} // 仮
 // with console = consoleHandlerInstance {
 //   main()
@@ -250,10 +250,10 @@ let main = fn ()(effect console: Console): Unit => {
 ```protorun
 // FileSystem 効果インターフェース (再掲)
 let FileSystem = effect {
-  fn open(path: String, mode: FileMode): Result<own FileHandle, IOError>
-  fn close(handle: own FileHandle): Result<Unit, IOError>
-  fn read(handle: &FileHandle): Result<String, IOError>
-  fn write(handle: &mut FileHandle, content: String): Result<Unit, IOError>
+  let open: fn(path: String, mode: FileMode) -> Result<own FileHandle, IOError>
+  let close: fn(handle: own FileHandle) -> Result<Unit, IOError>
+  let read: fn(handle: &FileHandle) -> Result<String, IOError>
+  let write: fn(handle: &mut FileHandle, content: String) -> Result<Unit, IOError>
 }
 // 仮の型定義
 let FileHandle = type { id: Int } // 簡単のため ID のみ
@@ -263,37 +263,37 @@ let IOError = type { message: String }
 // ファイルシステムハンドラ実装 (状態を持たない例)
 let SimpleFileHandler = type {} // ダミー型
 let SimpleFileHandlerImpl = handler FileSystem for SimpleFileHandler {
-  let open = fn (self, path: String, mode: FileMode): Result<own FileHandle, IOError> => {
-    println(s"Simulating open: ${path}, mode: ${mode}")
+  let open = fn (self, path: String, mode: FileMode) -> Result<own FileHandle, IOError> => {
+    println(s"Simulating open: ${path}, mode: ${mode}");
     // 実際のファイルオープン処理...
     Ok(FileHandle { id: 123 }) // 仮のハンドル
   }
-  let close = fn (self, handle: own FileHandle): Result<Unit, IOError> => {
-    println(s"Simulating close: handle ${handle.id}")
+  let close = fn (self, handle: own FileHandle) -> Result<Unit, IOError> => {
+    println(s"Simulating close: handle ${handle.id}");
     // 実際のファイルクローズ処理...
     Ok(())
   }
-  let read = fn (self, handle: &FileHandle): Result<String, IOError> => {
-    println(s"Simulating read: handle ${handle.id}")
+  let read = fn (self, handle: &FileHandle) -> Result<String, IOError> => {
+    println(s"Simulating read: handle ${handle.id}");
     Ok("Simulated file content")
   }
-  let write = fn (self, handle: &mut FileHandle, content: String): Result<Unit, IOError> => {
-    println(s"Simulating write: handle ${handle.id}, content: '${content}'")
+  let write = fn (self, handle: &mut FileHandle, content: String) -> Result<Unit, IOError> => {
+    println(s"Simulating write: handle ${handle.id}, content: '${content}'");
     Ok(())
   }
 }
 
 // ファイル処理の実装 (Effect パラメータを使用)
-let processFile = fn (path: String)(effect fs: FileSystem): Result<String, IOError> => {
+let processFile = fn (path: String)(effect fs: FileSystem) -> Result<String, IOError> => {
   // ハンドラにファイルを開かせ、ハンドルを取得
-  let handle = fs.open(path, FileMode.Read)?
+  let handle = fs.open(path, FileMode.Read)?;
 
   // try-finally のような構造が必要か？ (RAII連携待ち)
   // 現状では明示的に close を呼ぶ必要がある
   let contentResult = fs.read(&handle) // read の結果を一旦変数に
 
   // close を呼ぶ (エラーがあってもなくても)
-  let closeResult = fs.close(handle)
+  let closeResult = fs.close(handle);
 
   // read の結果と close の結果を組み合わせる
   match (contentResult, closeResult) {
@@ -304,7 +304,7 @@ let processFile = fn (path: String)(effect fs: FileSystem): Result<String, IOErr
 }
 
 // 使用例
-let main = fn ()(effect console: Console): Unit => {
+let main = fn ()(effect console: Console) -> Unit => {
   // ハンドラ実装を持つインスタンスを生成
   let fsHandler = SimpleFileHandler {}
 
@@ -323,7 +323,7 @@ let main = fn ()(effect console: Console): Unit => {
 // ConsoleHandler も新しい構文で定義されている必要がある
 // let Console = effect { fn log(String): Unit } // 仮定義
 // let ConsoleLogger = type {} // 仮定義
-// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) => println(msg) } // 仮定義
+// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
 // let consoleHandlerInstance = ConsoleLogger {} // 仮
 // with console = consoleHandlerInstance {
 //   main()
@@ -349,13 +349,13 @@ let DbError = enum { NotFound(String), ConnectionError(String) }
 
 // データベースアクセス効果インターフェース
 let Database = effect {
-  fn query(sql: String): Result<List<Map<String, String>>, DbError> // 簡単のため Map を使用
-  fn execute(sql: String): Result<Unit, DbError>
+  let query: fn(sql: String) -> Result<List<Map<String, String>>, DbError> // 簡単のため Map を使用
+  let execute: fn(sql: String) -> Result<Unit, DbError>
 }
 
 // ユーザーリポジトリ関数 (Database 効果に依存)
-let getUserById = fn (userId: String)(effect db: Database): Result<User, DbError> => {
-  let result = db.query(s"SELECT * FROM users WHERE id = '$userId'")?
+let getUserById = fn (userId: String)(effect db: Database) -> Result<User, DbError> => {
+  let result = db.query(s"SELECT * FROM users WHERE id = '$userId'")?;
 
   if result.isEmpty() {
     Result.Err(DbError.NotFound(s"ユーザーが見つかりません: $userId"))
@@ -369,7 +369,7 @@ let getUserById = fn (userId: String)(effect db: Database): Result<User, DbError
   }
 }
 
-let updateUser = fn (user: User)(effect db: Database): Result<Unit, DbError> => {
+let updateUser = fn (user: User)(effect db: Database) -> Result<Unit, DbError> => {
   db.execute(s"UPDATE users SET name = '${user.name}', email = '${user.email}' WHERE id = '${user.id}'")
 }
 
@@ -382,12 +382,12 @@ let PostgresConfig = type {
 }
 // PostgresConfig に対して Database 効果を実装
 let PostgresHandler = handler Database for PostgresConfig {
-  let query = fn (self, sql: String): Result<List<Map<String, String>>, DbError> => {
+  let query = fn (self, sql: String) -> Result<List<Map<String, String>>, DbError> => {
     // self.connectionString を使って Postgres に接続し、クエリ実行
     // ... 実際の DB アクセスロジック ...
     /* ... */
   }
-  let execute = fn (self, sql: String): Result<Unit, DbError> => {
+  let execute = fn (self, sql: String) -> Result<Unit, DbError> => {
     // ... 実際の DB アクセスロジック ...
     /* ... */
   }
@@ -399,12 +399,12 @@ let MockDbData = type {
 }
 // MockDbData に対して Database 効果を実装
 let MockDbHandler = handler Database for MockDbData {
-  let query = fn (self, sql: String): Result<List<Map<String, String>>, DbError> => {
+  let query = fn (self, sql: String) -> Result<List<Map<String, String>>, DbError> => {
     // sql を簡易的にパースして self.users からデータを返す (テスト用)
     // ... モック実装 ...
     /* ... */
   }
-  let execute = fn (self, sql: String): Result<Unit, DbError> => {
+  let execute = fn (self, sql: String) -> Result<Unit, DbError> => {
     // self.users マップを更新する (テスト用)
     // ... モック実装 ...
     /* ... */
@@ -413,9 +413,9 @@ let MockDbHandler = handler Database for MockDbData {
 
 // --- 使用例 ---
 
-let main = fn ()(effect console: Console): Unit => {
+let main = fn ()(effect console: Console) -> Unit => {
   // --- 本番環境での実行 ---
-  console.log("--- 本番 DB で実行 ---")
+  console.log("--- 本番 DB で実行 ---");
   let postgresConfig = PostgresConfig { connectionString: "postgres://user:pass@host:port/db" }
   with db = postgresConfig { // 型推論される (または : Database と明示)
     let userResult = getUserById("user123") // Effect パラメータは暗黙的に解決されると仮定
@@ -426,7 +426,7 @@ let main = fn ()(effect console: Console): Unit => {
   }
 
   // --- テスト環境での実行 ---
-  console.log("\n--- モック DB で実行 ---")
+  console.log("\n--- モック DB で実行 ---");
   let mockData = MockDbData {
     users: Map.of([ // Map.of は仮のコンストラクタ
       ("user123", User { id: "user123", name: "Alice", email: "alice@example.com" })
@@ -461,7 +461,7 @@ let main = fn ()(effect console: Console): Unit => {
 // ConsoleHandler も新しい構文で定義されている必要がある
 // let Console = effect { fn log(String): Unit } // 仮定義
 // let ConsoleLogger = type {} // 仮定義
-// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) => println(msg) } // 仮定義
+// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
 // let consoleHandlerInstance = ConsoleLogger {} // 仮
 // with console = consoleHandlerInstance {
 //   main()

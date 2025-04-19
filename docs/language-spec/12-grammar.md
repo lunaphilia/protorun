@@ -21,7 +21,7 @@ TopLevelItem ::= Declaration | Expression
 
 Declaration ::= LetDecl | ImplDecl
 
-LetDecl ::= ("export")? "let" ("mut")? LetPattern (":" Type)? "=" Expression
+LetDecl ::= ("export")? "let" ("mut")? LetPattern (":" Type)? ("=" Expression)?
 ImplDecl ::= ("export")? "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" ImplItem* "}"
 
 Expression ::= LiteralExpr
@@ -59,18 +59,15 @@ EnumVariant ::= Identifier ("(" TypeList? ")")?
               | Identifier "{" (FieldDefinition ("," FieldDefinition)*)? "}"
 
 TraitDefinitionExpr ::= "trait" GenericParams? (":" TypeRef)? "{" TraitItem* "}"
-TraitItem ::= FunctionSignature
-            | LetDecl
+TraitItem ::= LetDecl
 
 EffectDefinitionExpr ::= "effect" GenericParams? "{" EffectItem* "}"
-EffectItem ::= FunctionSignature
+EffectItem ::= LetDecl
 
 HandlerDefinitionExpr ::= "handler" GenericParams? TypeRef "for" TypeRef WhereClause? "{" HandlerItem* "}"
 HandlerItem ::= LetDecl
 
 AliasDefinitionExpr ::= "alias" GenericParams? Type
-
-FunctionSignature ::= "fn" Identifier GenericParams? ParamList EffectParamList? ImplicitParamList? (":" ReturnType)?
 
 ImplItem ::= LetDecl
 
@@ -98,7 +95,13 @@ TypeRef ::= Identifier GenericArgs?
 
 GenericArgs ::= "<" (Type ("," Type)*)? ">"
 
-FunctionType ::= "fn" "(" TypeList? ")" EffectSpecifier? "->" ReturnType
+FunctionType ::= "fn" GenericParams? ParamListType? EffectParamListType? ImplicitParamListType? "->" ReturnType
+
+ParamListType ::= "(" (Type ("," Type)*)? ")"
+EffectParamListType ::= "(" (EffectParamType ("," EffectParamType)*)? ")"
+ImplicitParamListType ::= "(" "with" Type ("," Type)* ")"
+EffectParamType ::= "effect" TypeRef
+
 TupleType ::= "(" TypeList? ")"
 
 TypeList ::= Type ("," Type)*
@@ -106,9 +109,6 @@ TypeList ::= Type ("," Type)*
 ArrayType ::= "[" Type "]"
 
 ReturnType ::= Type | "Unit"
-
-EffectSpecifier ::= "(" EffectList? ")"
-EffectList ::= TypeRef ("," TypeRef)*
 
 Statement ::= ReturnStatement
 
@@ -143,7 +143,9 @@ SetComprehension ::= "#{" Expression "for" Pattern "<-" Expression ("if" Express
 
 BindExpr ::= "bind" "{" (Pattern "<-" Expression)* Expression "}"
 
-FunctionExpr ::= "fn" GenericParams? ParamList? EffectParamList? ImplicitParamList? (":" ReturnType)? "=>" Expression
+FunctionHeader ::= "fn" GenericParams? ParamList? EffectParamList? ImplicitParamList? ("->" ReturnType)?
+
+FunctionExpr ::= FunctionHeader "=>" Expression
 
 CallExpr ::= Expression "(" ArgList? ")"
 ArgList ::= Expression ("," Expression)*

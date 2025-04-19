@@ -296,7 +296,8 @@ trait Monad<T> {
 **構文:**
 
 ```ebnf
-FunctionExpr ::= "fn" ParamList? EffectParamList? ImplicitParamList? (":" ReturnType)? "=>" Expression
+FunctionExpr ::= FunctionHeader "=>" Expression
+FunctionHeader ::= "fn" GenericParams? ParamList? EffectParamList? ImplicitParamList? ("->" ReturnType)?
 ParamList ::= "(" (Param ("," Param)*)? ")"
 EffectParamList ::= "(" (EffectParam ("," EffectParam)*)? ")"
 ImplicitParamList ::= "(" "with" Param ("," Param)* ")"
@@ -309,7 +310,7 @@ ReturnType ::= Type | "Unit" // (Type の定義は他を参照)
 - `ParamList?`: 通常のパラメータリスト（オプション）。`()` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。
 - `EffectParamList?`: Effect パラメータリスト（オプション）。`()` で囲み、カンマ区切りで `effect identifier: TypeRef` を記述します。関数が依存する効果インターフェースを指定します。
 - `ImplicitParamList?`: Implicit パラメータリスト（オプション）。`(with ...)` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。コンテキストから暗黙的に渡される値を指定します（Scala の implicit parameter list に類似）。
-- `(":" ReturnType)?`: 戻り値の型注釈（オプション）。コロン `:` に続けて戻り値の型 (`ReturnType`) を記述します。
+- `("->" ReturnType)?`: 戻り値の型注釈（オプション）。アロー `->` に続けて戻り値の型 (`ReturnType`) を記述します。
 - `=>`: パラメータリスト/型注釈と関数本体を区切るキーワード。
 - `Expression`: 関数本体。`=>` の後に直接続きます。単一の式である必要があります。複数の文を実行したい場合はブロック式 `{...}` を使用します。
 
@@ -317,32 +318,32 @@ ReturnType ::= Type | "Unit" // (Type の定義は他を参照)
 
 ```protorun
 // 通常のパラメータのみ
-let add = fn (a: Int, b: Int): Int => a + b
-let square = fn x => x * x // 型推論
+let add = fn (a: Int, b: Int) -> Int => a + b
+let square = fn x -> x * x // 戻り値型推論
 
 // Effect パラメータを持つ関数式
-let logOperation = fn (data: Data) (effect logger: Logger) => {
+let logOperation = fn (data: Data) (effect logger: Logger) -> Unit => { // 戻り値 Unit を明示 (または推論)
   logger.log(s"Processing $data")
   process(data)
 }
 
 // Implicit パラメータを持つ関数式
-let greet = fn (name: String) (with context: Context) => {
+let greet = fn (name: String) (with context: Context) -> String => {
   s"${context.greeting}, $name!"
 }
 
 // 複数のパラメータリストを持つ関数式
-let complexCalc = fn (x: Int) (effect state: State<Int>) (with config: Config) => {
+let complexCalc = fn (x: Int) (effect state: State<Int>) (with config: Config) -> Int => {
   let current = state.get()
   state.set(current + x * config.multiplier)
   state.get()
 }
 
 // パラメータなしの関数式
-let getMeaning = fn => 42
+let getMeaning = fn -> Int => 42 // 戻り値型を明示 (または推論)
 
 // ブロック式を本体に持つ関数式
-let process = fn (input: String) => {
+let process = fn (input: String) -> String => {
   let trimmed = input.trim()
   println(s"Processing: $trimmed")
   trimmed.toUpperCase() // ブロックの最後の式が返り値
@@ -351,7 +352,7 @@ let process = fn (input: String) => {
 
 **特徴:**
 
-- **統一された関数定義**: `let` 束縛と組み合わせることで、名前付き関数も無名関数も同じ `fn ... => ...` 形式で表現されます ([4.2.2 `let` による関数定義](04-declarations.md#let-による関数定義) を参照)。
+- **統一された関数定義**: `let` 束縛と組み合わせることで、名前付き関数も無名関数も同じ `fn (...) -> RetType => body` 形式で表現されます ([4.2.2 `let` による関数定義](04-declarations.md#let-による関数定義) を参照)。
 - **パラメータリストの柔軟性**: 通常、Effect、Implicit の3種類のパラメータリストを任意の順序（ただし、各種類は1回まで）で記述できます（※注: 現在のパーサー実装では `ParamList? EffectParamList? ImplicitParamList?` の順序のみサポート）。これにより、カリー化や依存性の注入を表現豊かに行えます。
 - **式ベース**: 関数式の本体は常に単一の式です。
 
@@ -500,7 +501,7 @@ Protorun言語のパターンマッチングは、以下の原則に基づいて
 関数内で Effect パラメータのエイリアスを使って効果操作を呼び出す構文 `alias.operation(...)` も式の一種です。
 
 ```protorun
-let example = fn (effect log: Console): Int = {
+let example = fn (effect log: Console) -> Int => {
   log.log("開始") // 効果操作呼び出し式 (Unit を返す)
   let result = calculate()
   log.log("終了") // 効果操作呼び出し式
@@ -595,7 +596,7 @@ PartialApplicationExpr ::= Expression "(" ((Expression | "_") ("," (Expression |
 
 ```protorun
 // 2引数関数
-let add = fn (a: Int, b: Int): Int = a + b
+let add = fn (a: Int, b: Int) -> Int => a + b
 
 // 部分適用: 最初の引数に 1 を適用
 let add_one = add(1, _) // add_one は Int -> Int 型の関数
@@ -608,7 +609,7 @@ let add_ten = add(_, 10) // add_ten は Int -> Int 型の関数
 let result2 = add_ten(3) // result2 は 13
 
 // 複数のプレースホルダー
-let multiply = fn (a: Int, b: Int, c: Int): Int = a * b * c
+let multiply = fn (a: Int, b: Int, c: Int) -> Int => a * b * c
 let multiply_by_two = multiply(_, 2, _) // multiply_by_two は (Int, Int) -> Int 型の関数
 let result3 = multiply_by_two(3, 4) // result3 は 24 (3 * 2 * 4)
 ```
@@ -694,20 +695,20 @@ let StringMap = alias<T> Map<String, T>
 
 ```protorun
 trait<GenericParams>? (: SuperTrait<SuperArgs>)? {
-  fn method1(self, ...): ReturnType1; // シグネチャ
-  let method2 = fn (self, ...): ReturnType2 => { /* デフォルト実装 */ };
+  let method1: fn(self, ...) -> ReturnType1 // シグネチャ (右辺なし LetDecl + FunctionType)
+  let method2 = fn (self, ...) -> ReturnType2 => { /* デフォルト実装 (右辺あり LetDecl + FunctionExpr) */ }
   // ...
 }
 ```
 - `trait` キーワードで始まります。
 - オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
 - オプションでスーパー（親）トレイト `(: SuperTrait)` を指定できます（単一継承のみ）。
-- 中括弧 `{}` 内に、メソッドシグネチャ（`fn name(...): Type;`）またはデフォルト実装（`let name = fn (...) => ...;`）を記述します。
+- 中括弧 `{}` 内に、`LetDecl` を用いてメソッドシグネチャ (`let name: fn(...) -> ...`) またはデフォルト実装 (`let name = fn (...) -> ... => ...`) を記述します。
 
 この式は、`let` で束縛されることで、新しいトレイトをスコープに導入します。
 
 ```protorun
-let Show = trait { fn show(self): String; }
+let Show = trait { let show: fn(self) -> String }
 let Ord = trait: Eq { /* ... */ }
 ```
 詳細な意味論は [4. 宣言](04-declarations.md#46-トレイト定義-trait-と実装-impl) を参照してください。
@@ -720,19 +721,19 @@ let Ord = trait: Eq { /* ... */ }
 
 ```protorun
 effect<GenericParams>? {
-  fn operation1(arg1: Type1, ...): ReturnType1;
-  fn operation2(arg2: Type2, ...): ReturnType2;
+  let operation1: fn(arg1: Type1, ...) -> ReturnType1 // 操作シグネチャ (右辺なし LetDecl + FunctionType)
+  let operation2: fn(arg2: Type2, ...) -> ReturnType2
   // ...
 }
 ```
 - `effect` キーワードで始まります。
 - オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
-- 中括弧 `{}` 内に、操作シグネチャ (`fn name(...): Type;`) を記述します。
+- 中括弧 `{}` 内に、`LetDecl` を用いて操作シグネチャ (`let name: fn(...) -> ...`) を記述します。
 
 この式は、`let` で束縛されることで、新しい効果インターフェースをスコープに導入します。
 
 ```protorun
-let State = effect<S> { fn get(): S; fn put(value: S): Unit; }
+let State = effect<S> { let get: fn() -> S; let put: fn(value: S) -> Unit }
 ```
 詳細な意味論は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
 
@@ -744,15 +745,15 @@ let State = effect<S> { fn get(): S; fn put(value: S): Unit; }
 
 ```protorun
 handler<GenericParams>? EffectName<EffectArgs> for TargetType<TargetArgs> {
-  let operation1 = fn (self, arg1: Type1, ...) => { /* 実装 */ };
-  let operation2 = fn (self, arg2: Type2, ...) => { /* 実装 */ };
+  let operation1 = fn (self, arg1: Type1, ...) -> ReturnType1 => { /* 実装 */ }
+  let operation2 = fn (self, arg2: Type2, ...) -> ReturnType2 => { /* 実装 */ }
   // ... (EffectName で定義されたすべての操作を実装)
 }
 ```
 - `handler` キーワードで始まります。
 - オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
 - 実装する効果 (`EffectName`) と対象の型 (`TargetType`) を指定します (`for` キーワードを使用)。
-- 中括弧 `{}` 内に、`let` を用いた関数定義の形式で操作の実装を記述します。
+- 中括弧 `{}` 内に、`let` を用いた関数定義 (`let name = fn (...) -> ... => ...`) の形式で操作の実装を記述します。
 
 この式は、`let` で束縛されることで、特定の効果実装（ハンドラ）をスコープに導入します。
 

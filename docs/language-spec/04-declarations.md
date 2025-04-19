@@ -32,7 +32,7 @@ let mut counter = 0
 let mut name: String = "John"
 
 // 関数定義 (関数式を束縛)
-let add = fn (a: Int, b: Int): Int => a + b
+let add = fn (a: Int, b: Int) -> Int => a + b
 
 // 型定義 (型定義式を束縛)
 let Point = type { x: Float, y: Float }
@@ -44,7 +44,7 @@ let UserId = alias Int
 
 束縛宣言の設計は、以下の原則に基づいています：
 
-1.  **統一された構文**: すべての束縛宣言が `let ("mut")? LetPattern = Expression` の形式に従い、言語の学習コストと複雑さを低減します。型定義なども式の一種として扱われます。
+1.  **統一された構文**: すべての束縛宣言が `let ("mut")? LetPattern (":" Type)? ("=" Expression)?` の形式に従い、言語の学習コストと複雑さを低減します。型定義なども式の一種として扱われます。シグネチャ宣言（例: Trait 内のメソッドシグネチャ）もこの形式の右辺省略形として表現されます。
 2.  **不変性の優先**: デフォルトでは束縛は不変 (`let` のみ) であり、これにより予測可能性と安全性が向上します。これは関数型プログラミングの原則に沿った設計です。不変性により、コードの理解と推論が容易になり、並行処理における安全性も向上します。
 3.  **明示的な可変性**: 値の可変性が必要な場合は `mut` キーワードを `let` の後に付与して明示的に宣言します (`let mut`)。これにより、状態が変化する箇所をコード上で明確に識別できます。
 4.  **型推論**: 多くの場合、初期化式から値束縛の型が推論されるため、型注釈 (`: Type`) は省略可能です。これによりコードが簡潔になります。
@@ -59,7 +59,7 @@ let UserId = alias Int
 **構文:**
 
 ```ebnf
-LetDecl ::= ("export")? "let" ("mut")? LetPattern (":" Type)? "=" Expression
+LetDecl ::= ("export")? "let" ("mut")? LetPattern (":" Type)? ("=" Expression)?
 
 LetPattern ::= LetIdentifierPattern
              | LetTuplePattern
@@ -80,14 +80,14 @@ LetRecordFieldPattern ::= Identifier (":" LetPattern)?
     - `LetRecordPattern`: レコードの分解束縛 (例: `Point { x, y }`)。
     `match` 式で使える `LiteralPattern` や `ConstructorPattern` などは `let` 宣言では使用できません。
 - `(: Type)?`: **任意**の型注釈。値束縛の場合に利用でき、省略された場合は右辺の `Expression` から推論されます。定義式の場合は通常、型注釈は不要です。
-- `= Expression`: 束縛する対象を評価または解釈する式。これには、通常の計算式、関数式、そして型定義式、トレイト定義式なども含まれます。`let` 宣言では**右辺の式が必須**です。
+- `("=" Expression)?`: **任意**の初期化式。存在する場合、束縛する対象を評価または解釈する式。これには、通常の計算式、関数式、そして型定義式、トレイト定義式なども含まれます。右辺が省略された場合（例: `let name: Type;`）、これはシグネチャ宣言（Trait/Effect 内など）や未初期化変数の宣言（スコープによる）として解釈される可能性があります（意味解析で文脈に応じて判断）。
 
 **意味:**
 
 `let` 宣言は以下の動作を行います。
 
-1.  右辺の `Expression` を評価または解釈します。
-2.  結果の値、関数、型、トレイトなどを左辺の `LetPattern` に束縛します。値の場合はパターンマッチングが行われます。
+1.  右辺の `Expression` が存在する場合、それを評価または解釈します。
+2.  右辺の結果（または右辺がない場合はシグネチャ情報など）を左辺の `LetPattern` に束縛します。値の場合はパターンマッチングが行われます。
 3.  束縛された名前は、宣言された時点から現在のスコープの終わりまで有効です。
 4.  `mut` キーワードがない場合、束縛された名前は**不変**であり、後から別の値や定義を再代入することはできません。
 5.  `mut` キーワードがある場合 (`let mut`)、束縛された名前は**可変**であり、後から代入演算子 (`=`) を使って同じ型の別の式の結果を代入することができます。ただし、`let mut` の左辺は単一の識別子でなければなりません（意味論チェック）。
@@ -111,16 +111,16 @@ let person_value = Person { name: "Alice", age: 30 }
 let { name: person_name, age } = person_value
 
 // 関数定義 (関数式を束縛)
-let square = fn x => x * x
-let identity = fn <T> (x: T): T => x
+let square = fn x -> x * x // 戻り値型推論
+let identity = fn <T> (x: T) -> T => x
 
 // 型定義 (型定義式を束縛)
 let Person = type { name: String, age: Int }
 let Result = enum<T, E> { Ok(T), Err(E) }
 
 // トレイト定義 (トレイト定義式を束縛)
-let Show = trait { fn show(self): String }
-let Ord = trait<T: Eq> { fn compare(self, other: T): Int }
+let Show = trait { let show: fn(self) -> String } // シグネチャ
+let Ord = trait<T: Eq> { let compare: fn(self, other: T) -> Int } // シグネチャ
 
 // 型エイリアス定義 (型エイリアス定義式を束縛)
 let UserId = alias Int
@@ -148,9 +148,9 @@ fn example_scope() {
 関数は `let` 束縛と関数式 ([6.3.3 関数式](06-expressions.md#633-関数式)) を組み合わせて定義します。これにより、関数も他の値と同様に扱われ、言語の一貫性が保たれます。詳細な構文は [6. 式](06-expressions.md) を参照してください。
 
 ```protorun
-let add = fn (a: Int, b: Int): Int => a + b
-let square = fn x => x * x
-let identity = fn <T> (x: T): T => x
+let add = fn (a: Int, b: Int) -> Int => a + b
+let square = fn x -> x * x // 戻り値型推論
+let identity = fn <T> (x: T) -> T => x
 ```
 
 **暗黙的な再帰:**
@@ -158,7 +158,7 @@ let identity = fn <T> (x: T): T => x
 `let` で束縛された関数式は、自身の名前を再帰的に参照できます。特別なキーワード (`rec` など) は不要です。
 
 ```protorun
-let factorial = fn (n: Int): Int => {
+let factorial = fn (n: Int) -> Int => {
   if n <= 1 {
     1
   } else {
@@ -269,7 +269,7 @@ let AliasName = alias<GenericParams>? ExistingType<GenericParams>
 let UserId = alias Int
 let StringMap = alias<T> Map<String, T>
 let PointTuple = alias (Float, Float)
-let Callback = alias fn (Int): String
+let Callback = alias fn(Int) -> String
 ```
 
 型エイリアスは、特にジェネリック型や関数型など、型シグネチャが長くなりがちな場合にコードを整理し、理解しやすくするのに有効です。
@@ -287,19 +287,19 @@ let Callback = alias fn (Int): String
 **宣言 (束縛):**
 
 ```protorun
-let EffectName = effect<GenericParams>? { /* 操作シグネチャ */ }
+let EffectName = effect<GenericParams>? { /* 操作シグネチャ (LetDecl) */ }
 ```
 
 **具体例:**
 
 ```protorun
 let State = effect<S> {
-  fn get(): S
-  fn put(value: S): Unit
+  let get: fn() -> S
+  let put: fn(value: S) -> Unit
 }
 
 let Console = effect {
-  fn log(message: String): Unit
+  let log: fn(message: String) -> Unit
 }
 ```
 
@@ -317,8 +317,8 @@ let HandlerName = handler<GenericParams>? EffectName<EffectArgs> for TargetType<
 
 ```protorun
 let CounterStateHandler = handler State<Int> for CounterState {
-  let get = fn (self): Int => self.count
-  let put = fn (self, value: Int): Unit => {
+  let get = fn (self) -> Int => self.count
+  let put = fn (self, value: Int) -> Unit => {
     resume_with(Unit, CounterState { count: value })
   }
 }
@@ -335,27 +335,27 @@ let CounterStateHandler = handler State<Int> for CounterState {
 **宣言 (束縛):**
 
 ```protorun
-let TraitName = trait<GenericParams>? (: SuperTrait<SuperArgs>)? { /* メソッドシグネチャ / デフォルト実装 */ }
+let TraitName = trait<GenericParams>? (: SuperTrait<SuperArgs>)? { /* メソッドシグネチャ / デフォルト実装 (LetDecl) */ }
 ```
 
 **具体例:**
 
 ```protorun
 let Show = trait {
-  fn show(self): String
+  let show: fn(self) -> String // シグネチャ
 }
 
 let Eq = trait {
-  fn equals(self, other: Self): Bool
+  let equals: fn(self, other: Self) -> Bool // シグネチャ
 }
 
 let Ord = trait: Eq {
-  fn compare(self, other: Self): Int
-  fn equals(self, other: Self): Bool = self.compare(other) == 0 // デフォルト実装
+  let compare: fn(self, other: Self) -> Int // シグネチャ
+  let equals = fn(self, other: Self) -> Bool => self.compare(other) == 0 // デフォルト実装
 }
 
 let Add = trait<Rhs = Self, Output = Self> {
-    fn add(self, rhs: Rhs): Output
+    let add: fn(self, rhs: Rhs) -> Output // シグネチャ
 }
 ```
 
@@ -377,24 +377,24 @@ ImplItem ::= LetDecl // 主に関数定義
 - `TraitName<TraitArgs>`: 実装するトレイト。
 - `TypeName<TypeArgs>`: 実装対象の型。
 - `<WhereClause>?`: 型パラメータに対する追加の制約（例: `where T: Show`）。
-- `ImplItem*`: トレイトメソッドの実装。通常は `let method_name = fn ...` の形式。
+- `ImplItem*`: トレイトメソッドの実装。`let method_name = fn (...) -> ... => ...;` の形式。
 
 **具体例:**
 
 ```protorun
 impl Show for Int {
-  let show = fn (self): String => self.toString()
+  let show = fn (self) -> String => self.toString()
 }
 
 impl<T> Show for Option<T> where T: Show {
-  let show = fn (self): String => match self {
+  let show = fn (self) -> String => match self {
     Option.Some(v) => s"Some(${v.show()})",
     Option.None => "None"
   }
 }
 
 impl Add for Int {
-    let add = fn (self, rhs: Int): Int => self + rhs
+    let add = fn (self, rhs: Int) -> Int => self + rhs
 }
 ```
 

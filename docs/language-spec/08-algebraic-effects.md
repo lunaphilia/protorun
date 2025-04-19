@@ -19,27 +19,27 @@
 ```protorun
 // 基本的な効果インターフェース定義
 let Console = effect {
-  fn log(message: String): Unit;
-  fn readLine(): String;
+  let log: fn(message: String) -> Unit
+  let readLine: fn() -> String
 }
 
 // パラメータ化された効果インターフェース
 let State = effect<S> {
-  fn get(): S;
-  fn set(newState: S): Unit;
-  fn modify(f: (S) -> S): Unit; // 関数を受け取る操作も可能
+  let get: fn() -> S
+  let set: fn(newState: S) -> Unit
+  let modify: fn(f: (S) -> S) -> Unit // 関数を受け取る操作も可能
 }
 
 // 所有権を考慮した効果インターフェース定義
 let FileSystem = effect {
   // FileHandle の所有権を返す操作
-  fn open(path: String, mode: FileMode): Result<own FileHandle, IOError>;
+  let open: fn(path: String, mode: FileMode) -> Result<own FileHandle, IOError>
   // FileHandle の所有権を消費する操作
-  fn close(handle: own FileHandle): Result<Unit, IOError>;
+  let close: fn(handle: own FileHandle) -> Result<Unit, IOError>
   // FileHandle の借用を使用する操作
-  fn read(handle: &FileHandle): Result<String, IOError>;
+  let read: fn(handle: &FileHandle) -> Result<String, IOError>
   // FileHandle の可変借用を使用する操作
-  fn write(handle: &mut FileHandle, content: String): Result<Unit, IOError>;
+  let write: fn(handle: &mut FileHandle, content: String) -> Result<Unit, IOError>
 }
 
 // 仮の型定義
@@ -49,9 +49,9 @@ let IOError = type { /* ... */ }
 ```
 
 * `let EffectName = effect<GenericParams>? { ... }` は、`EffectName` という名前の効果インターフェースを定義します。
-* 効果定義式 (`effect { ... }`) の内部には、その効果が提供する操作（関数シグネチャ）を記述します。シグネチャの終わりにはセミコロンが必要です。
+* 効果定義式 (`effect { ... }`) の内部には、その効果が提供する操作を右辺なし `LetDecl` (`let name: fn(...) -> ...`) の形式で記述します。
 * 効果インターフェースは型パラメータを持つことができます (`State<S>`)。
-* 操作シグネチャは、所有権 (`own`, `&`, `&mut`) を含む通常の関数シグネチャと同じルールに従います。
+* 操作シグネチャの型注釈 (`fn(...) -> ...`) は、所有権 (`own`, `&`, `&mut`) を含む通常の関数型と同じルールに従います。
 * **重要:** 効果インターフェースの操作定義には、通常、ハンドラ固有の設定データ（例: ファイルパス、データベース接続文字列）は含めません。これらはハンドラ自身が保持します。
 
 効果定義式の詳細な構文は [6. 式](06-expressions.md#694-効果定義式-effect) を参照してください。
@@ -65,18 +65,18 @@ let IOError = type { /* ... */ }
 let HandlerImplName = handler<GenericParams>? EffectName<EffectArgs> for TargetType<TargetArgs> {
   // 効果操作の実装 (let 束縛 + 関数式)
   // 関数式内では 'self' を通じて TargetType のインスタンスにアクセス可能
-  let operation1 = fn (self, args...): ReturnType => {
+  let operation1 = fn (self, args...) -> ReturnType => {
     // self を使って TargetType のフィールドやメソッドにアクセス
     // 継続 (resume) を扱える (後述)
     // ... 実装 ...
-  }; // 操作実装の終わりにもセミコロンが必要な場合がある (要確認)
+  }
   // ... 他の操作の実装 ...
 }
 ```
 
 * `let HandlerImplName = handler EffectName for TargetType { ... }` は、型 `TargetType` が効果インターフェース `EffectName` を実装する方法を定義し、そのハンドラ定義を `HandlerImplName` という名前で束縛します。
 * **状態の保持:** ハンドラ定義式自体は状態を持ちません。状態や設定は、実装対象の型 `TargetType` がフィールドとして保持します。
-* **効果操作の実装:** `EffectName` で定義された各操作に対応する実装を、`let operationName = fn (self, ...) => ...` の形式で記述します。最初の引数 `self` は `TargetType` のインスタンス（操作対象のデータ）を受け取ります。
+* **効果操作の実装:** `EffectName` で定義された各操作に対応する実装を、`let operationName = fn (self, ...) -> ... => ...` の形式で記述します。最初の引数 `self` は `TargetType` のインスタンス（操作対象のデータ）を受け取ります。
 * **継続制御:** ハンドラ関数式の本体は、代数的効果システムの核となる **継続 (`resume`)** を扱う特別な能力を持ちます。これにより、計算の中断、再開、破棄などを制御できます（詳細は 8.6 節）。
 
 ```protorun
@@ -87,24 +87,24 @@ let Counter = type {
 
 // 効果インターフェース (再掲)
 let State = effect<S> {
-  fn get(): S;
-  fn set(newState: S): Unit;
+  let get: fn() -> S
+  let set: fn(newState: S) -> Unit
 }
 
 // Counter 型に対して State<Int> 効果を実装
 let CounterStateHandler = handler State<Int> for Counter {
-  let get = fn (self): Int => self.count;
-  let set = fn (self, newState: Int): Unit => { self.count = newState };
+  let get = fn (self) -> Int => self.count
+  let set = fn (self, newState: Int) -> Unit => { self.count = newState }
 }
 
 // 状態を持たない効果の例
 let Logger = effect {
-  fn log(message: String): Unit;
+  let log: fn(message: String) -> Unit
 }
 // 状態を持たない型 (例: Unit 型や空の構造体) に対して実装
 let ConsoleLogger = type {} // ダミーの型
 let ConsoleLoggerHandler = handler Logger for ConsoleLogger {
-  let log = fn (self, message: String): Unit => { println(message) };
+  let log = fn (self, message: String) -> Unit => { println(message) }
 }
 
 // 設定を持つ型の例
@@ -112,14 +112,14 @@ let FileSystemConfig = type {
   let basePath: String
 }
 let FileSystem = effect { // 再掲
-  fn open(path: String, mode: FileMode): Result<own FileHandle, IOError>;
+  let open: fn(path: String, mode: FileMode) -> Result<own FileHandle, IOError>
   // ...
 }
 let FileSystemHandler = handler FileSystem for FileSystemConfig {
-  let open = fn (self, path: String, mode: FileMode): Result<own FileHandle, IOError> => {
+  let open = fn (self, path: String, mode: FileMode) -> Result<own FileHandle, IOError> => {
     let fullPath = self.basePath + "/" + path // self は FileSystemConfig インスタンス
     // ... fullPath を使ってファイルを開く処理 ...
-  };
+  }
   // ...
 }
 
@@ -140,14 +140,14 @@ let fsConfigInstance = FileSystemConfig { basePath: "/tmp/data" }
 
 ```protorun
 // 関数定義: 'logger' という名前で Logger 効果の実装に依存することを宣言
-let greet = fn (name: String)(effect logger: Logger): Unit => {
+let greet = fn (name: String)(effect logger: Logger) -> Unit => {
   // パラメータ名を使って効果操作を呼び出す
   logger.log(s"こんにちは、${name}さん！")
 }
 
 // 複数の Effect パラメータを持つ関数
 // 'log' という名前で Logger 効果、'state' という名前で State<Int> 効果に依存
-let counter = fn (effect log: Logger, effect state: State<Int>): Int => {
+let counter = fn (effect log: Logger, effect state: State<Int>) -> Int => {
   let current = state.get()
   log.log(s"現在の値: $current")
   state.set(current + 1)
@@ -156,7 +156,7 @@ let counter = fn (effect log: Logger, effect state: State<Int>): Int => {
 
 // ファイル操作の例 (異なる実装に依存)
 // 'localFs' と 'remoteFs' という名前で FileSystem の異なる実装に依存
-let processFiles = fn (effect localFs: FileSystem, effect remoteFs: FileSystem): Result<Unit, Error> => {
+let processFiles = fn (effect localFs: FileSystem, effect remoteFs: FileSystem) -> Result<Unit, Error> => {
   let handle1 = localFs.open("local.txt", FileMode.Read)? // localFs に束縛されたハンドラ実装が使われる
   let content = localFs.read(&handle1)? // read 操作も定義されていると仮定
   localFs.close(handle1)? // close 操作も定義されていると仮定
@@ -229,8 +229,8 @@ let FileSystemHandler = handler FileSystem for FileSystemConfig { /* ... */ }
 let S3FileSystemHandler = handler FileSystem for S3Config { /* ... */ }
 
 // 関数定義 (再掲)
-let counter = fn (effect log: Logger, effect state: State<Int>): Int => { /* ... */ }
-let processFiles = fn (effect localFs: FileSystem, effect remoteFs: FileSystem): Result<Unit, Error> => { /* ... */ }
+let counter = fn (effect log: Logger, effect state: State<Int>) -> Int => { /* ... */ }
+let processFiles = fn (effect localFs: FileSystem, effect remoteFs: FileSystem) -> Result<Unit, Error> => { /* ... */ }
 
 // インスタンス生成
 let logger = ConsoleLogger {}
@@ -282,14 +282,14 @@ with localFs = localFsConfig: FileSystem, // FileSystem として使用するこ
 // Counter 型は State<Int> を実装すると仮定
 let CounterStateHandler = handler State<Int> for Counter {
   // get は resume パラメータを受け取らない
-  let get = fn (self): Int => self.count;
+  let get = fn (self) -> Int => self.count
   // => 実行後、暗黙的に resume(self.count) が呼び出される
 
   // set は resume パラメータを受け取らない
-  let set = fn (self, newState: Int): Unit => {
+  let set = fn (self, newState: Int) -> Unit => {
     self.count = newState
     // => 実行後、暗黙的に resume(()) が呼び出される
-  };
+  }
 }
 ```
 
@@ -304,23 +304,23 @@ let CounterStateHandler = handler State<Int> for Counter {
 let ConsoleLoggerHandler = handler Logger for ConsoleLogger {
   // log 操作は Unit を返す計算の継続を受け取る
   // ハンドラ関数自体の戻り値は Unit (継続呼び出し後の値ではない)
-  let log = fn (self, message: String, resume: (Unit) -> S): Unit => {
+  let log = fn (self, message: String, resume: (Unit) -> S) -> Unit => {
     println(message)
     resume(()) // 明示的に継続を呼び出す。結果は S 型。
-  };
+  }
 }
 
 // Reader 効果の例
-let Reader = effect<Env> { fn ask(): Env; }
+let Reader = effect<Env> { let ask: fn() -> Env }
 // EnvProvider<Env> 型は Reader<Env> を実装すると仮定
 let EnvProvider = type<Env> { environment: Env }
 let ReaderHandler = handler Reader<Env> for EnvProvider<Env> {
   // ask 操作は Env を受け取る計算の継続を受け取る
   // ハンドラ関数自体の戻り値は Unit
-  let ask = fn (self, resume: (Env) -> S): Unit => {
+  let ask = fn (self, resume: (Env) -> S) -> Unit => {
     let env = self.environment
     resume(env) // 環境の値を継続に渡して再開。結果は S 型。
-  };
+  }
 }
 ```
 
@@ -332,7 +332,7 @@ let ReaderHandler = handler Reader<Env> for EnvProvider<Env> {
 
 ```protorun
 // 効果インターフェース
-let Exception = effect<E> { fn raise<T>(error: E): T; } // T は任意の型
+let Exception = effect<E> { let raise: fn<T>(error: E) -> T } // T は任意の型
 
 // ハンドラ実装 (状態は持たない例)
 let ExceptionHandler = type<E> {} // ダミー型
@@ -340,15 +340,15 @@ let ExceptionHandlerImpl = handler Exception<E> for ExceptionHandler<E> {
   // raise が呼ばれたら継続を破棄し、Result.Err を返す。
   // このハンドラ関数自体の戻り値型は Result<T, E> であり、
   // これは with 式全体の期待する型と一致する必要がある。
-  let raise = fn <T>(self, error: E, resume: (Nothing) -> Result<T, E>): Result<T, E> => {
+  let raise = fn <T>(self, error: E, resume: (Nothing) -> Result<T, E>) -> Result<T, E> => {
     // resume の引数型が Nothing なのは、この継続が呼び出せないことを示す慣習。
     // 実際に resume() を呼び出さずに Result<T, E> 型の値を返す。
     Result.Err(error)
-  };
+  }
 }
 
 // 使用例
-let runWithException = fn <T, E>(action: (effect exc: Exception<E>) -> T): Result<T, E> => {
+let runWithException = fn <T, E>(action: (effect exc: Exception<E>) -> T) -> Result<T, E> => {
   let handlerInstance = ExceptionHandler<E> {}
   // この with 式は Result<T, E> 型の値を返す
   with exc = handlerInstance {
@@ -375,9 +375,9 @@ let runWithException = fn <T, E>(action: (effect exc: Exception<E>) -> T): Resul
 ```protorun
 // 効果インターフェース (リソース獲得・解放操作を含む)
 let ManagedResource = effect<R> {
-  fn acquire(): Result<R, Error>; // リソースを獲得 (あるいは参照を返す？)
-  fn useResource(resource: &R, /* ... */): Result<Unit, Error>;
-  fn release(resource: R): Result<Unit, Error>; // 明示的な解放？
+  let acquire: fn() -> Result<R, Error> // リソースを獲得 (あるいは参照を返す？)
+  let useResource: fn(resource: &R, /* ... */) -> Result<Unit, Error>
+  let release: fn(resource: R) -> Result<Unit, Error> // 明示的な解放？
 }
 
 // ハンドラが実装される型 (リソースと状態を保持)
@@ -387,7 +387,7 @@ let ResourceManager = type<R> {
 }
 // ハンドラ実装
 let ResourceManagerHandler = handler ManagedResource<R> for ResourceManager<R> {
-  let acquire = fn (self): Result<R, Error> => {
+  let acquire = fn (self) -> Result<R, Error> => {
     if self.resourceInstance.isSome() {
       // 既に獲得済みの場合のエラー処理など
     }
@@ -396,18 +396,18 @@ let ResourceManagerHandler = handler ManagedResource<R> for ResourceManager<R> {
     self.resourceInstance = Some(newResource)
     // R を返すか、あるいは内部で保持するだけか？ 要検討
     Ok(newResource) // 仮: R を返す
-  };
+  }
 
-  let useResource = fn (resource: &R, /* ... */): Result<Unit, Error> => {
+  let useResource = fn (resource: &R, /* ... */) -> Result<Unit, Error> => {
     // resource を使った処理
-  };
+  }
 
-  let release = fn (resource: R): Result<Unit, Error> => {
+  let release = fn (resource: R) -> Result<Unit, Error> => {
     // リソースを解放する処理
     destroyResource(resource)?
     self.resourceInstance = None
     Ok(())
-  };
+  }
 }
 ```
 
@@ -432,8 +432,8 @@ Effect パラメータ (`effect alias: EffectType`) と `with` 構文 (`with ali
 
 1. **効果の粒度**: 効果インターフェースは適切な粒度で設計し、関連する操作をグループ化します。
 2. **ハンドラの責務**: ハンドラ実装は効果の操作ロジックを担当します。必要な状態や設定は、ハンドラが実装される型 (`TargetType`) のインスタンスが管理します。
-3. **データと効果の分離**: 効果インターフェースの操作シグネチャには、ハンドラ固有のデータを含めず、抽象性を保ちます。データはハンドラが実装される型のインスタンス (`self`) が保持するか、操作の引数として渡されるべきかを慎重に検討します（通常は `self` が保持する方がカプセル化に適しています）。
-4. **継続制御の選択**: ハンドラの各操作実装において、継続をどう扱うか（暗黙的、明示的、呼び出さない）を、関数のシグネチャと `resume` の呼び出し方によって適切に表現します。
+3. **データと効果の分離**: 効果インターフェースの操作シグネチャ (`let name: fn(...) -> ...`) には、ハンドラ固有のデータを含めず、抽象性を保ちます。データはハンドラが実装される型のインスタンス (`self`) が保持するか、操作の引数として渡されるべきかを慎重に検討します（通常は `self` が保持する方がカプセル化に適しています）。
+4. **継続制御の選択**: ハンドラの各操作実装において、継続をどう扱うか（暗黙的、明示的、呼び出さない）を、関数実装のシグネチャ (`fn (...) -> ... => ...` における `resume` パラメータの有無と型）と `resume` の呼び出し方によって適切に表現します。
 5. **合成可能性**: 異なる効果を持つインスタンスを `with` 構文で容易に組み合わせられるように設計します。
 6. **型安全性**: Effect パラメータと `with` 構文（およびオプションの型注釈）により、ハンドラ実装を持つインスタンスの依存関係と提供が型レベルでチェックされることを保証します。
 7. **パフォーマンス**: （言語実装の課題として）効果処理メカニズム（中断、継続キャプチャ、ハンドラ呼び出し）のオーバーヘッドを最小限に抑える最適化が重要です。
