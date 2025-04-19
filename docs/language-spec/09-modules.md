@@ -14,31 +14,31 @@
 
 ## 9.2 モジュール定義
 
-モジュールは、関連する型、関数、効果などをグループ化するための単位です。モジュールは`module`キーワードを使用して定義されます。
+モジュールは、関連する型、関数、効果などをグループ化するための単位です。モジュールは`module`キーワードを使用して定義されます。（注意: モジュール定義の構文自体も将来的に変更される可能性があります。）
 
-```
+```protorun
 module Math {
   // 公開関数（外部からアクセス可能）
-  export fn add(a: Int, b: Int): Int = a + b
-  export fn subtract(a: Int, b: Int): Int = a - b
-  
+  export let add = fn (a: Int, b: Int): Int => a + b;
+  export let subtract = fn (a: Int, b: Int): Int => a - b;
+
   // 非公開関数（モジュール内でのみアクセス可能）
-  fn helper(): Int = 42
-  
+  let helper = fn (): Int => 42;
+
   // 公開型
-  export type Point = {
+  export let Point = type {
     x: Float,
     y: Float
-  }
-  
-  // 公開定数
-  export const PI: Float = 3.14159
+  };
+
+  // 公開定数 (let束縛として)
+  export let PI: Float = 3.14159;
 }
 ```
 
 モジュール定義には以下の特徴があります：
 
-1. **公開/非公開**: `export`キーワードを使用して、モジュール外からアクセス可能な要素を指定します。
+1. **公開/非公開**: `export`キーワードを `let`, `let mut`, `impl` 宣言の前に付与することで、モジュール外からアクセス可能な要素を指定します。`export` が付いていない宣言は、デフォルトでモジュールプライベート（非公開）となります。
 2. **スコープ**: モジュール内で定義された要素は、そのモジュールのスコープ内に存在します。
 3. **ネスト**: モジュールは他のモジュール内にネストすることができます。
 
@@ -46,72 +46,74 @@ module Math {
 
 他のモジュールで定義された要素を使用するには、`import`キーワードを使用してインポートします。
 
-```
-// モジュール全体のインポート
-import Math
+```protorun
+// モジュール全体のインポート (非推奨: 名前空間の汚染)
+// import Math // この形式は非推奨または廃止の可能性あり
 
 // 特定の要素のインポート
-import Math.add
+import Math.add;
+import Math.Point;
 
 // 複数の要素のインポート
-import Math.{add, subtract}
+import Math.{add, subtract, Point};
 
 // モジュールのすべての公開要素のインポート（注意：ワイルドカードインポートは推奨されない場合がある）
-// import Math.* // 文法的には可能だが、名前空間の汚染を避けるため、通常は明示的なインポートが推奨される
+// import Math.*; // 文法的には可能だが、名前空間の汚染を避けるため、通常は明示的なインポートが推奨される
 
 // 別名を付けてインポート
-import Math as M
-import Math.add as addition
+import Math as M;
+import Math.add as addition;
+import Math.{Point as Vec2};
 ```
 
 インポートには以下の特徴があります：
 
-1. **選択的インポート**: 必要な要素のみをインポートできます。
-2. **ワイルドカードインポート**: モジュールのすべての公開要素をインポートできますが、名前空間の衝突を避けるために注意が必要です。
-3. **別名**: インポートした要素に別名を付けることができます。
+1. **選択的インポート**: 必要な要素のみをインポートできます。`{...}` を使って複数要素をまとめてインポートすることも可能です。
+2. **ワイルドカードインポート**: モジュールのすべての公開要素をインポートできますが (`import Module.*`)、名前空間の衝突を避けるために注意が必要です。一般的には非推奨です。
+3. **別名**: インポートした要素に `as` キーワードを使って別名を付けることができます。
 4. **可視性**: インポートした要素は、インポートしたスコープ内でのみ使用できます。
 
 ## 9.4 モジュールの階層構造
 
 モジュールは階層構造を形成することができ、サブモジュールを定義することができます。
 
-```
+```protorun
 module Graphics {
   // 共通の型や関数
-  export type Color = {
+  export let Color = type {
     r: Int,
     g: Int,
     b: Int
-  }
-  
+  };
+
   // 2Dグラフィックスのサブモジュール
   export module TwoD {
-    export fn drawRect(x: Int, y: Int, width: Int, height: Int, color: Color): Unit = {
+    export let drawRect = fn (x: Int, y: Int, width: Int, height: Int, color: Color): Unit => {
       // 実装
-    }
+    };
   }
-  
+
   // 3Dグラフィックスのサブモジュール
   export module ThreeD {
-    export fn drawCube(x: Int, y: Int, z: Int, size: Int, color: Color): Unit = {
+    export let drawCube = fn (x: Int, y: Int, z: Int, size: Int, color: Color): Unit => {
       // 実装
-    }
+    };
   }
 }
 
 // サブモジュールの使用
-import Graphics.TwoD
-import Graphics.ThreeD
+import Graphics.TwoD;
+import Graphics.ThreeD.drawCube; // 特定の要素をインポート
 
 // または
-import Graphics.{TwoD, ThreeD}
+import Graphics.{TwoD, ThreeD};
 ```
 
 階層構造には以下の特徴があります：
 
 1. **名前空間の整理**: 関連する機能をさらに細かく整理できます。
-2. **選択的インポート**: 必要なサブモジュールのみをインポートできます。
-3. **可視性の制御**: サブモジュールの可視性も`export`キーワードで制御できます。
+2. **選択的インポート**: 必要なサブモジュールやその中の要素のみをインポートできます。
+3. **可視性の制御**: サブモジュール自体の可視性も`export`キーワードで制御できます。
 
 ## 9.5 モジュールとファイルシステム
 
@@ -121,34 +123,37 @@ Protorun言語では、モジュール構造とファイルシステム構造を
 // ファイル: graphics/two_d.pr
 module Graphics.TwoD {
   // 2Dグラフィックスの実装
+  export let drawLine = fn (...) => { ... };
 }
 
 // ファイル: graphics/three_d.pr
 module Graphics.ThreeD {
   // 3Dグラフィックスの実装
+  export let drawSphere = fn (...) => { ... };
 }
 
 // ファイル: main.pr
-import Graphics.TwoD
-import Graphics.ThreeD
+import Graphics.TwoD; // graphics/two_d.pr をインポート
+import Graphics.ThreeD.drawSphere; // graphics/three_d.pr の drawSphere をインポート
 
-fn main(): Unit = {
-  // グラフィックスモジュールの使用
-}
+let main = fn (): Unit => {
+  TwoD.drawLine(...);
+  drawSphere(...);
+};
 ```
 
 ファイルシステムとの関連付けには以下の特徴があります：
 
-1. **モジュールパス**: ファイルパスがモジュールパスに対応します。
-2. **自動インポート**: ファイルシステム構造に基づいて、モジュールが自動的に認識されます。
-3. **分割定義**: 大きなモジュールを複数のファイルに分割できます。
+1. **モジュールパス**: ファイルパスがモジュールパスに対応します。ディレクトリ構造がモジュールの階層構造を反映します。
+2. **自動インポート**: ファイルシステム構造に基づいて、モジュールが自動的に認識されます（コンパイラがソースファイルを探索します）。
+3. **分割定義**: 大きなモジュールを複数のファイルに分割できます（同じ `module` 宣言を複数のファイルに記述するなど、具体的な方法は言語仕様で定義されます）。
 
 ## 9.6 モジュールの設計上の考慮事項
 
 モジュールを設計する際には、以下の点を考慮することが重要です：
 
 1. **凝集度**: モジュールは関連する機能をグループ化し、高い凝集度を持つべきです。
-2. **インターフェース**: モジュールは明確で一貫したインターフェースを提供すべきです。
+2. **インターフェース**: モジュールは明確で一貫したインターフェース（公開された `let`, `let mut`, `impl` 宣言）を提供すべきです。
 3. **依存関係**: モジュール間の依存関係は最小限に抑え、循環依存を避けるべきです。
 4. **可視性**: 必要な要素のみを`export`し、実装の詳細は隠蔽すべきです。
 5. **命名規則**: モジュールと要素の命名は一貫性を持ち、意図を明確に表現すべきです。

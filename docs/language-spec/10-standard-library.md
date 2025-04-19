@@ -16,9 +16,9 @@
 
 標準ライブラリは、プログラミングに不可欠な基本的なデータ構造を提供します。
 
-```
+```protorun
 // リスト
-enum List<T> {
+let List = enum<T> {
   Cons(head: T, tail: List<T>),
   Nil
 }
@@ -28,15 +28,15 @@ module List {
   // リスト操作 (例)
   // 注意: 以下の関数定義は例であり、実際の標準ライブラリの実装とは異なる場合があります。
   // また、List<T> のメソッドとして実装される可能性もあります。
-  export fn empty<T>(): List<T> = List.Nil
-  export fn cons<T>(head: T, tail: List<T>): List<T> = List.Cons(head, tail)
-  // export fn append<T>(list1: List<T>, list2: List<T>): List<T> // 例: appendの実装は省略
+  export let empty = fn <T>(): List<T> => List.Nil
+  export let cons = fn <T>(head: T, tail: List<T>): List<T> => List.Cons(head, tail)
+  // export let append = fn <T>(list1: List<T>, list2: List<T>): List<T> => { /* ... */ } // 例: appendの実装は省略
   // map や filter などの高階関数は、List<T> 型のメソッドとして
   // または List モジュール内の関数として提供される可能性があります。
 }
 
 // マップ (トレイトとして定義 - 実装は標準ライブラリで提供)
-trait Map<K, V> {
+let Map = trait<K, V> {
   fn get(key: K): Option<V>
   fn put(key: K, value: V): Map<K, V> // Note: May need to be mutable or return new map
   fn remove(key: K): Map<K, V>      // Note: May need to be mutable or return new map
@@ -50,12 +50,12 @@ trait Map<K, V> {
 // Map モジュール (コンパニオンオブジェクト的な役割)
 module Map {
   // マップ構築関数など (例)
-  export fn empty<K, V>(): Map<K, V>
+  export let empty = fn <K, V>(): Map<K, V> => { /* ... */ }
 }
 
 
 // セット (トレイトとして定義 - 実装は標準ライブラリで提供)
-trait Set<T> {
+let Set = trait<T> {
   fn contains(value: T): Bool
   fn add(value: T): Set<T>      // Note: May need to be mutable or return new set
   fn remove(value: T): Set<T>   // Note: May need to be mutable or return new set
@@ -69,17 +69,17 @@ trait Set<T> {
 // Set モジュール (コンパニオンオブジェクト的な役割)
 module Set {
   // セット構築関数など (例)
-  export fn empty<T>(): Set<T>
+  export let empty = fn <T>(): Set<T> => { /* ... */ }
 }
 
 // オプション型
-enum Option<T> {
+let Option = enum<T> {
   Some(T),
   None
 }
 
 // 結果型
-enum Result<T, E> {
+let Result = enum<T, E> {
   Ok(T),
   Err(E)
 }
@@ -87,55 +87,55 @@ enum Result<T, E> {
 // Result型の拡張メソッド (implブロックを使用)
 impl<T, E> Result<T, E> {
   // 既存のメソッド
-  fn map<U>(self, f: (T) -> U): Result<U, E> = match self {
+  let map = fn <U>(self, f: (T) -> U): Result<U, E> => match self {
     Result.Ok(value) => Result.Ok(f(value)),
     Result.Err(error) => Result.Err(error)
   }
 
-  fn flatMap<U>(self, f: (T) -> Result<U, E>): Result<U, E> = match self {
+  let flatMap = fn <U>(self, f: (T) -> Result<U, E>): Result<U, E> => match self {
     Result.Ok(value) => f(value),
     Result.Err(error) => Result.Err(error)
   }
 
   // 新しいユーティリティメソッド
-  fn mapErr<F>(self, f: (E) -> F): Result<T, F> = match self {
+  let mapErr = fn <F>(self, f: (E) -> F): Result<T, F> => match self {
     Result.Ok(value) => Result.Ok(value),
     Result.Err(error) => Result.Err(f(error))
   }
 
-  fn flatMapErr<F>(self, f: (E) -> Result<T, F>): Result<T, F> = match self {
+  let flatMapErr = fn <F>(self, f: (E) -> Result<T, F>): Result<T, F> => match self {
     Result.Ok(value) => Result.Ok(value),
     Result.Err(error) => f(error)
   }
 
   // 注意: panic は言語のコア機能として別途定義される必要があります
-  fn unwrap(self): T = match self {
+  let unwrap = fn (self): T => match self {
     Result.Ok(value) => value,
     Result.Err(_) => panic("Result.unwrap called on an Err value")
   }
 
-  fn unwrapOr(self, default: T): T = match self {
+  let unwrapOr = fn (self, default: T): T => match self {
     Result.Ok(value) => value,
     Result.Err(_) => default
   }
 
-  fn unwrapOrElse(self, f: (E) -> T): T = match self {
+  let unwrapOrElse = fn (self, f: (E) -> T): T => match self {
     Result.Ok(value) => value,
     Result.Err(error) => f(error)
   }
 
-  fn isOk(self): Bool = match self {
+  let isOk = fn (self): Bool => match self {
     Result.Ok(_) => true,
     Result.Err(_) => false
   }
 
-  fn isErr(self): Bool = match self {
+  let isErr = fn (self): Bool => match self {
     Result.Ok(_) => false,
     Result.Err(_) => true
   }
 
   // 注意: panic は言語のコア機能として別途定義される必要があります
-  fn unwrapErr(self): E = match self {
+  let unwrapErr = fn (self): E => match self {
     Result.Ok(_) => panic("Result.unwrapErr called on an Ok value"),
     Result.Err(error) => error
   }
@@ -144,42 +144,40 @@ impl<T, E> Result<T, E> {
 // Result モジュール (ユーティリティ関数)
 module Result {
   // 複数のResultを結合する (実装は List の機能に依存するため、シグネチャのみ示す)
-  export fn all<T, E>(results: List<Result<T, E>>): Result<List<T>, E>
-  // {
-  //   // 実装例 (List.fold, List.reverse, List.cons が必要)
-  //   results.fold(Result.Ok(List.empty<T>()), (accResult, currentResult) => {
-  //     bind {
-  //       acc <- accResult
-  //       current <- currentResult
-  //       Result.Ok(List.cons(current, acc)) // 逆順になるので最後に reverse が必要
-  //     }
-  //   }).map(list => list.reverse()) // List.reverse が必要
-  // }
+  export let all = fn <T, E>(results: List<Result<T, E>>): Result<List<T>, E> => {
+    // 実装例 (List.fold, List.reverse, List.cons が必要)
+    // results.fold(Result.Ok(List.empty<T>()), (accResult, currentResult) => {
+    //   bind {
+    //     acc <- accResult
+    //     current <- currentResult
+    //     Result.Ok(List.cons(current, acc)) // 逆順になるので最後に reverse が必要
+    //   }
+    // }).map(list => list.reverse()) // List.reverse が必要
+    /* ... 実装 ... */
+  }
 
   // 最初に成功したResultを返す (実装は List の機能に依存するため、シグネチャのみ示す)
-  export fn any<T, E>(results: List<Result<T, E>>): Result<T, List<E>>
-  // {
-  //   // 実装例 (List.fold, List.reverse, List.cons が必要)
-  //   results.fold(Result.Err(List.empty<E>()), (accResult, currentResult) => {
-  //     match (accResult, currentResult) {
-  //       (Result.Ok(v), _) => Result.Ok(v), // 既に成功が見つかっていればそれを返す
-  //       (_, Result.Ok(v)) => Result.Ok(v), // 現在のものが成功ならそれを返す
-  //       (Result.Err(errs), Result.Err(err)) => Result.Err(List.cons(err, errs)), // 両方エラーならエラーリストに追加 (逆順)
-  //     }
-  //   }).mapErr(errs => errs.reverse()) // List.reverse が必要
-  // }
+  export let any = fn <T, E>(results: List<Result<T, E>>): Result<T, List<E>> => {
+    // 実装例 (List.fold, List.reverse, List.cons が必要)
+    // results.fold(Result.Err(List.empty<E>()), (accResult, currentResult) => {
+    //   match (accResult, currentResult) {
+    //     (Result.Ok(v), _) => Result.Ok(v), // 既に成功が見つかっていればそれを返す
+    //     (_, Result.Ok(v)) => Result.Ok(v), // 現在のものが成功ならそれを返す
+    //     (Result.Err(errs), Result.Err(err)) => Result.Err(List.cons(err, errs)) // 両方エラーならエラーリストに追加 (逆順)
+    //   }
+    // }).mapErr(errs => errs.reverse()) // List.reverse が必要
+    /* ... 実装 ... */
+  }
 }
 ```
 
-```
 ## 10.3 I/O操作
 
 標準ライブラリは、ファイルシステムやコンソールとの対話など、I/O操作のための効果を提供します。
 
-```
-
+```protorun
 // I/O効果
-effect IO {
+let IO = effect {
   fn readFile(path: String): Result<String, IOError>
   fn writeFile(path: String, content: String): Result<Unit, IOError>
   fn fileExists(path: String): Bool
@@ -193,48 +191,63 @@ effect IO {
   fn setEnv(name: String, value: String): Result<Unit, IOError>
 }
 
-handler IO for IOHandler {
+// 仮のIOエラー型
+let IOError = enum { FileNotFound(String), PermissionDenied, Other(String) }
+
+// IOハンドラの実装例 (特定のプラットフォーム向け)
+let IOHandler = type { /* プラットフォーム依存の状態など */ }
+let IOHandlerImpl = handler IO for IOHandler {
   let readFile = fn (self, path: String): Result<String, IOError> => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 
   let writeFile = fn (self, path: String, content: String): Result<Unit, IOError> => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 
   let fileExists = fn (self, path: String): Bool => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 
   let deleteFile = fn (self, path: String): Result<Unit, IOError> => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 
   let println = fn (self, message: String): Unit => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 
   let print = fn (self, message: String): Unit => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 
   let readLine = fn (self): String => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 
   let getEnv = fn (self, name: String): Option<String> => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 
   let setEnv = fn (self, name: String, value: String): Result<Unit, IOError> => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 }
 
-fn processFile(path: String) (effect io: IO): Result<String, IOError> = {
+// 使用例
+let processFile = fn (path: String) (effect io: IO): Result<String, IOError> => {
   if io.fileExists(path) {
     let content = io.readFile(path)?
-    let processed = processContent(content)
+    let processed = processContent(content) // processContent は別途定義
     io.writeFile(path + ".processed", processed)?
     io.println(s"ファイル $path を処理しました")
     Result.Ok(processed)
@@ -244,16 +257,32 @@ fn processFile(path: String) (effect io: IO): Result<String, IOError> = {
   }
 }
 
+// 実行例
+let main = fn () => {
+  let ioHandler = IOHandler { /* ... */ }
+  with io = ioHandler {
+    processFile("my_data.txt") match {
+      Result.Ok(result) => io.println(s"処理成功: ${result}"),
+      Result.Err(err) => io.println(s"処理失敗: ${err}") // エラー表示方法要検討
+    }
+  }
+}
 ```
 
 ## 10.4 並行処理
 
 標準ライブラリは、並行処理と非同期プログラミングのためのサポートを提供します。
 
-```
+```protorun
+// 仮の型
+let Duration = type { /* ... */ }
+module Duration { export let ofSeconds = fn (Int): Duration => { /* ... */ } }
+let Task = type<T> { /* ... */ } // 非同期タスクを表す型
+let TimeoutError = type {}
+let NetworkError = enum { Timeout, ConnectionFailed, Other(String) }
 
 // 非同期効果
-effect Async {
+let Async = effect {
   fn spawn<T>(task: () -> T): Task<T>
   fn await<T>(task: Task<T>): T
   fn sleep(duration: Duration): Unit
@@ -263,46 +292,54 @@ effect Async {
   fn all<T>(tasks: List<() -> T>): List<T>
 }
 
-handler Async for AsyncHandler {
+// Asyncハンドラの実装例
+let AsyncHandler = type { /* スレッドプールなどの状態 */ }
+let AsyncHandlerImpl = handler Async for AsyncHandler {
   let spawn = fn <T> (self, task: () -> T, resume: (Task<T>) -> Unit): Unit => {
-    let taskHandle = createTask(task)
+    let taskHandle = createTask(task) // createTask は内部関数と仮定
     resume(taskHandle)
   }
 
   let await = fn <T> (self, task: Task<T>, resume: (T) -> Unit): Unit => {
+    // task.onComplete は Task<T> のメソッドと仮定
     task.onComplete(result => resume(result))
   }
 
   let sleep = fn (self, duration: Duration): Unit => {
     // プラットフォーム固有の実装
+    /* ... */
   }
 
   let withTimeout = fn <T> (self, duration: Duration, task: () -> T): Result<T, TimeoutError> => {
     // 実装
+    /* ... */
   }
 
   let race = fn <T> (self, tasks: List<() -> T>): T => {
     // 実装
+    /* ... */
   }
 
   let all = fn <T> (self, tasks: List<() -> T>): List<T> => {
     // 実装
+    /* ... */
   }
 }
 
-fn fetchData(url: String) (effect async: Async, effect io: IO): Result<String, NetworkError> = {
+// 使用例
+let fetchData = fn (url: String) (effect async: Async, effect io: IO): Result<String, NetworkError> => {
   io.println(s"データを取得中: $url")
 
   let task = async.spawn(() => {
-    networkRequest(url)
+    networkRequest(url) // networkRequest は外部関数と仮定
   })
 
   async.withTimeout(Duration.ofSeconds(10), () => {
-    let result = async.await(task)?
+    let result = async.await(task)? // await が Result を返すか、例外効果を使うか要検討
     io.println(s"データ取得完了: ${result.length} バイト")
     Result.Ok(result)
   }) match {
-    Result.Ok(data) => Result.Ok(data),
+    Result.Ok(dataResult) => dataResult, // dataResult は Result<String, NetworkError>
     Result.Err(_) => {
       io.println("タイムアウトしました")
       Result.Err(NetworkError.Timeout)
@@ -310,69 +347,78 @@ fn fetchData(url: String) (effect async: Async, effect io: IO): Result<String, N
   }
 }
 
+// 実行例
+let mainAsync = fn () => {
+  let asyncHandler = AsyncHandler { /* ... */ }
+  let ioHandler = IOHandler { /* ... */ }
+  with async = asyncHandler, io = ioHandler {
+    fetchData("http://example.com") match {
+      Result.Ok(data) => io.println("成功"),
+      Result.Err(err) => io.println("失敗")
+    }
+  }
+}
 ```
 
 並行処理は代数的効果として実装され、非同期プログラミングを型安全かつ直感的に行うことができます。これにより、コールバックの複雑さを避けつつ、効率的な並行処理を実現できます。
 
 ## 10.5 コレクション操作
 
-標準ライブラリは、コレクションに対する豊富な操作を提供します。
+標準ライブラリは、コレクションに対する豊富な操作を提供します。これらは多くの場合、対応する型のメソッドとして実装されるか、コンパニオンモジュール内の関数として提供されます。
 
-```
-
-// リスト操作
+```protorun
+// リスト操作 (List モジュール内または List<T> のメソッドとして)
 module List {
   // 変換操作
-  export fn map<T, U>(list: List<T>, f: (T) -> U): List<U>
-  export fn flatMap<T, U>(list: List<T>, f: (T) -> List<U>): List<U>
-  export fn filter<T>(list: List<T>, predicate: (T) -> Bool): List<T>
+  export let map = fn <T, U>(list: List<T>, f: (T) -> U): List<U> => { /* ... */ }
+  export let flatMap = fn <T, U>(list: List<T>, f: (T) -> List<U>): List<U> => { /* ... */ }
+  export let filter = fn <T>(list: List<T>, predicate: (T) -> Bool): List<T> => { /* ... */ }
 
   // 集約操作
-  export fn fold<T, U>(list: List<T>, initial: U, f: (U, T) -> U): U
-  export fn reduce<T>(list: List<T>, f: (T, T) -> T): Option<T>
-  export fn sum<T: Num>(list: List<T>): T // Num トレイトが必要
+  export let fold = fn <T, U>(list: List<T>, initial: U, f: (U, T) -> U): U => { /* ... */ }
+  export let reduce = fn <T>(list: List<T>, f: (T, T) -> T): Option<T> => { /* ... */ }
+  export let sum = fn <T: Num>(list: List<T>): T => { /* ... */ } // Num トレイトが必要
 
   // 検索操作
-  export fn find<T>(list: List<T>, predicate: (T) -> Bool): Option<T>
-  export fn contains<T: Eq>(list: List<T>, value: T): Bool // Eq トレイトが必要
-  export fn indexOf<T: Eq>(list: List<T>, value: T): Option<Int> // Eq トレイトが必要
+  export let find = fn <T>(list: List<T>, predicate: (T) -> Bool): Option<T> => { /* ... */ }
+  export let contains = fn <T: Eq>(list: List<T>, value: T): Bool => { /* ... */ } // Eq トレイトが必要
+  export let indexOf = fn <T: Eq>(list: List<T>, value: T): Option<Int> => { /* ... */ } // Eq トレイトが必要
 
   // 構造操作
-  export fn append<T>(list1: List<T>, list2: List<T>): List<T>
-  export fn reverse<T>(list: List<T>): List<T>
-  export fn take<T>(list: List<T>, n: Int): List<T>
-  export fn drop<T>(list: List<T>, n: Int): List<T>
+  export let append = fn <T>(list1: List<T>, list2: List<T>): List<T> => { /* ... */ }
+  export let reverse = fn <T>(list: List<T>): List<T> => { /* ... */ }
+  export let take = fn <T>(list: List<T>, n: Int): List<T> => { /* ... */ }
+  export let drop = fn <T>(list: List<T>, n: Int): List<T> => { /* ... */ }
 }
 
-// マップ操作
+// マップ操作 (Map モジュール内または Map<K, V> のメソッドとして)
 module Map {
   // 変換操作
-  export fn mapValues<K, V, W>(map: Map<K, V>, f: (V) -> W): Map<K, W>
-  export fn filterKeys<K, V>(map: Map<K, V>, predicate: (K) -> Bool): Map<K, V>
-  export fn filterValues<K, V>(map: Map<K, V>, predicate: (V) -> Bool): Map<K, V>
+  export let mapValues = fn <K, V, W>(map: Map<K, V>, f: (V) -> W): Map<K, W> => { /* ... */ }
+  export let filterKeys = fn <K, V>(map: Map<K, V>, predicate: (K) -> Bool): Map<K, V> => { /* ... */ }
+  export let filterValues = fn <K, V>(map: Map<K, V>, predicate: (V) -> Bool): Map<K, V> => { /* ... */ }
 
   // 集約操作
-  export fn foldEntries<K, V, U>(map: Map<K, V>, initial: U, f: (U, K, V) -> U): U
+  export let foldEntries = fn <K, V, U>(map: Map<K, V>, initial: U, f: (U, K, V) -> U): U => { /* ... */ }
 
   // 構造操作
-  export fn merge<K, V>(map1: Map<K, V>, map2: Map<K, V>): Map<K, V> // 衝突解決戦略が必要な場合がある
-  export fn withDefault<K, V>(map: Map<K, V>, defaultValue: V): (K) -> V
+  export let merge = fn <K, V>(map1: Map<K, V>, map2: Map<K, V>): Map<K, V> => { /* ... */ } // 衝突解決戦略が必要な場合がある
+  export let withDefault = fn <K, V>(map: Map<K, V>, defaultValue: V): ((K) -> V) => { /* ... */ }
 }
 
-// セット操作
+// セット操作 (Set モジュール内または Set<T> のメソッドとして)
 module Set {
   // 集合演算
-  export fn union<T>(set1: Set<T>, set2: Set<T>): Set<T>
-  export fn intersection<T>(set1: Set<T>, set2: Set<T>): Set<T>
-  export fn difference<T>(set1: Set<T>, set2: Set<T>): Set<T>
-  export fn symmetricDifference<T>(set1: Set<T>, set2: Set<T>): Set<T>
+  export let union = fn <T>(set1: Set<T>, set2: Set<T>): Set<T> => { /* ... */ }
+  export let intersection = fn <T>(set1: Set<T>, set2: Set<T>): Set<T> => { /* ... */ }
+  export let difference = fn <T>(set1: Set<T>, set2: Set<T>): Set<T> => { /* ... */ }
+  export let symmetricDifference = fn <T>(set1: Set<T>, set2: Set<T>): Set<T> => { /* ... */ }
 
   // 検査操作
-  export fn isSubset<T>(set1: Set<T>, set2: Set<T>): Bool
-  export fn isSuperset<T>(set1: Set<T>, set2: Set<T>): Bool
-  export fn isDisjoint<T>(set1: Set<T>, set2: Set<T>): Bool
+  export let isSubset = fn <T>(set1: Set<T>, set2: Set<T>): Bool => { /* ... */ }
+  export let isSuperset = fn <T>(set1: Set<T>, set2: Set<T>): Bool => { /* ... */ }
+  export let isDisjoint = fn <T>(set1: Set<T>, set2: Set<T>): Bool => { /* ... */ }
 }
-
 ```
 
 これらのコレクション操作は、関数型プログラミングのパターンに基づいており、データの変換と操作を簡潔かつ表現力豊かに行うことができます。
@@ -381,10 +427,9 @@ module Set {
 
 標準ライブラリは、数値計算のための機能を提供します。
 
-```
-
-// 数値型クラス
-trait Num<T> {
+```protorun
+// 数値型クラス (トレイト)
+let Num = trait<T> {
   fn add(self, other: T): T
   fn subtract(self, other: T): T
   fn multiply(self, other: T): T
@@ -395,74 +440,71 @@ trait Num<T> {
   fn one(): T
 }
 
-// 数学関数
+// 数学関数 (Math モジュール)
 module Math {
   // 定数
-  export const PI: Float = 3.14159265358979323846
-  export const E: Float = 2.71828182845904523536
+  export let PI: Float = 3.14159265358979323846
+  export let E: Float = 2.71828182845904523536
 
   // 基本関数
-  export fn sqrt(x: Float): Float
-  export fn pow(x: Float, y: Float): Float
-  export fn exp(x: Float): Float
-  export fn log(x: Float): Float
-  export fn log10(x: Float): Float
+  export let sqrt = fn (x: Float): Float => { /* ... */ }
+  export let pow = fn (x: Float, y: Float): Float => { /* ... */ }
+  export let exp = fn (x: Float): Float => { /* ... */ }
+  export let log = fn (x: Float): Float => { /* ... */ }
+  export let log10 = fn (x: Float): Float => { /* ... */ }
 
   // 三角関数
-  export fn sin(x: Float): Float
-  export fn cos(x: Float): Float
-  export fn tan(x: Float): Float
-  export fn asin(x: Float): Float
-  export fn acos(x: Float): Float
-  export fn atan(x: Float): Float
-  export fn atan2(y: Float, x: Float): Float
+  export let sin = fn (x: Float): Float => { /* ... */ }
+  export let cos = fn (x: Float): Float => { /* ... */ }
+  export let tan = fn (x: Float): Float => { /* ... */ }
+  export let asin = fn (x: Float): Float => { /* ... */ }
+  export let acos = fn (x: Float): Float => { /* ... */ }
+  export let atan = fn (x: Float): Float => { /* ... */ }
+  export let atan2 = fn (y: Float, x: Float): Float => { /* ... */ }
 
   // 丸め関数
-  export fn floor(x: Float): Float
-  export fn ceil(x: Float): Float
-  export fn round(x: Float): Float
-  export fn truncate(x: Float): Float
+  export let floor = fn (x: Float): Float => { /* ... */ }
+  export let ceil = fn (x: Float): Float => { /* ... */ }
+  export let round = fn (x: Float): Float => { /* ... */ }
+  export let truncate = fn (x: Float): Float => { /* ... */ }
 }
-
 ```
 
 数値計算機能は、科学計算や数学的操作を効率的に行うための基盤を提供します。
 
 ## 10.7 文字列操作
 
-標準ライブラリは、文字列操作のための豊富な機能を提供します。
+標準ライブラリは、文字列操作のための豊富な機能を提供します。これらは `String` 型のメソッドまたは `String` モジュール内の関数として提供される可能性があります。
 
-```
-
-// 文字列操作
+```protorun
+// 文字列操作 (String モジュールまたは String メソッド)
 module String {
   // 基本操作
-  export fn length(s: String): Int
-  export fn isEmpty(s: String): Bool
-  export fn charAt(s: String, index: Int): Option<Char>
-  export fn substring(s: String, start: Int, end: Int): String
+  export let length = fn (s: String): Int => { /* ... */ }
+  export let isEmpty = fn (s: String): Bool => { /* ... */ }
+  export let charAt = fn (s: String, index: Int): Option<Char> => { /* ... */ }
+  export let substring = fn (s: String, start: Int, end: Int): String => { /* ... */ }
 
   // 変換操作
-  export fn toUpperCase(s: String): String
-  export fn toLowerCase(s: String): String
-  export fn trim(s: String): String
-  export fn replace(s: String, oldStr: String, newStr: String): String
+  export let toUpperCase = fn (s: String): String => { /* ... */ }
+  export let toLowerCase = fn (s: String): String => { /* ... */ }
+  export let trim = fn (s: String): String => { /* ... */ }
+  export let replace = fn (s: String, oldStr: String, newStr: String): String => { /* ... */ }
 
   // 検索操作
-  export fn contains(s: String, substr: String): Bool
-  export fn startsWith(s: String, prefix: String): Bool
-  export fn endsWith(s: String, suffix: String): Bool
-  export fn indexOf(s: String, substr: String): Option<Int>
-  export fn lastIndexOf(s: String, substr: String): Option<Int>
+  export let contains = fn (s: String, substr: String): Bool => { /* ... */ }
+  export let startsWith = fn (s: String, prefix: String): Bool => { /* ... */ }
+  export let endsWith = fn (s: String, suffix: String): Bool => { /* ... */ }
+  export let indexOf = fn (s: String, substr: String): Option<Int> => { /* ... */ }
+  export let lastIndexOf = fn (s: String, substr: String): Option<Int> => { /* ... */ }
 
   // 分割と結合
-  export fn split(s: String, delimiter: String): List<String>
-  export fn join(strings: List<String>, delimiter: String): String
+  export let split = fn (s: String, delimiter: String): List<String> => { /* ... */ }
+  export let join = fn (strings: List<String>, delimiter: String): String => { /* ... */ }
 
   // 文字列補間 (言語機能として提供される可能性あり)
-  // export fn format(template: String, args: Map<String, String>): String
+  // export let format = fn (template: String, args: Map<String, String>): String => { /* ... */ }
 }
-
 ```
 
 文字列操作機能は、テキスト処理やユーザーインターフェースの構築に不可欠です。

@@ -620,3 +620,143 @@ let result3 = multiply_by_two(3, 4) // result3 は 24 (3 * 2 * 4)
 - **高階関数との連携**: 高階関数に渡す関数をその場で生成するのに便利です。
 
 部分適用は、関数型プログラミングにおける重要なテクニックであり、コードの抽象化と再利用性を高めます。
+
+## 6.9 定義式
+
+Protorunでは、型、トレイト、効果、ハンドラ、型エイリアスの定義も式の一種として扱われます。これらの「定義式」は `let` 宣言の右辺で使用され、それぞれの定義を導入します。
+
+### 6.9.1 型定義式 (type / enum)
+
+型定義式は、新しいレコード型（構造体）または代数的データ型（列挙型）を定義します。
+
+**レコード型定義式 (type):**
+
+```protorun
+type<GenericParams>? {
+  field1: Type1,
+  field2: Type2,
+  // ...
+}
+```
+- `type` キーワードで始まります。
+- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- 中括弧 `{}` 内に、カンマ区切りでフィールド定義 (`identifier: Type`) を記述します。
+
+**代数的データ型定義式 (enum):**
+
+```protorun
+enum<GenericParams>? {
+  Variant1(TypeA, TypeB, ...), // タプル形式ヴァリアント
+  Variant2 { field1: TypeC, ... }, // レコード形式ヴァリアント
+  Variant3, // データなしヴァリアント
+  // ...
+}
+```
+- `enum` キーワードで始まります。
+- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- 中括弧 `{}` 内に、カンマ区切りでヴァリアント定義を記述します。
+- ヴァリアントは、名前、オプションのデータ（タプル形式またはレコード形式）を持ちます。
+
+これらの式は、`let` で束縛されることで、新しい型をスコープに導入します。
+
+```protorun
+let Point = type { x: Float, y: Float }
+let Option = enum<T> { Some(T), None }
+```
+詳細な意味論は [4. 宣言](04-declarations.md#43-型定義-type--enum) および [3. 型システム](03-type-system.md) を参照してください。
+
+### 6.9.2 型エイリアス定義式 (alias)
+
+型エイリアス定義式は、既存の型に別名を付けます。
+
+**構文:**
+
+```protorun
+alias<GenericParams>? ExistingType<GenericParams>
+```
+- `alias` キーワードで始まります。
+- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- 既存の型 (`ExistingType`) を指定します。
+
+この式は、`let` で束縛されることで、新しい型エイリアスをスコープに導入します。
+
+```protorun
+let UserId = alias Int
+let StringMap = alias<T> Map<String, T>
+```
+詳細な意味論は [4. 宣言](04-declarations.md#44-型エイリアス定義-alias) を参照してください。
+
+### 6.9.3 トレイト定義式 (trait)
+
+トレイト定義式は、型の振る舞いを定義するインターフェース（トレイト）を定義します。
+
+**構文:**
+
+```protorun
+trait<GenericParams>? (: SuperTrait<SuperArgs>)? {
+  fn method1(self, ...): ReturnType1; // シグネチャ
+  let method2 = fn (self, ...): ReturnType2 => { /* デフォルト実装 */ };
+  // ...
+}
+```
+- `trait` キーワードで始まります。
+- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- オプションでスーパー（親）トレイト `(: SuperTrait)` を指定できます（単一継承のみ）。
+- 中括弧 `{}` 内に、メソッドシグネチャ（`fn name(...): Type;`）またはデフォルト実装（`let name = fn (...) => ...;`）を記述します。
+
+この式は、`let` で束縛されることで、新しいトレイトをスコープに導入します。
+
+```protorun
+let Show = trait { fn show(self): String; }
+let Ord = trait: Eq { /* ... */ }
+```
+詳細な意味論は [4. 宣言](04-declarations.md#46-トレイト定義-trait-と実装-impl) を参照してください。
+
+### 6.9.4 効果定義式 (effect)
+
+効果定義式は、代数的効果のインターフェースを定義します。
+
+**構文:**
+
+```protorun
+effect<GenericParams>? {
+  fn operation1(arg1: Type1, ...): ReturnType1;
+  fn operation2(arg2: Type2, ...): ReturnType2;
+  // ...
+}
+```
+- `effect` キーワードで始まります。
+- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- 中括弧 `{}` 内に、操作シグネチャ (`fn name(...): Type;`) を記述します。
+
+この式は、`let` で束縛されることで、新しい効果インターフェースをスコープに導入します。
+
+```protorun
+let State = effect<S> { fn get(): S; fn put(value: S): Unit; }
+```
+詳細な意味論は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
+
+### 6.9.5 ハンドラ定義式 (handler)
+
+ハンドラ定義式は、特定の型に対して効果インターフェースの操作を実装する方法を定義します。
+
+**構文:**
+
+```protorun
+handler<GenericParams>? EffectName<EffectArgs> for TargetType<TargetArgs> {
+  let operation1 = fn (self, arg1: Type1, ...) => { /* 実装 */ };
+  let operation2 = fn (self, arg2: Type2, ...) => { /* 実装 */ };
+  // ... (EffectName で定義されたすべての操作を実装)
+}
+```
+- `handler` キーワードで始まります。
+- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- 実装する効果 (`EffectName`) と対象の型 (`TargetType`) を指定します (`for` キーワードを使用)。
+- 中括弧 `{}` 内に、`let` を用いた関数定義の形式で操作の実装を記述します。
+
+この式は、`let` で束縛されることで、特定の効果実装（ハンドラ）をスコープに導入します。
+
+```protorun
+let CounterStateHandler = handler State<Int> for CounterState { /* ... */ }
+```
+詳細な意味論は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
