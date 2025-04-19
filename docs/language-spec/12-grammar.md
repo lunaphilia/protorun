@@ -19,10 +19,9 @@ Program ::= TopLevelItem*
 
 TopLevelItem ::= Declaration | Expression
 
-Declaration ::= LetDecl | LetMutDecl | ImplDecl
+Declaration ::= LetDecl | ImplDecl
 
-LetDecl ::= ("export")? "let" Pattern (":" Type)? "=" Expression
-LetMutDecl ::= ("export")? "let" "mut" Identifier (":" Type)? "=" Expression
+LetDecl ::= ("export")? "let" ("mut")? LetPattern (":" Type)? "=" Expression
 ImplDecl ::= ("export")? "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" ImplItem* "}"
 
 Expression ::= LiteralExpr
@@ -175,6 +174,19 @@ Pattern ::= LiteralPattern
           | RecordPattern
           | WildcardPattern
 
+LetPattern ::= LetIdentifierPattern
+             | LetTuplePattern
+             | LetRecordPattern
+
+LetIdentifierPattern ::= Identifier
+
+LetTuplePattern ::= "(" (LetPattern ("," LetPattern)*)? ")"
+
+LetRecordPattern ::= TypeRef "{" (LetRecordFieldPattern ("," LetRecordFieldPattern)*)? ("," "..")? "}"
+
+LetRecordFieldPattern ::= Identifier (":" LetPattern)?
+
+
 LiteralPattern ::= LiteralExpr
 
 IdentifierPattern ::= ("ref")? ("mut")? Identifier
@@ -204,13 +216,16 @@ Protorun言語のプログラムは、トップレベルに配置できる宣言
 
 ### 12.3.2 宣言 (Declaration)
 
-Protorunの宣言は、主に `let` キーワードを用いた束縛宣言に統一されています。
+Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と、`impl` キーワードを用いたトレイト実装宣言があります。
 
-- **`LetDecl` (不変束縛)**: `let` キーワードで始まり、パターン、オプションの型注釈、そして式 (`Expression`) が続きます。右辺の式には、通常の計算式だけでなく、型定義式 (`TypeDefinitionExpr`) なども含まれます。
-- **`LetMutDecl` (可変束縛)**: `let mut` キーワードで始まり、識別子、オプションの型注釈、そして式 (`Expression`) が続きます。右辺の式には、構文上、型定義式なども含まれますが、その意味論は現在検討中です。
-- **`ImplDecl` (トレイト実装)**: `impl` キーワードで始まり、特定の型に対するトレイトの実装を定義します。これは `let` を使用しない例外的な宣言です。
+- **`LetDecl` (束縛宣言)**: `let` キーワードで始まり、オプションで `mut` キーワード、束縛パターン (`LetPattern`)、オプションの型注釈、そして式 (`Expression`) が続きます。
+    - `mut` キーワードがない場合は**不変束縛**となり、`mut` キーワードがある場合は**可変束縛**となります。
+    - 左辺の `LetPattern` には、識別子 (`LetIdentifierPattern`)、タプル (`LetTuplePattern`)、レコード (`LetRecordPattern`) のいずれかの形式のパターンを指定できます。これにより、値の分解束縛が可能です。
+    - `let mut` を使用する場合、左辺の `LetPattern` は単一の識別子 (`LetIdentifierPattern`) でなければなりません。この制約は文法レベルではなく、**意味論解析（セマンティックチェック）**で検証されます。
+    - 右辺の式 (`Expression`) には、通常の計算式だけでなく、関数式や型定義式なども含まれます。
+- **`ImplDecl` (トレイト実装)**: `impl` キーワードで始まり、特定の型に対するトレイトの実装を定義します。
 
-**`export` 修飾子**: `let`, `let mut`, `impl` 宣言の前に `export` キーワードを付与することで、その宣言をモジュール外に公開できます。（詳細は [9. モジュール](09-modules.md) を参照）
+**`export` 修飾子**: `let` (不変・可変問わず) および `impl` 宣言の前に `export` キーワードを付与することで、その宣言をモジュール外に公開できます。（詳細は [9. モジュール](09-modules.md) を参照）
 
 ### 12.3.3 型システム (Type System)
 
@@ -256,14 +271,24 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言に�
 
 ### 12.3.6 パターン (Pattern)
 
-パターンは `match` 式や `let` 束縛で使用され、値の構造と照合します。
+パターンは主に `match` 式で使用され、値の構造と照合します。`let` 束縛で使用できるパターンは `LetPattern` として別途定義されており、より限定されています。
+
+**汎用パターン (`Pattern`)**: `match` 式などで使用されます。
 
 - **リテラル (`LiteralPattern`)**: リテラル値とのマッチング。
-- **識別子 (`IdentifierPattern`)**: 新しい変数を束縛します。`ref` や `mut` 修飾子を伴うことがあります（所有権関連）。
+- **識別子 (`IdentifierPattern`)**: 新しい変数を束縛します。`match` 式内では `ref` や `mut` 修飾子を伴うことがあります（所有権関連）。
 - **タプル (`TuplePattern`)**: `(Pattern1, Pattern2, ...)` 形式。
 - **コンストラクタ (`ConstructorPattern`)**: `EnumVariant(Pattern1, ...)` 形式で、`enum` のヴァリアントとマッチングします。
 - **レコード (`RecordPattern`)**: `TypeName { field: Pattern, ... }` 形式で、レコード型とマッチングします。`..` で残りのフィールドを無視できます。
 - **ワイルドカード (`WildcardPattern`)**: `_` で任意の値とマッチングし、束縛しません。
+
+**let束縛用パターン (`LetPattern`)**: `let` 宣言の左辺で使用されます。
+
+- **識別子 (`LetIdentifierPattern`)**: 単一の識別子による束縛。
+- **タプル (`LetTuplePattern`)**: タプル構造の分解束縛。
+- **レコード (`LetRecordPattern`)**: レコード構造の分解束縛。
+
+`LetPattern` は、マッチに失敗する可能性のある `LiteralPattern` や `ConstructorPattern`、および `let` 文脈では冗長な `WildcardPattern` を除外しています。
 
 ## 12.4 特殊な構文要素
 

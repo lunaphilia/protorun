@@ -20,15 +20,15 @@ Protorun言語で使用されるキーワードは以下の通りです。これ
 | `effect`      | 効果定義式で使用されます。                                         | `EffectDefinitionExpr` ([6. 式](06-expressions.md)), ([8. 代数的効果](08-algebraic-effects.md))         |
 | `else`        | `if`式の偽の場合の分岐を示します。                                 | `IfExpr` ([6. 式](06-expressions.md))                                                                  |
 | `enum`        | 列挙型（代数的データ型）定義式で使用されます。                     | `EnumDefinitionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                     |
-| `export`      | モジュールから宣言（関数、型など）をエクスポートします。           | `LetDecl`, `LetMutDecl`, `ImplDecl` ([9. モジュール](09-modules.md)), ([4. 宣言](04-declarations.md)) |
+| `export`      | モジュールから宣言（関数、型など）をエクスポートします。           | `LetDecl`, `ImplDecl` ([9. モジュール](09-modules.md)), ([4. 宣言](04-declarations.md))                 |
 | `fn`          | 関数式で使用されます。                                             | `FunctionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                         |
 | `for`         | コレクション内包表記で使用され、要素の反復を示します。             | `CollectionComprehensionExpr` ([6. 式](06-expressions.md))                                             |
 | `handler`     | ハンドラ定義式で使用されます。                                     | `HandlerDefinitionExpr` ([6. 式](06-expressions.md)), ([8. 代数的効果](08-algebraic-effects.md))    |
 | `if`          | 条件式を開始します。                                               | `IfExpr` ([6. 式](06-expressions.md))                                                                  |
 | `impl`        | トレイトの実装を宣言します。                                       | `ImplDecl` ([4. 宣言](04-declarations.md))                                                             |
-| `let`         | 不変（イミュータブル）な束縛を宣言します (`let mut` と対比)。       | `LetDecl`, `LetMutDecl` ([4. 宣言](04-declarations.md))                                                |
+| `let`         | 束縛を宣言します (`mut` キーワードと組み合わせて可変束縛も可能)。   | `LetDecl` ([4. 宣言](04-declarations.md))                                                              |
 | `match`       | パターンマッチ式を開始します。                                     | `MatchExpr` ([6. 式](06-expressions.md))                                                               |
-| `mut`         | 可変性（ミュータビリティ）を示します（例: `let mut`, `&mut`）。    | `LetMutDecl`, `TypeRef` ([4. 宣言](04-declarations.md)), ([3. 型システム](03-type-system.md))         |
+| `mut`         | 可変性（ミュータビリティ）を示します（例: `let mut`, `&mut`）。    | `LetDecl`, `TypeRef` ([4. 宣言](04-declarations.md)), ([3. 型システム](03-type-system.md))            |
 | `own`         | 所有権を持つ型を示します。                                         | `TypeRef` ([7. 所有権](07-ownership.md))                                                               |
 | `resume`      | 効果ハンドラ内で、操作の再開ポイントを示します。                   | `HandlerFunction` ([8. 代数的効果](08-algebraic-effects.md))                                           |
 | `return`      | 現在の関数から値を返します。                                       | `ReturnStatement` ([5. 文](05-statements.md))                                                          |
