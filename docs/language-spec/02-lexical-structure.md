@@ -19,7 +19,6 @@ Protorun言語で使用されるキーワードは以下の通りです。これ
 | `bind`        | bind式で使用され、モナド的な操作の連鎖を表現します。               | `BindExpr` ([6. 式](06-expressions.md))                                                                |
 | `effect`      | 効果定義式で使用されます。                                         | `EffectDefinitionExpr` ([6. 式](06-expressions.md)), ([8. 代数的効果](08-algebraic-effects.md))         |
 | `else`        | `if`式の偽の場合の分岐を示します。                                 | `IfExpr` ([6. 式](06-expressions.md))                                                                  |
-| `enum`        | 列挙型（代数的データ型）定義式で使用されます。                     | `EnumDefinitionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                     |
 | `export`      | モジュールから宣言（関数、型など）をエクスポートします。           | `LetDecl`, `ImplDecl` ([9. モジュール](09-modules.md)), ([4. 宣言](04-declarations.md))                 |
 | `fn`          | 関数式で使用されます。                                             | `FunctionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                         |
 | `for`         | コレクション内包表記で使用され、要素の反復を示します。             | `CollectionComprehensionExpr` ([6. 式](06-expressions.md))                                             |
@@ -33,7 +32,7 @@ Protorun言語で使用されるキーワードは以下の通りです。これ
 | `resume`      | 効果ハンドラ内で、操作の再開ポイントを示します。                   | `HandlerFunction` ([8. 代数的効果](08-algebraic-effects.md))                                           |
 | `return`      | 現在の関数から値を返します。                                       | `ReturnStatement` ([5. 文](05-statements.md))                                                          |
 | `trait`       | トレイト定義式で使用されます。                                     | `TraitDefinitionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                    |
-| `type`        | レコード型定義式で使用されます。                                   | `TypeDefinitionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                    |
+| `type`        | レコード型またはヴァリアント型（代数的データ型）定義式で使用されます。 | `TypeDefinitionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                    |
 | `with`        | 暗黙的パラメータリストやwith式（効果ハンドラの適用）で使用します。 | `ImplicitParamList`, `WithExpr` ([8. 代数的効果](08-algebraic-effects.md), [6. 式](06-expressions.md)) |
 
 Protorun言語のキーワードは、以下の原則に基づいて選択されています：

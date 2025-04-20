@@ -17,8 +17,8 @@
 標準ライブラリは、プログラミングに不可欠な基本的なデータ構造を提供します。
 
 ```protorun
-// リスト
-let List = enum<T> {
+// リスト (ヴァリアント型)
+let List = type<T> {
   Cons(head: T, tail: List<T>),
   Nil
 }
@@ -72,14 +72,14 @@ module Set {
   export let empty = fn <T>(): Set<T> => { /* ... */ }
 }
 
-// オプション型
-let Option = enum<T> {
+// オプション型 (ヴァリアント型)
+let Option = type<T> {
   Some(T),
   None
 }
 
-// 結果型
-let Result = enum<T, E> {
+// 結果型 (ヴァリアント型)
+let Result = type<T, E> {
   Ok(T),
   Err(E)
 }
@@ -191,8 +191,8 @@ let IO = effect {
   fn setEnv(name: String, value: String): Result<Unit, IOError>
 }
 
-// 仮のIOエラー型
-let IOError = enum { FileNotFound(String), PermissionDenied, Other(String) }
+// 仮のIOエラー型 (ヴァリアント型)
+let IOError = type { FileNotFound(String), PermissionDenied, Other(String) }
 
 // IOハンドラの実装例 (特定のプラットフォーム向け)
 let IOHandler = type { /* プラットフォーム依存の状態など */ }
@@ -278,8 +278,8 @@ let main = fn () => {
 let Duration = type { /* ... */ }
 module Duration { export let ofSeconds = fn (Int): Duration => { /* ... */ } }
 let Task = type<T> { /* ... */ } // 非同期タスクを表す型
-let TimeoutError = type {}
-let NetworkError = enum { Timeout, ConnectionFailed, Other(String) }
+let TimeoutError = type {} // レコード型 (空)
+let NetworkError = type { Timeout, ConnectionFailed, Other(String) } // ヴァリアント型
 
 // 非同期効果
 let Async = effect {

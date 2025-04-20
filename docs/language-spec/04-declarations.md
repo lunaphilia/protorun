@@ -35,8 +35,8 @@ let mut name: String = "John"
 let add = fn (a: Int, b: Int) -> Int => a + b
 
 // 型定義 (型定義式を束縛)
-let Point = type { x: Float, y: Float }
-let Option = enum<T> { Some(T), None }
+let Point = type { x: Float, y: Float } // レコード型
+let Option = type<T> { Some(T), None } // ヴァリアント型
 
 // 型エイリアス定義 (型エイリアス定義式を束縛)
 let UserId = alias Int
@@ -115,8 +115,8 @@ let square = fn x -> x * x // 戻り値型推論
 let identity = fn <T> (x: T) -> T => x
 
 // 型定義 (型定義式を束縛)
-let Person = type { name: String, age: Int }
-let Result = enum<T, E> { Ok(T), Err(E) }
+let Person = type { name: String, age: Int } // レコード型
+let Result = type<T, E> { Ok(T), Err(E) } // ヴァリアント型
 
 // トレイト定義 (トレイト定義式を束縛)
 let Show = trait { let show: fn(self) -> String } // シグネチャ
@@ -187,20 +187,20 @@ name = "Charlie"
 
 可変変数の使用は、プログラムのどの部分で状態が変化しうるかを理解する上で重要になるため、そのスコープを可能な限り小さく保つことが推奨されます。
 
-## 4.3 型定義 (type / enum)
+## 4.3 型定義 (type)
 
-Protorun言語では、`let` 宣言と**型定義式** (`type` または `enum` キーワードで始まる式) を組み合わせて、新しい型を定義します。これにより、コードの抽象化レベルを高め、データ構造を明確に表現することが可能になります。
+Protorun言語では、`let` 宣言と `type` キーワードで始まる**型定義式**を組み合わせて、新しい**レコード型**（直積）または**ヴァリアント型**（直和、代数的データ型）を定義します。これにより、コードの抽象化レベルを高め、データ構造を明確に表現することが可能になります。
 
 型定義式の詳細な構文については [6. 式](06-expressions.md) の章を参照してください。
 
 ### 4.3.1 レコード型定義 (構造体)
 
-レコード型は、名前付きフィールドを持つ複合データ型を定義します。`let` と `type` キーワードを用いた型定義式で定義します。
+レコード型は、名前付きフィールドを持つ複合データ型（直積）を定義します。`let` と `type` キーワードを用い、中括弧 `{}` 内にフィールド定義を記述する型定義式で定義します。
 
 **宣言 (束縛):**
 
 ```protorun
-let TypeName = type<GenericParams>? { /* フィールド定義 */ }
+let TypeName = type<GenericParams>? { field1: Type1, field2: Type2, ... }
 ```
 
 **具体例:**
@@ -219,37 +219,50 @@ let Pair = type<A, B> {
 
 レコード型は、アプリケーションのドメインモデル（例: ユーザー、製品、注文など）を表現するのに適しています。
 
-### 4.3.2 代数的データ型定義 (enum)
+### 4.3.2 ヴァリアント型定義 (type)
 
-代数的データ型（ADT）は、複数の異なる可能性のある構造（ヴァリアント）を一つの型として定義する方法です。`let` と `enum` キーワードを用いた型定義式を使用します。
+ヴァリアント型（代数的データ型、ADT、直和型）は、複数の異なる可能性のある構造（ヴァリアント）を一つの型として定義する方法です。`let` と `type` キーワードを用い、中括弧 `{}` 内にヴァリアント定義をカンマ区切りで記述する型定義式を使用します。
 
 **宣言 (束縛):**
 
 ```protorun
-let TypeName = enum<GenericParams>? { /* ヴァリアント定義 */ }
+let TypeName = type<GenericParams>? { Variant1(...), Variant2{...}, Variant3, ... }
 ```
+
+- 中括弧 `{}` 内には、1つ以上のヴァリアント定義をカンマ区切りで記述します。
+- 各ヴァリアントは、名前（通常は大文字で始まる識別子）、およびオプションで関連データ（タプル形式またはレコード形式）を持ちます。
 
 **具体例:**
 
 ```protorun
-let Option = enum<T> {
-  Some(T),
-  None
+// Option型: 値が存在するか(Some)しないか(None)
+let Option = type<T> {
+  Some(T), // T型の値を持つヴァリアント
+  None     // データを持たないヴァリアント
 }
 
-let Result = enum<T, E> {
-  Ok(T),
-  Err(E)
+// Result型: 成功(Ok)か失敗(Err)か
+let Result = type<T, E> {
+  Ok(T),   // 成功時の値 T を持つヴァリアント
+  Err(E)   // 失敗時のエラー E を持つヴァリアント
 }
 
-let Shape = enum {
-  Circle(radius: Float),
-  Rectangle(width: Float, height: Float),
-  Point
+// Shape型: 様々な図形
+let Shape = type {
+  Circle(radius: Float), // タプル形式 (名前付き引数も可能だが、ここでは位置引数)
+  Rectangle { width: Float, height: Float }, // レコード形式
+  Point // データなし
 }
 ```
 
-代数的データ型は、特にエラーハンドリング (`Result`)、オプションの値 (`Option`)、状態機械、ツリー構造などの表現に強力です。
+**レコード型定義との区別:**
+
+`type { ... }` 構文はレコード型定義とヴァリアント型定義の両方に使用されます。パーサーは `{` の直後の最初の要素の形式によってどちらかを判断します。
+
+- `identifier: Type ...` で始まればレコード型定義。
+- `Identifier(...) ...`, `Identifier { ... } ...`, または `Identifier, ...`, `Identifier }` で始まればヴァリアント型定義。
+
+ヴァリアント型は、特にエラーハンドリング (`Result`)、オプションの値 (`Option`)、状態機械、ツリー構造などの表現に強力です。
 
 ## 4.4 型エイリアス定義 (alias)
 

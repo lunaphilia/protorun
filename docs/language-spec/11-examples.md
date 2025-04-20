@@ -17,8 +17,8 @@
 この例は、代数的データ型、パターンマッチング、代数的効果（例外処理）を使用した簡単な計算機の実装を示しています。
 
 ```protorun
-// 計算機の実装
-let Expr = enum {
+// 計算機の実装 (ヴァリアント型)
+let Expr = type {
   Number(Int),
   Add(Expr, Expr),
   Subtract(Expr, Expr),
@@ -135,7 +135,7 @@ let main = fn ()(effect console: Console) -> Unit => {
 
 この例では、以下の言語機能を示しています：
 
-1. **代数的データ型（enum）**: 式の構造を表現。
+1. **ヴァリアント型（代数的データ型）**: 式の構造を表現 (`type { ... }` 構文を使用)。
 2. **パターンマッチング**: 式の種類に基づいた処理の分岐。
 3. **代数的効果**: 例外処理のための型安全なメカニズム (`Exception<E>`)。
 4. **ハンドラ型**: 効果インターフェースの実装 (`ExceptionHandler<E>`)。
@@ -256,9 +256,9 @@ let FileSystem = effect {
   let write: fn(handle: &mut FileHandle, content: String) -> Result<Unit, IOError>
 }
 // 仮の型定義
-let FileHandle = type { id: Int } // 簡単のため ID のみ
-let FileMode = enum { Read, Write }
-let IOError = type { message: String }
+let FileHandle = type { id: Int } // レコード型
+let FileMode = type { Read, Write } // ヴァリアント型
+let IOError = type { message: String } // レコード型
 
 // ファイルシステムハンドラ実装 (状態を持たない例)
 let SimpleFileHandler = type {} // ダミー型
@@ -344,8 +344,8 @@ let main = fn ()(effect console: Console) -> Unit => {
 
 ```protorun
 // ユーザーデータ型
-let User = type { id: String, name: String, email: String }
-let DbError = enum { NotFound(String), ConnectionError(String) }
+let User = type { id: String, name: String, email: String } // レコード型
+let DbError = type { NotFound(String), ConnectionError(String) } // ヴァリアント型
 
 // データベースアクセス効果インターフェース
 let Database = effect {

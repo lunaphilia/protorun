@@ -43,9 +43,9 @@ let FileSystem = effect {
 }
 
 // 仮の型定義
-let FileHandle = type { /* ... */ }
-let FileMode = enum { Read, Write, ReadWrite }
-let IOError = type { /* ... */ }
+let FileHandle = type { /* ... */ } // レコード型
+let FileMode = type { Read, Write, ReadWrite } // ヴァリアント型
+let IOError = type { /* ... */ } // レコード型
 ```
 
 * `let EffectName = effect<GenericParams>? { ... }` は、`EffectName` という名前の効果インターフェースを定義します。

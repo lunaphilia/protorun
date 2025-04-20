@@ -45,18 +45,19 @@ Expression ::= LiteralExpr
              | PartialApplicationExpr
              | RecordExpr
              | TypeDefinitionExpr
-             | EnumDefinitionExpr
              | TraitDefinitionExpr
              | EffectDefinitionExpr
              | HandlerDefinitionExpr
              | AliasDefinitionExpr
 
-TypeDefinitionExpr ::= "type" GenericParams? "{" (FieldDefinition ("," FieldDefinition)*)? "}"
+TypeDefinitionExpr ::= "type" GenericParams? "{" (FieldDefinitionList | VariantDefinitionList)? "}"
+
+FieldDefinitionList ::= FieldDefinition ("," FieldDefinition)*
 FieldDefinition ::= Identifier ":" Type
 
-EnumDefinitionExpr ::= "enum" GenericParams? "{" (EnumVariant ("," EnumVariant)*)? "}"
-EnumVariant ::= Identifier ("(" TypeList? ")")?
-              | Identifier "{" (FieldDefinition ("," FieldDefinition)*)? "}"
+VariantDefinitionList ::= VariantDefinition ("," VariantDefinition)*
+VariantDefinition ::= Identifier ("(" TypeList? ")")?
+                    | Identifier "{" (FieldDefinition ("," FieldDefinition)*)? "}"
 
 TraitDefinitionExpr ::= "trait" GenericParams? (":" TypeRef)? "{" TraitItem* "}"
 TraitItem ::= LetDecl
@@ -264,7 +265,6 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 - **グループ化 (`GroupedExpr`)**: `(expr)` 形式。評価順序の制御。
 - **定義式**:
     - **`TypeDefinitionExpr`**: `type <GenericParams>? { ... }`
-    - **`EnumDefinitionExpr`**: `enum <GenericParams>? { ... }`
     - **`TraitDefinitionExpr`**: `trait <GenericParams>? (: SuperTrait)? { ... }`
     - **`EffectDefinitionExpr`**: `effect <GenericParams>? { ... }`
     - **`HandlerDefinitionExpr`**: `handler <GenericParams>? Effect for Type { ... }`
@@ -280,8 +280,8 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 - **リテラル (`LiteralPattern`)**: リテラル値とのマッチング。
 - **識別子 (`IdentifierPattern`)**: 新しい変数を束縛します。`match` 式内では `ref` や `mut` 修飾子を伴うことがあります（所有権関連）。
 - **タプル (`TuplePattern`)**: `(Pattern1, Pattern2, ...)` 形式。
-- **コンストラクタ (`ConstructorPattern`)**: `EnumVariant(Pattern1, ...)` 形式で、`enum` のヴァリアントとマッチングします。
-- **レコード (`RecordPattern`)**: `TypeName { field: Pattern, ... }` 形式で、レコード型とマッチングします。`..` で残りのフィールドを無視できます。
+- **コンストラクタ (`ConstructorPattern`)**: `VariantName(Pattern1, ...)` または `VariantName { field: Pattern, ... }` 形式で、`type` で定義されたヴァリアント型のヴァリアントとマッチングします。
+- **レコード (`RecordPattern`)**: `TypeName { field: Pattern, ... }` 形式で、`type` で定義されたレコード型とマッチングします。`..` で残りのフィールドを無視できます。
 - **ワイルドカード (`WildcardPattern`)**: `_` で任意の値とマッチングし、束縛しません。
 
 **let束縛用パターン (`LetPattern`)**: `let` 宣言の左辺で使用されます。
