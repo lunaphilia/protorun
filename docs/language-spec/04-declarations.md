@@ -282,7 +282,7 @@ let AliasName = alias<GenericParams>? ExistingType<GenericParams>
 let UserId = alias Int
 let StringMap = alias<T> Map<String, T>
 let PointTuple = alias (Float, Float)
-let Callback = alias fn(Int) -> String
+let Callback = alias (Int) -> String
 ```
 
 型エイリアスは、特にジェネリック型や関数型など、型シグネチャが長くなりがちな場合にコードを整理し、理解しやすくするのに有効です。
@@ -307,12 +307,12 @@ let EffectName = effect<GenericParams>? { /* 操作シグネチャ (LetDecl) */ 
 
 ```protorun
 let State = effect<S> {
-  let get: fn() -> S
-  let put: fn(value: S) -> Unit
+  let get: () -> S
+  let put: (value: S) -> Unit
 }
 
 let Console = effect {
-  let log: fn(message: String) -> Unit
+  let log: (message: String) -> Unit
 }
 ```
 
@@ -355,20 +355,20 @@ let TraitName = trait<GenericParams>? (: SuperTrait<SuperArgs>)? { /* メソッ�
 
 ```protorun
 let Show = trait {
-  let show: fn(self) -> String // シグネチャ
+  let show: (self) -> String // シグネチャ
 }
 
 let Eq = trait {
-  let equals: fn(self, other: Self) -> Bool // シグネチャ
+  let equals: (self, other: Self) -> Bool // シグネチャ
 }
 
 let Ord = trait: Eq {
-  let compare: fn(self, other: Self) -> Int // シグネチャ
-  let equals = fn(self, other: Self) -> Bool => self.compare(other) == 0 // デフォルト実装
+  let compare: (self, other: Self) -> Int // シグネチャ
+  let equals = fn(self, other: Self) -> Bool => self.compare(other) == 0 // デフォルト実装は fn を残す
 }
 
 let Add = trait<Rhs = Self, Output = Self> {
-    let add: fn(self, rhs: Rhs) -> Output // シグネチャ
+    let add: (self, rhs: Rhs) -> Output // シグネチャ
 }
 ```
 

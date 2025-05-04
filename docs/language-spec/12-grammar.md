@@ -21,15 +21,24 @@ TopLevelItem ::= Declaration | Expression
 
 Declaration ::= LetDecl | ImplDecl
 
-LetDecl ::= ("export")? "let" ("mut")? LetPattern (":" Type)? ("=" Expression)?
-ImplDecl ::= ("export")? "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" ImplItem* "}"
+Identifier ::= some of string
+
+LetDecl ::= "mut"? LetPattern (":" Type)? ("=" Expression)?
+LetPattern ::= LetIdentifierPattern
+             | LetTuplePattern
+             | LetRecordPattern
+
+LetIdentifierPattern ::= Identifier
+LetTuplePattern ::= "(" (Identifier ("," Identifier)*)? ")"
+LetRecordPattern ::= "{" (LetRecordFieldPattern ("," LetRecordFieldPattern)*)? "}"
+LetRecordFieldPattern ::= Identifier (":" Identifier)?
 
 Expression ::= LiteralExpr
              | IdentifierExpr
              | BlockExpr
              | IfExpr
              | MatchExpr
-             | CollectionComprehensionExpr
+             | ListComprehension
              | BindExpr
              | FunctionExpr
              | CallExpr
@@ -40,14 +49,12 @@ Expression ::= LiteralExpr
              | WithExpr
              | RangeExpr
              | AssignmentExpr
-             | TupleExpr
              | GroupedExpr
              | PartialApplicationExpr
              | RecordExpr
              | TypeDefinitionExpr
              | TraitDefinitionExpr
              | EffectDefinitionExpr
-             | HandlerDefinitionExpr
              | AliasDefinitionExpr
 
 TypeDefinitionExpr ::= "type" GenericParams? "{" (FieldDefinitionList | VariantDefinitionList)? "}"
@@ -65,19 +72,12 @@ TraitItem ::= LetDecl
 EffectDefinitionExpr ::= "effect" GenericParams? "{" EffectItem* "}"
 EffectItem ::= LetDecl
 
-HandlerDefinitionExpr ::= "handler" GenericParams? TypeRef "for" TypeRef WhereClause? "{" HandlerItem* "}"
-HandlerItem ::= LetDecl
-
 AliasDefinitionExpr ::= "alias" GenericParams? Type
 
+ImplDecl ::= ("export")? "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" ImplItem* "}"
 ImplItem ::= LetDecl
-
-ParamList ::= "(" (Param ("," Param)*)? ")"
-ImplicitParamList ::= "(" "with" Param ("," Param)* ")"
-EffectParamList ::= "(" (EffectParam ("," EffectParam)*)? ")"
-
-Param ::= Identifier ":" Type
-EffectParam ::= "effect" Identifier ":" TypeRef
+WhereClause ::= "where" WherePredicate ("," WherePredicate)*
+WherePredicate ::= TypeRef ":" TypeConstraint
 
 GenericParams ::= "<" (GenericParam ("," GenericParam)*)? ">"
 GenericParam ::= Identifier (":" TypeConstraint)?
@@ -87,64 +87,62 @@ TypeConstraint ::= TypeRef (("&" | "|") TypeRef)*
 Type ::= TypeRef
        | FunctionType
        | TupleType
-       | ArrayType
+       | ListType
+       | UnitType
 
 TypeRef ::= Identifier GenericArgs?
-          | "own" TypeRef
-          | "&" TypeRef
-          | "&mut" TypeRef
-
 GenericArgs ::= "<" (Type ("," Type)*)? ">"
 
-FunctionType ::= "fn" GenericParams? ParamListType? EffectParamListType? ImplicitParamListType? "->" ReturnType
+FunctionType ::= GenericParams? ParamListType? EffectParamListType? ImplicitParamListType? "->" ReturnType
 
 ParamListType ::= "(" (Type ("," Type)*)? ")"
 EffectParamListType ::= "(" (EffectParamType ("," EffectParamType)*)? ")"
-ImplicitParamListType ::= "(" "with" Type ("," Type)* ")"
+ImplicitParamListType ::= "(" (ImplicitParamType ("," ImplicitParamType)*)? ")"
+ImplicitParamType ::= "with" TypeRef
 EffectParamType ::= "effect" TypeRef
+ReturnType ::= Type
 
-TupleType ::= "(" TypeList? ")"
+TupleType ::= "(" TypeList ")"
 
 TypeList ::= Type ("," Type)*
 
-ArrayType ::= "[" Type "]"
+ListType ::= "[" Type "]"
 
-ReturnType ::= Type | "Unit"
+UnitType ::= "Unit"
 
 Statement ::= ReturnStatement
 
 ReturnStatement ::= "return" Expression?
 
 LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral
-              | ListLiteral | MapLiteral | SetLiteral
+              | ListLiteral | TupleLiteral
 
+BoolLiteral ::= "true" | "false"
+UnitLiteral ::= "(" ")"
 ListLiteral ::= "[" (Expression ("," Expression)*)? "]"
-MapLiteral ::= "{" (Expression "->" Expression ("," Expression "->" Expression)*)? "}"
-SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
-
-TupleExpr ::= "(" Expression "," TypeList ")"
-            | "(" ")"
-
-GroupedExpr ::= "(" Expression ")"
+TupleLiteral ::= "(" (Expression ("," Expression)*)? ")"
 
 IdentifierExpr ::= Identifier
 
 BlockExpr ::= "{" BlockItem* "}"
-BlockItem ::= Declaration | Statement | Expression
+BlockItem ::= LetDecl | Statement | Expression
 
 IfExpr ::= "if" Expression BlockExpr ("else" (IfExpr | BlockExpr))?
 
 MatchExpr ::= "match" Expression "{" (MatchArm ("," MatchArm)*)? "}"
 MatchArm ::= Pattern ("if" Expression)? "=>" Expression
 
-CollectionComprehensionExpr ::= ListComprehension | MapComprehension | SetComprehension
 ListComprehension ::= "[" Expression "for" Pattern "<-" Expression ("if" Expression)? "]"
-MapComprehension ::= "{" Expression "->" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
-SetComprehension ::= "#{" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
 
 BindExpr ::= "bind" "{" (Pattern "<-" Expression)* Expression "}"
 
-FunctionHeader ::= "fn" GenericParams? ParamList? EffectParamList? ImplicitParamList? ("->" ReturnType)?
+SimpleParam ::= Identifier ":" Type
+ImplicitParam ::= "with" SimpleParam
+EffectParam ::= "effect" SimpleParam
+Param ::= SimpleParam | ImplicitParam | EffectParam
+ParamList ::= "(" (Param ("," Param)*)? ")"
+
+FunctionHeader ::= "fn" GenericParams? ParamList ("->" ReturnType)?
 
 FunctionExpr ::= FunctionHeader "=>" Expression
 
@@ -154,10 +152,6 @@ ArgList ::= Expression ("," Expression)*
 MemberAccessExpr ::= Expression "." Identifier
 
 EffectOperationCallExpr ::= Expression "." Identifier "(" ArgList? ")"
-
-BinaryExpr ::= Expression Operator Expression
-
-UnaryExpr ::= Operator Expression
 
 WithExpr ::= "with" WithBinding ("," WithBinding)* BlockExpr
 WithBinding ::= Identifier "=" Expression (":" TypeRef)?
@@ -177,19 +171,6 @@ Pattern ::= LiteralPattern
           | RecordPattern
           | WildcardPattern
 
-LetPattern ::= LetIdentifierPattern
-             | LetTuplePattern
-             | LetRecordPattern
-
-LetIdentifierPattern ::= Identifier
-
-LetTuplePattern ::= "(" (LetPattern ("," LetPattern)*)? ")"
-
-LetRecordPattern ::= TypeRef "{" (LetRecordFieldPattern ("," LetRecordFieldPattern)*)? ("," "..")? "}"
-
-LetRecordFieldPattern ::= Identifier (":" LetPattern)?
-
-
 LiteralPattern ::= LiteralExpr
 
 IdentifierPattern ::= ("ref")? ("mut")? Identifier
@@ -205,10 +186,17 @@ WildcardPattern ::= "_"
 
 QualifiedIdentifier ::= (Identifier ".")* Identifier
 
-Operator ::= "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" | "!" | "|>" | "|>*" | ">>>" | ">>>*"
+GroupedExpr ::= "(" Expression ")"
 
-WhereClause ::= "where" WherePredicate ("," WherePredicate)*
-WherePredicate ::= TypeRef ":" TypeConstraint
+BinaryExpr ::= Expression ArithmeticOperator Expression
+ConditionExpr ::= Expression ConditionOperator Expression
+LogicalExpr ::= Expression LogicalOperator Expression
+NotExpr ::= NotOperator Expression
+
+ArithmeticOperator ::= "+" | "-" | "*" | "/" | "%" 
+ConditionOperator ::= "==" | "!=" | "<" | ">" | "<=" | ">=" 
+LogicalOperator ::= "&&" | "||" 
+NotOperator ::= "!"
 ```
 
 ## 12.3 文法の説明
@@ -233,8 +221,8 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 ### 12.3.3 型システム (Type System)
 
 - **型参照 (`TypeRef`)**: 型名とジェネリック引数で構成されます。所有権修飾子（`own`, `&`, `&mut`）を含むことができます（所有権システムの詳細は [7. 所有権](07-ownership.md) を参照）。
-- **関数型 (`FunctionType`)**: `fn(ParamList) -> ReturnType` の形式で、パラメータ型、戻り値の型、およびオプションの効果指定 (`EffectSpecifier`) で構成されます。
-- **タプル型 (`TupleType`)**: `(Type1, Type2, ...)` の形式で、複数の型を組み合わせた型です。要素を持たない `()` はユニット型を表します。
+- **関数型 (`FunctionType`)**: `(ParamListType?) -> ReturnType` の形式で、パラメータ型、戻り値の型、およびオプションの効果指定 (`EffectSpecifier`) で構成されます。
+- **タプル型 (`TupleType`)**: `(Type1, Type2, ...)` の形式で、複数の型を組み合わせた型です。要素を持たない `()` はユニット型を表します。**注意:** 1要素のタプル型 `(Type)` は、その要素の型 `Type` と同一として扱われます。
 - **ジェネリクス (`GenericParams`, `GenericArgs`)**: 型、関数、トレイトなどに型パラメータを導入し、多相的なコードを可能にします。
 - **トレイト制約 (`TypeConstraint`, `WhereClause`)**: ジェネリックパラメータが満たすべきトレイトを指定します。
 
@@ -250,18 +238,17 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 
 式は評価されて値を生成します。Protorunでは、型定義なども式の一種として扱われます。
 
-- **リテラル (`LiteralExpr`)**: 数値、文字列、真偽値、ユニット `()` など。コレクションリテラル（`ListLiteral`, `MapLiteral`, `SetLiteral`）も含まれますが、標準ライブラリの型（例: `List<T>`）で代替される可能性があります。
+- **リテラル (`LiteralExpr`)**: 数値、文字列、真偽値、ユニット `()` など。コレクションリテラル（`ListLiteral`, `TupleLiteral`）も含まれますが、標準ライブラリの型（例: `List<T>`）で代替される可能性があります。
 - **識別子 (`IdentifierExpr`)**: 変数や関数名など。
 - **ブロック (`BlockExpr`)**: `{ BlockItem* }` 形式。
 - **条件 (`IfExpr`)**: `if cond { ... } else { ... }` 形式。
 - **パターンマッチ (`MatchExpr`)**: `match value { Pattern => Expr, ... }` 形式。
-- **関数 (`FunctionExpr`)**: `fn <GenericParams>? (Params) => Expr` 形式の無名関数。
+- **関数 (`FunctionExpr`)**: `<GenericParams>? (Params)? => Expr` 形式の無名関数。
 - **呼び出し (`CallExpr`)**: `func(Args)` 形式。
 - **メンバーアクセス (`MemberAccessExpr`)**: `expr.identifier` 形式。
 - **レコード構築 (`RecordExpr`)**: `TypeName { field: value, ... }` 形式。
 - **二項/単項演算 (`BinaryExpr`, `UnaryExpr`)**: 演算子を用いた式。
 - **代入 (`AssignmentExpr`)**: `lvalue = expr` 形式。`lvalue` は識別子やメンバーアクセスなど。
-- **タプル (`TupleExpr`)**: `(expr1, expr2, ...)` 形式（要素2つ以上）。
 - **グループ化 (`GroupedExpr`)**: `(expr)` 形式。評価順序の制御。
 - **定義式**:
     - **`TypeDefinitionExpr`**: `type <GenericParams>? { ... }`

@@ -306,7 +306,7 @@ EffectParam ::= "effect" Identifier ":" TypeRef
 ReturnType ::= Type | "Unit" // (Type の定義は他を参照)
 ```
 
-- `fn`: 関数式の開始を示すキーワード。
+- `fn`: 関数式の開始を示すキーワード。これは関数**定義**（関数式）の一部です。関数**型**の表記（例: `(Int) -> String`）には `fn` キーワードは含まれません。
 - `ParamList?`: 通常のパラメータリスト（オプション）。`()` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。
 - `EffectParamList?`: Effect パラメータリスト（オプション）。`()` で囲み、カンマ区切りで `effect identifier: TypeRef` を記述します。関数が依存する効果インターフェースを指定します。
 - `ImplicitParamList?`: Implicit パラメータリスト（オプション）。`(with ...)` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。コンテキストから暗黙的に渡される値を指定します（Scala の implicit parameter list に類似）。
@@ -566,7 +566,8 @@ let simple_group = (5)     // これは Int 型の 5 であり、タプルでは
 
 **要素数1のタプル:**
 
-- Protorun言語の現在の仕様では、**要素数1のタプルを生成するためのリテラル構文は存在しません**。`(式)` は常にグループ化として解釈されます。これはSwift言語と同様の仕様であり、実用上問題になることは稀であると考えられています。もし要素が1つのコンテナが必要な場合は、構造体 (struct) などを定義することを検討してください。
+- Protorun言語の現在の仕様では、**要素数1のタプルを生成するためのリテラル構文は存在しません**。`(式)` は常にグループ化として解釈されます。
+- 型レベルでは、1要素のタプル型 `(Type)` は、その要素の型 `Type` と同一として扱われます（例: `(Int)` は `Int` と同じ型）。これはSwift言語と同様の仕様であり、実用上問題になることは稀であると考えられています。もし要素が1つのコンテナが必要な場合は、構造体 (struct) などを定義することを検討してください。
 
 ## 6.8 部分適用式
 
@@ -632,12 +633,17 @@ Protorunでは、型、トレイト、効果、ハンドラ、型エイリアス
 
 **構文:**
 
-```protorun
+```ebnf
 // レコード型定義
-type<GenericParams>? { field1: Type1, field2: Type2, ... }
+TypeDefinitionExpr ::= "type" GenericParams? "{" FieldDefinitionList "}"
+FieldDefinitionList ::= FieldDefinition ("," FieldDefinition)*
+FieldDefinition ::= Identifier ":" Type
 
 // ヴァリアント型定義
-type<GenericParams>? { Variant1(...), Variant2{...}, Variant3, ... }
+TypeDefinitionExpr ::= "type" GenericParams? "{" VariantDefinitionList "}"
+VariantDefinitionList ::= VariantDefinition ("," VariantDefinition)*
+VariantDefinition ::= Identifier ("(" TypeList? ")")?
+                    | Identifier "{" FieldDefinitionList? "}"
 ```
 
 - `type` キーワードで始まります。
@@ -665,18 +671,19 @@ let Option = type<T> { Some(T), None }
 
 **構文:**
 
-```protorun
-alias<GenericParams>? ExistingType<GenericParams>
+```ebnf
+AliasDefinitionExpr ::= "alias" GenericParams? Type
 ```
 - `alias` キーワードで始まります。
 - オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
-- 既存の型 (`ExistingType`) を指定します。
+- 既存の型 (`Type`) を指定します。
 
 この式は、`let` で束縛されることで、新しい型エイリアスをスコープに導入します。
 
 ```protorun
 let UserId = alias Int
 let StringMap = alias<T> Map<String, T>
+let Callback = alias (Int) -> String
 ```
 詳細な意味論は [4. 宣言](04-declarations.md#44-型エイリアス定義-alias) を参照してください。
 
@@ -686,23 +693,23 @@ let StringMap = alias<T> Map<String, T>
 
 **構文:**
 
-```protorun
-trait<GenericParams>? (: SuperTrait<SuperArgs>)? {
-  let method1: fn(self, ...) -> ReturnType1 // シグネチャ (右辺なし LetDecl + FunctionType)
-  let method2 = fn (self, ...) -> ReturnType2 => { /* デフォルト実装 (右辺あり LetDecl + FunctionExpr) */ }
-  // ...
-}
+```ebnf
+TraitDefinitionExpr ::= "trait" GenericParams? (":" TypeRef)? "{" TraitItem* "}"
+TraitItem ::= LetDecl // メソッドシグネチャ or デフォルト実装
 ```
 - `trait` キーワードで始まります。
 - オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
-- オプションでスーパー（親）トレイト `(: SuperTrait)` を指定できます（単一継承のみ）。
-- 中括弧 `{}` 内に、`LetDecl` を用いてメソッドシグネチャ (`let name: fn(...) -> ...`) またはデフォルト実装 (`let name = fn (...) -> ... => ...`) を記述します。
+- オプションでスーパー（親）トレイト `(: TypeRef)` を指定できます（単一継承のみ）。
+- 中括弧 `{}` 内に、`LetDecl` を用いてメソッドシグネチャ (`let name: (self, ...) -> ...`) またはデフォルト実装 (`let name = fn (self, ...) -> ... => ...`) を記述します。
 
 この式は、`let` で束縛されることで、新しいトレイトをスコープに導入します。
 
 ```protorun
-let Show = trait { let show: fn(self) -> String }
-let Ord = trait: Eq { /* ... */ }
+let Show = trait { let show: (self) -> String }
+let Ord = trait: Eq {
+  let compare: (self, other: Self) -> Int
+  let equals = fn(self, other: Self) -> Bool => self.compare(other) == 0
+}
 ```
 詳細な意味論は [4. 宣言](04-declarations.md#46-トレイト定義-trait-と実装-impl) を参照してください。
 
@@ -712,21 +719,18 @@ let Ord = trait: Eq { /* ... */ }
 
 **構文:**
 
-```protorun
-effect<GenericParams>? {
-  let operation1: fn(arg1: Type1, ...) -> ReturnType1 // 操作シグネチャ (右辺なし LetDecl + FunctionType)
-  let operation2: fn(arg2: Type2, ...) -> ReturnType2
-  // ...
-}
+```ebnf
+EffectDefinitionExpr ::= "effect" GenericParams? "{" EffectItem* "}"
+EffectItem ::= LetDecl // 操作シグネチャ
 ```
 - `effect` キーワードで始まります。
 - オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
-- 中括弧 `{}` 内に、`LetDecl` を用いて操作シグネチャ (`let name: fn(...) -> ...`) を記述します。
+- 中括弧 `{}` 内に、`LetDecl` を用いて操作シグネチャ (`let name: (arg1: Type1, ...) -> ReturnType1`) を記述します。
 
 この式は、`let` で束縛されることで、新しい効果インターフェースをスコープに導入します。
 
 ```protorun
-let State = effect<S> { let get: fn() -> S; let put: fn(value: S) -> Unit }
+let State = effect<S> { let get: () -> S; let put: (value: S) -> Unit }
 ```
 詳細な意味論は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
 
@@ -736,21 +740,21 @@ let State = effect<S> { let get: fn() -> S; let put: fn(value: S) -> Unit }
 
 **構文:**
 
-```protorun
-handler<GenericParams>? EffectName<EffectArgs> for TargetType<TargetArgs> {
-  let operation1 = fn (self, arg1: Type1, ...) -> ReturnType1 => { /* 実装 */ }
-  let operation2 = fn (self, arg2: Type2, ...) -> ReturnType2 => { /* 実装 */ }
-  // ... (EffectName で定義されたすべての操作を実装)
-}
+```ebnf
+HandlerDefinitionExpr ::= "handler" GenericParams? TypeRef "for" TypeRef WhereClause? "{" HandlerItem* "}"
+HandlerItem ::= LetDecl // 操作実装
 ```
 - `handler` キーワードで始まります。
 - オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
-- 実装する効果 (`EffectName`) と対象の型 (`TargetType`) を指定します (`for` キーワードを使用)。
-- 中括弧 `{}` 内に、`let` を用いた関数定義 (`let name = fn (...) -> ... => ...`) の形式で操作の実装を記述します。
+- 実装する効果 (`TypeRef`) と対象の型 (`TypeRef`) を指定します (`for` キーワードを使用)。
+- 中括弧 `{}` 内に、`let` を用いた関数定義 (`let name = fn (self, ...) -> ... => ...`) の形式で操作の実装を記述します。
 
 この式は、`let` で束縛されることで、特定の効果実装（ハンドラ）をスコープに導入します。
 
 ```protorun
-let CounterStateHandler = handler State<Int> for CounterState { /* ... */ }
+let CounterStateHandler = handler State<Int> for CounterState {
+  let get = fn (self) -> Int => self.count
+  let put = fn (self, value: Int) -> Unit => { /* ... */ }
+}
 ```
 詳細な意味論は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
