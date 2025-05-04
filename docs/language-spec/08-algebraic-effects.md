@@ -19,27 +19,27 @@
 ```protorun
 // 基本的な効果インターフェース定義
 let Console = effect {
-  let log: fn(message: String) -> Unit
-  let readLine: fn() -> String
+  let log: (message: String) -> Unit
+  let readLine: () -> String
 }
 
 // パラメータ化された効果インターフェース
 let State = effect<S> {
-  let get: fn() -> S
-  let set: fn(newState: S) -> Unit
-  let modify: fn(f: (S) -> S) -> Unit // 関数を受け取る操作も可能
+  let get: () -> S
+  let set: (newState: S) -> Unit
+  let modify: (f: (S) -> S) -> Unit // 関数を受け取る操作も可能
 }
 
 // 所有権を考慮した効果インターフェース定義
 let FileSystem = effect {
   // FileHandle の所有権を返す操作
-  let open: fn(path: String, mode: FileMode) -> Result<own FileHandle, IOError>
+  let open: (path: String, mode: FileMode) -> Result<own FileHandle, IOError>
   // FileHandle の所有権を消費する操作
-  let close: fn(handle: own FileHandle) -> Result<Unit, IOError>
+  let close: (handle: own FileHandle) -> Result<Unit, IOError>
   // FileHandle の借用を使用する操作
-  let read: fn(handle: &FileHandle) -> Result<String, IOError>
+  let read: (handle: &FileHandle) -> Result<String, IOError>
   // FileHandle の可変借用を使用する操作
-  let write: fn(handle: &mut FileHandle, content: String) -> Result<Unit, IOError>
+  let write: (handle: &mut FileHandle, content: String) -> Result<Unit, IOError>
 }
 
 // 仮の型定義
@@ -87,8 +87,8 @@ let Counter = type {
 
 // 効果インターフェース (再掲)
 let State = effect<S> {
-  let get: fn() -> S
-  let set: fn(newState: S) -> Unit
+  let get: () -> S
+  let set: (newState: S) -> Unit
 }
 
 // Counter 型に対して State<Int> 効果を実装
@@ -99,7 +99,7 @@ let CounterStateHandler = handler State<Int> for Counter {
 
 // 状態を持たない効果の例
 let Logger = effect {
-  let log: fn(message: String) -> Unit
+  let log: (message: String) -> Unit
 }
 // 状態を持たない型 (例: Unit 型や空の構造体) に対して実装
 let ConsoleLogger = type {} // ダミーの型
@@ -112,7 +112,7 @@ let FileSystemConfig = type {
   let basePath: String
 }
 let FileSystem = effect { // 再掲
-  let open: fn(path: String, mode: FileMode) -> Result<own FileHandle, IOError>
+  let open: (path: String, mode: FileMode) -> Result<own FileHandle, IOError>
   // ...
 }
 let FileSystemHandler = handler FileSystem for FileSystemConfig {
@@ -311,7 +311,7 @@ let ConsoleLoggerHandler = handler Logger for ConsoleLogger {
 }
 
 // Reader 効果の例
-let Reader = effect<Env> { let ask: fn() -> Env }
+let Reader = effect<Env> { let ask: () -> Env }
 // EnvProvider<Env> 型は Reader<Env> を実装すると仮定
 let EnvProvider = type<Env> { environment: Env }
 let ReaderHandler = handler Reader<Env> for EnvProvider<Env> {

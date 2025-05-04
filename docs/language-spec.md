@@ -69,8 +69,6 @@ Protorun言語の仕様は以下のセクションに分かれています。各
     *   12.2 EBNF文法
     *   12.3 文法の説明
     *   12.4 特殊な構文要素
-13. [今後の展望](language-spec/13-future.md)
-14. [参考文献](language-spec/14-references.md)
 
 ## 更新履歴
 

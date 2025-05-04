@@ -28,7 +28,7 @@ let Expr = type {
 
 // 例外効果インターフェース
 let Exception = effect<E> {
-  let raise: fn<T>(error: E) -> T // T は任意の型 (脱出するため)
+  let raise: <T>(error: E) -> T
 }
 
 // 例外ハンドラ実装 (特定の型に対して実装)
@@ -152,9 +152,9 @@ let main = fn ()(effect console: Console) -> Unit => {
 ```protorun
 // 状態効果インターフェース (再掲)
 let State = effect<S> {
-  let get: fn() -> S
-  let set: fn(newState: S) -> Unit
-  let modify: fn(f: (S) -> S) -> Unit
+  let get: () -> S
+  let set: (newState: S) -> Unit
+  let modify: ((S) -> S) -> Unit
 }
 
 // 状態を保持する型
@@ -250,10 +250,10 @@ let main = fn ()(effect console: Console) -> Unit => {
 ```protorun
 // FileSystem 効果インターフェース (再掲)
 let FileSystem = effect {
-  let open: fn(path: String, mode: FileMode) -> Result<own FileHandle, IOError>
-  let close: fn(handle: own FileHandle) -> Result<Unit, IOError>
-  let read: fn(handle: &FileHandle) -> Result<String, IOError>
-  let write: fn(handle: &mut FileHandle, content: String) -> Result<Unit, IOError>
+  let open: (path: String, mode: FileMode) -> Result<own FileHandle, IOError>
+  let close: (handle: own FileHandle) -> Result<Unit, IOError>
+  let read: (handle: &FileHandle) -> Result<String, IOError>
+  let write: (handle: &mut FileHandle, content: String) -> Result<Unit, IOError>
 }
 // 仮の型定義
 let FileHandle = type { id: Int } // レコード型
@@ -349,8 +349,8 @@ let DbError = type { NotFound(String), ConnectionError(String) } // ヴァリア
 
 // データベースアクセス効果インターフェース
 let Database = effect {
-  let query: fn(sql: String) -> Result<List<Map<String, String>>, DbError> // 簡単のため Map を使用
-  let execute: fn(sql: String) -> Result<Unit, DbError>
+  let query: (sql: String) -> Result<List<Map<String, String>>, DbError> // 簡単のため Map を使用
+  let execute: (sql: String) -> Result<Unit, DbError>
 }
 
 // ユーザーリポジトリ関数 (Database 効果に依存)
