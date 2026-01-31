@@ -56,22 +56,25 @@ FieldDefinitionList ::= FieldDefinition ("," FieldDefinition)*
 FieldDefinition ::= Identifier ":" Type
 
 VariantDefinitionList ::= VariantDefinition ("," VariantDefinition)*
-VariantDefinition ::= Identifier ("(" TypeList? ")")?
-                    | Identifier "{" (FieldDefinition ("," FieldDefinition)*)? "}"
+VariantDefinition ::= Identifier ( "(" TypeList? ")" | "{" FieldDefinitionList? "}" )?
 
 TraitDefinitionExpr ::= "trait" GenericParams? (":" TypeRef)? "{" TraitItem* "}"
-TraitItem ::= LetDecl
+TraitItem ::= InnerDecl
 
 EffectDefinitionExpr ::= "effect" GenericParams? "{" EffectItem* "}"
-EffectItem ::= LetDecl
+EffectItem ::= InnerDecl
 
 HandlerDefinitionExpr ::= "handler" GenericParams? TypeRef "for" TypeRef WhereClause? "{" HandlerItem* "}"
-HandlerItem ::= LetDecl
+HandlerItem ::= InnerDecl
 
 AliasDefinitionExpr ::= "alias" GenericParams? Type
 
-ImplItem ::= LetDecl
+InnerDecl ::= LetDecl
 
+ImplItem ::= InnerDecl
+
+# Parameter lists follow the general pattern: "(" (Item ("," Item)*)? ")"
+# with optional modifiers like "with" for implicit parameters.
 ParamList ::= "(" (Param ("," Param)*)? ")"
 ImplicitParamList ::= "(" "with" Param ("," Param)* ")"
 EffectParamList ::= "(" (EffectParam ("," EffectParam)*)? ")"
@@ -122,7 +125,12 @@ ListLiteral ::= "[" (Expression ("," Expression)*)? "]"
 MapLiteral ::= "{" (Expression "->" Expression ("," Expression "->" Expression)*)? "}"
 SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
 
-TupleExpr ::= "(" Expression "," TypeList ")"
+ExpressionList ::= Expression ("," Expression)*
+
+# TupleExpr uses ExpressionList. At runtime/semantic analysis:
+# - 1 element is interpreted as GroupedExpr
+# - 2+ elements is interpreted as TupleExpr
+TupleExpr ::= "(" ExpressionList ")"
             | "(" ")"
 
 GroupedExpr ::= "(" Expression ")"
@@ -137,6 +145,8 @@ IfExpr ::= "if" Expression BlockExpr ("else" (IfExpr | BlockExpr))?
 MatchExpr ::= "match" Expression "{" (MatchArm ("," MatchArm)*)? "}"
 MatchArm ::= Pattern ("if" Expression)? "=>" Expression
 
+# Comprehensions follow the general pattern: for Pattern <- Expression (if Expression)?
+# The outer delimiters and result expression vary by collection type.
 CollectionComprehensionExpr ::= ListComprehension | MapComprehension | SetComprehension
 ListComprehension ::= "[" Expression "for" Pattern "<-" Expression ("if" Expression)? "]"
 MapComprehension ::= "{" Expression "->" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
@@ -170,6 +180,9 @@ LValue ::= IdentifierExpr | MemberAccessExpr
 RecordExpr ::= TypeRef "{" (RecordFieldInit ("," RecordFieldInit)*)? "}"
 RecordFieldInit ::= Identifier ":" Expression
 
+# LetPattern is a subset of Pattern, used in let bindings.
+# It excludes LiteralPattern, ConstructorPattern, and WildcardPattern
+# which can fail to match or are redundant in binding contexts.
 Pattern ::= LiteralPattern
           | IdentifierPattern
           | TuplePattern
@@ -261,7 +274,7 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 - **レコード構築 (`RecordExpr`)**: `TypeName { field: value, ... }` 形式。
 - **二項/単項演算 (`BinaryExpr`, `UnaryExpr`)**: 演算子を用いた式。
 - **代入 (`AssignmentExpr`)**: `lvalue = expr` 形式。`lvalue` は識別子やメンバーアクセスなど。
-- **タプル (`TupleExpr`)**: `(expr1, expr2, ...)` 形式（要素2つ以上）。
+- **タプル (`TupleExpr`)**: `(expr1, expr2, ...)` 形式。構文上は `ExpressionList` を括弧で囲んだ形で、実行時/セマンティック解析で要素数を判定します。1要素の場合は `GroupedExpr` として、2要素以上の場合は `TupleExpr` として解釈されます。
 - **グループ化 (`GroupedExpr`)**: `(expr)` 形式。評価順序の制御。
 - **定義式**:
     - **`TypeDefinitionExpr`**: `type <GenericParams>? { ... }`
@@ -284,13 +297,13 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 - **レコード (`RecordPattern`)**: `TypeName { field: Pattern, ... }` 形式で、`type` で定義されたレコード型とマッチングします。`..` で残りのフィールドを無視できます。
 - **ワイルドカード (`WildcardPattern`)**: `_` で任意の値とマッチングし、束縛しません。
 
-**let束縛用パターン (`LetPattern`)**: `let` 宣言の左辺で使用されます。
+**let束縛用パターン (`LetPattern`)**: `let` 宣言の左辺で使用されます。`Pattern` のサブセットです。
 
 - **識別子 (`LetIdentifierPattern`)**: 単一の識別子による束縛。
 - **タプル (`LetTuplePattern`)**: タプル構造の分解束縛。
-- **レコード (`LetRecordPattern`)**: レコード構造の分解束縛。
+- **レコード (`LetRecordPattern`)**: レコード構造の分解束縛。文法上は `RecordPattern` と同じ構造（`TypeRef "{" フィールドパターンのリスト ("," "..")? "}"`)を持ちますが、フィールドパターンに `LetPattern` のみを許容します。
 
-`LetPattern` は、マッチに失敗する可能性のある `LiteralPattern` や `ConstructorPattern`、および `let` 文脈では冗長な `WildcardPattern` を除外しています。
+`LetPattern` は、マッチに失敗する可能性のある `LiteralPattern` や `ConstructorPattern`、および `let` 文脈では冗長な `WildcardPattern` を除外しています。これにより、`let` 宣言が常に成功することを文法的に保証します。
 
 ## 12.4 特殊な構文要素
 
