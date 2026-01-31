@@ -233,7 +233,7 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 ### 12.3.3 型システム (Type System)
 
 - **型参照 (`TypeRef`)**: 型名とジェネリック引数で構成されます。所有権修飾子（`own`, `&`, `&mut`）を含むことができます（所有権システムの詳細は [7. 所有権](07-ownership.md) を参照）。
-- **関数型 (`FunctionType`)**: `fn(ParamList) -> ReturnType` の形式で、パラメータ型、戻り値の型、およびオプションの効果指定 (`EffectSpecifier`) で構成されます。
+- **関数型 (`FunctionType`)**: `fn GenericParams? ParamListType? EffectParamListType? ImplicitParamListType? -> ReturnType` の形式で、ジェネリクス、パラメータ型リスト、効果パラメータリスト、暗黙的パラメータリスト、戻り値の型で構成されます。
 - **タプル型 (`TupleType`)**: `(Type1, Type2, ...)` の形式で、複数の型を組み合わせた型です。要素を持たない `()` はユニット型を表します。
 - **ジェネリクス (`GenericParams`, `GenericArgs`)**: 型、関数、トレイトなどに型パラメータを導入し、多相的なコードを可能にします。
 - **トレイト制約 (`TypeConstraint`, `WhereClause`)**: ジェネリックパラメータが満たすべきトレイトを指定します。
