@@ -24,6 +24,8 @@ Declaration ::= LetDecl | ImplDecl
 LetDecl ::= ("export")? "let" ("mut")? LetPattern (":" Type)? ("=" Expression)?
 ImplDecl ::= ("export")? "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" ImplItem* "}"
 
+InnerDecl ::= LetDecl
+
 Expression ::= LiteralExpr
              | IdentifierExpr
              | BlockExpr
@@ -56,21 +58,22 @@ FieldDefinitionList ::= FieldDefinition ("," FieldDefinition)*
 FieldDefinition ::= Identifier ":" Type
 
 VariantDefinitionList ::= VariantDefinition ("," VariantDefinition)*
-VariantDefinition ::= Identifier ("(" TypeList? ")")?
-                    | Identifier "{" (FieldDefinition ("," FieldDefinition)*)? "}"
+VariantDefinition ::= Identifier ( "(" TypeList? ")" | "{" FieldDefinitionList? "}" )?
 
 TraitDefinitionExpr ::= "trait" GenericParams? (":" TypeRef)? "{" TraitItem* "}"
-TraitItem ::= LetDecl
+TraitItem ::= InnerDecl
 
 EffectDefinitionExpr ::= "effect" GenericParams? "{" EffectItem* "}"
-EffectItem ::= LetDecl
+EffectItem ::= InnerDecl
 
 HandlerDefinitionExpr ::= "handler" GenericParams? TypeRef "for" TypeRef WhereClause? "{" HandlerItem* "}"
-HandlerItem ::= LetDecl
+HandlerItem ::= InnerDecl
 
 AliasDefinitionExpr ::= "alias" GenericParams? Type
 
-ImplItem ::= LetDecl
+ImplItem ::= InnerDecl
+
+-- Parameter lists follow a common pattern: parentheses with comma-separated elements
 
 ParamList ::= "(" (Param ("," Param)*)? ")"
 ImplicitParamList ::= "(" "with" Param ("," Param)* ")"
@@ -98,6 +101,8 @@ GenericArgs ::= "<" (Type ("," Type)*)? ">"
 
 FunctionType ::= "fn" GenericParams? ParamListType? EffectParamListType? ImplicitParamListType? "->" ReturnType
 
+-- Type parameter lists also follow the common pattern
+
 ParamListType ::= "(" (Type ("," Type)*)? ")"
 EffectParamListType ::= "(" (EffectParamType ("," EffectParamType)*)? ")"
 ImplicitParamListType ::= "(" "with" Type ("," Type)* ")"
@@ -122,10 +127,12 @@ ListLiteral ::= "[" (Expression ("," Expression)*)? "]"
 MapLiteral ::= "{" (Expression "->" Expression ("," Expression "->" Expression)*)? "}"
 SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
 
-TupleExpr ::= "(" Expression "," TypeList ")"
-            | "(" ")"
+ExpressionList ::= Expression ("," Expression)*
 
-GroupedExpr ::= "(" Expression ")"
+TupleExpr ::= "(" ExpressionList ")"  -- Tuple with 2 or more elements (enforced semantically)
+            | "(" ")"  -- Empty tuple (Unit)
+
+GroupedExpr ::= "(" Expression ")"  -- Parenthesized expression for precedence
 
 IdentifierExpr ::= Identifier
 
@@ -138,6 +145,9 @@ MatchExpr ::= "match" Expression "{" (MatchArm ("," MatchArm)*)? "}"
 MatchArm ::= Pattern ("if" Expression)? "=>" Expression
 
 CollectionComprehensionExpr ::= ListComprehension | MapComprehension | SetComprehension
+
+-- General form: [OpenDelim] Expression [KeyExpr] "for" Pattern "<-" Expression ("if" Expression)? [CloseDelim]
+
 ListComprehension ::= "[" Expression "for" Pattern "<-" Expression ("if" Expression)? "]"
 MapComprehension ::= "{" Expression "->" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
 SetComprehension ::= "#{" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
@@ -177,6 +187,9 @@ Pattern ::= LiteralPattern
           | RecordPattern
           | WildcardPattern
 
+-- LetPattern is a subset of Pattern, excluding patterns that may fail to match
+-- (LiteralPattern, ConstructorPattern) and patterns redundant in let bindings (WildcardPattern)
+
 LetPattern ::= LetIdentifierPattern
              | LetTuplePattern
              | LetRecordPattern
@@ -185,7 +198,9 @@ LetIdentifierPattern ::= Identifier
 
 LetTuplePattern ::= "(" (LetPattern ("," LetPattern)*)? ")"
 
-LetRecordPattern ::= TypeRef "{" (LetRecordFieldPattern ("," LetRecordFieldPattern)*)? ("," "..")? "}"
+RecordPatternBody ::= TypeRef "{" (RecordFieldPattern ("," RecordFieldPattern)*)? ("," "..")? "}"
+
+LetRecordPattern ::= RecordPatternBody
 
 LetRecordFieldPattern ::= Identifier (":" LetPattern)?
 
@@ -198,7 +213,7 @@ TuplePattern ::= "(" (Pattern ("," Pattern)*)? ")"
 
 ConstructorPattern ::= QualifiedIdentifier ("(" (Pattern ("," Pattern)*)? ")")?
 
-RecordPattern ::= TypeRef "{" (RecordFieldPattern ("," RecordFieldPattern)*)? ("," "..")? "}"
+RecordPattern ::= RecordPatternBody
 RecordFieldPattern ::= Identifier (":" Pattern)?
 
 WildcardPattern ::= "_"
@@ -261,8 +276,8 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 - **レコード構築 (`RecordExpr`)**: `TypeName { field: value, ... }` 形式。
 - **二項/単項演算 (`BinaryExpr`, `UnaryExpr`)**: 演算子を用いた式。
 - **代入 (`AssignmentExpr`)**: `lvalue = expr` 形式。`lvalue` は識別子やメンバーアクセスなど。
-- **タプル (`TupleExpr`)**: `(expr1, expr2, ...)` 形式（要素2つ以上）。
-- **グループ化 (`GroupedExpr`)**: `(expr)` 形式。評価順序の制御。
+- **タプル (`TupleExpr`)**: `(expr1, expr2, ...)` 形式（要素2つ以上）。1つの要素だけをカンマなしで括弧で囲んだ場合は `GroupedExpr` として扱われます。空の `()` はユニット値を表します。
+- **グループ化 (`GroupedExpr`)**: `(expr)` 形式。評価順序の制御のために単一の式を括弧で囲みます。
 - **定義式**:
     - **`TypeDefinitionExpr`**: `type <GenericParams>? { ... }`
     - **`TraitDefinitionExpr`**: `trait <GenericParams>? (: SuperTrait)? { ... }`
@@ -288,9 +303,9 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 
 - **識別子 (`LetIdentifierPattern`)**: 単一の識別子による束縛。
 - **タプル (`LetTuplePattern`)**: タプル構造の分解束縛。
-- **レコード (`LetRecordPattern`)**: レコード構造の分解束縛。
+- **レコード (`LetRecordPattern`)**: レコード構造の分解束縛。`RecordPatternBody` を使用し、構文上は `RecordPattern` と同じ形式です。
 
-`LetPattern` は、マッチに失敗する可能性のある `LiteralPattern` や `ConstructorPattern`、および `let` 文脈では冗長な `WildcardPattern` を除外しています。
+`LetPattern` は、マッチに失敗する可能性のある `LiteralPattern` や `ConstructorPattern`、および `let` 文脈では冗長な `WildcardPattern` を除外しています。`LetRecordFieldPattern` では `LetPattern` のみがネストできるため、`let` 束縛内で無効なパターンが再帰的に除外されます。
 
 ## 12.4 特殊な構文要素
 
