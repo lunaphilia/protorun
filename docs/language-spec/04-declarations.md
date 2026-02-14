@@ -44,13 +44,13 @@ let UserId = alias Int
 
 束縛宣言の設計は、以下の原則に基づいています：
 
-1.  **統一された構文**: すべての束縛宣言が `let ("mut")? LetPattern (":" Type)? ("=" Expression)?` の形式に従い、言語の学習コストと複雑さを低減します。型定義なども式の一種として扱われます。シグネチャ宣言（例: Trait 内のメソッドシグネチャ）もこの形式の右辺省略形として表現されます。
+1.  **統一された構文**: すべての束縛宣言が `let ("mut")? IrrefutablePattern (":" Type)? ("=" Expression)?` の形式に従い、言語の学習コストと複雑さを低減します。型定義なども式の一種として扱われます。シグネチャ宣言（例: Trait 内のメソッドシグネチャ）もこの形式の右辺省略形として表現されます。
 2.  **不変性の優先**: デフォルトでは束縛は不変 (`let` のみ) であり、これにより予測可能性と安全性が向上します。これは関数型プログラミングの原則に沿った設計です。不変性により、コードの理解と推論が容易になり、並行処理における安全性も向上します。
 3.  **明示的な可変性**: 値の可変性が必要な場合は `mut` キーワードを `let` の後に付与して明示的に宣言します (`let mut`)。これにより、状態が変化する箇所をコード上で明確に識別できます。
 4.  **型推論**: 多くの場合、初期化式から値束縛の型が推論されるため、型注釈 (`: Type`) は省略可能です。これによりコードが簡潔になります。
 5.  **静的型付け**: 型注釈を省略した場合でも、すべての束縛はコンパイル時に明確な型を持ちます。これにより型安全性が保証され、実行時エラーを削減します。必要に応じて明示的に型を指定することも可能です。
-6.  **限定された分解束縛**: `let` 宣言の左辺 (`LetPattern`) では、識別子、タプル、レコードのパターンによる分解束縛が可能です。`match` 式で使える全てのパターンが許可されるわけではありません。
-7.  **`let mut` の制約**: `let mut` を使用する場合、左辺のパターンは単一の識別子 (`LetIdentifierPattern`) でなければなりません。この制約は意味論解析でチェックされます。
+6.  **限定された分解束縛**: `let` 宣言の左辺 (`IrrefutablePattern`) では、識別子、タプル、レコード、ワイルドカードのパターンによる分解束縛が可能です。`match` 式で使える全てのパターンが許可されるわけではありません。
+7.  **`let mut` の制約**: `let mut` を使用する場合、左辺のパターンは単一の識別子 (`Identifier`) でなければなりません。この制約は意味論解析でチェックされます。
 
 ### 4.2.2 構文と意味
 
@@ -59,26 +59,27 @@ let UserId = alias Int
 **構文:**
 
 ```ebnf
-LetDecl ::= ("export")? "let" ("mut")? LetPattern (":" Type)? ("=" Expression)?
+LetDecl ::= ("export")? "let" ("mut")? IrrefutablePattern (":" Type)? ("=" Expression)?
 
-LetPattern ::= LetIdentifierPattern
-             | LetTuplePattern
-             | LetRecordPattern
+IrrefutablePattern ::= Identifier
+                     | IrrefutableTuplePattern
+                     | IrrefutableRecordPattern
+                     | WildcardPattern
 
-LetIdentifierPattern ::= Identifier
-LetTuplePattern ::= "(" (LetPattern ("," LetPattern)*)? ")"
-LetRecordPattern ::= TypeRef "{" (LetRecordFieldPattern ("," LetRecordFieldPattern)*)? ("," "..")? "}"
-LetRecordFieldPattern ::= Identifier (":" LetPattern)?
+IrrefutableTuplePattern ::= "(" (IrrefutablePattern ("," IrrefutablePattern)*)? ")"
+IrrefutableRecordPattern ::= TypeRef "{" (IrrefutableRecordFieldPattern ("," IrrefutableRecordFieldPattern)*)? ("," "..")? "}"
+IrrefutableRecordFieldPattern ::= Identifier (":" IrrefutablePattern)?
 ```
 ([12. 文法](12-grammar.md) も参照)
 
 - `let`: 宣言を開始するキーワード。
 - `("mut")?`: **任意**の `mut` キーワード。存在する場合、可変束縛となります。
-- `LetPattern`: 束縛する名前（または複数の名前）を指定するパターン。以下の形式が許可されます。
-    - `LetIdentifierPattern`: 単一の識別子 (例: `x`)。
-    - `LetTuplePattern`: タプルの分解束縛 (例: `(a, b)`)。
-    - `LetRecordPattern`: レコードの分解束縛 (例: `Point { x, y }`)。
-    `match` 式で使える `LiteralPattern` や `ConstructorPattern` などは `let` 宣言では使用できません。
+- `IrrefutablePattern`: 束縛する名前（または複数の名前）を指定する反駁不可能パターン。以下の形式が許可されます。
+  - `Identifier`: 単一の識別子 (例: `x`)。
+  - `IrrefutableTuplePattern`: タプルの分解束縛 (例: `(a, b)`)。
+  - `IrrefutableRecordPattern`: レコードの分解束縛 (例: `Point { x, y }`)。
+  - `WildcardPattern`: ワイルドカード (例: `_`)。
+  `match` 式で使える反駁可能なパターン（`LiteralPattern`, `ConstructorPattern` など）は `let` 宣言では使用できません。
 - `(: Type)?`: **任意**の型注釈。値束縛の場合に利用でき、省略された場合は右辺の `Expression` から推論されます。定義式の場合は通常、型注釈は不要です。
 - `("=" Expression)?`: **任意**の初期化式。存在する場合、束縛する対象を評価または解釈する式。これには、通常の計算式、関数式、そして型定義式、トレイト定義式なども含まれます。右辺が省略された場合（例: `let name: Type;`）、これはシグネチャ宣言（Trait/Effect 内など）や未初期化変数の宣言（スコープによる）として解釈される可能性があります（意味解析で文脈に応じて判断）。
 
@@ -87,7 +88,7 @@ LetRecordFieldPattern ::= Identifier (":" LetPattern)?
 `let` 宣言は以下の動作を行います。
 
 1.  右辺の `Expression` が存在する場合、それを評価または解釈します。
-2.  右辺の結果（または右辺がない場合はシグネチャ情報など）を左辺の `LetPattern` に束縛します。値の場合はパターンマッチングが行われます。
+2.  右辺の結果（または右辺がない場合はシグネチャ情報など）を左辺の `IrrefutablePattern` に束縛します。値の場合はパターンマッチングが行われます。
 3.  束縛された名前は、宣言された時点から現在のスコープの終わりまで有効です。
 4.  `mut` キーワードがない場合、束縛された名前は**不変**であり、後から別の値や定義を再代入することはできません。
 5.  `mut` キーワードがある場合 (`let mut`)、束縛された名前は**可変**であり、後から代入演算子 (`=`) を使って同じ型の別の式の結果を代入することができます。ただし、`let mut` の左辺は単一の識別子でなければなりません（意味論チェック）。
