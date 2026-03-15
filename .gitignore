@@ -38,3 +38,6 @@ Thumbs.db
 *.prc
 
 worklog
+
+# OpenCode work directory
+.sisyphus/
