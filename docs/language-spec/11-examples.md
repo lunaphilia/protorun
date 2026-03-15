@@ -19,10 +19,10 @@
 ```protorun
 // 計算機の実装 (ヴァリアント型)
 let Expr = type {
-  Number(Int),
-  Add(Expr, Expr),
-  Subtract(Expr, Expr),
-  Multiply(Expr, Expr),
+  Number(Int) |
+  Add(Expr, Expr) |
+  Subtract(Expr, Expr) |
+  Multiply(Expr, Expr) |
   Divide(Expr, Expr)
 }
 
@@ -33,7 +33,7 @@ let Exception = effect<E> {
 
 // 例外ハンドラ実装 (特定の型に対して実装)
 let ExceptionHandler = type<E> {} // 状態を持たないダミー型
-let ExceptionHandlerImpl = handler Exception<E> for ExceptionHandler<E> {
+impl Exception<E> for ExceptionHandler<E> {
   // raise は継続を呼び出さず、with 式の結果となる Result<T, E> を返す
   let raise = fn <T>(self, error: E, resume: (Nothing) -> Result<T, E>) -> Result<T, E> => {
     Result.Err(error)
@@ -82,11 +82,11 @@ let evaluate = fn (expr: Expr)(effect exc: Exception<String>) -> Int => {
 
 // runWithException ヘルパー関数 (新しい構文を使用)
 let runWithException = fn <T, E>(action: (effect exc: Exception<E>) -> T) -> Result<T, E> => {
-  // ハンドラ実装を持つインスタンスを生成
-  let handlerInstance = ExceptionHandler<E> {}
-  // with 式でハンドラを注入
-  with exc = handlerInstance { // 型推論される (または : Exception<E> と明示)
-    // action を呼び出す。action 内の exc.raise は handlerInstance で処理される
+  // 実装インスタンスを生成
+  let implInstance = ExceptionHandler<E> {}
+  // with 式で実装を注入
+  with exc = implInstance { // 型推論される (または : Exception<E> と明示)
+    // action を呼び出す。action 内の exc.raise は implInstance で処理される
     // action が正常終了すれば Ok(T)、raise されれば Err(E) が with 式の結果となる
     let result: T = action() // action が正常終了した場合の結果は T 型
     Result.Ok(result) // 正常終了時は Ok で包む (with 式全体の型は Result<T, E>)
@@ -122,13 +122,13 @@ let main = fn ()(effect console: Console) -> Unit => {
   }
 }
 
-// main 関数を実行するためのトップレベルハンドラ (仮)
-// ConsoleHandler も新しい構文で定義されている必要がある
+// main 関数を実行するためのトップレベル実装 (仮)
+// Console 効果も新しい構文で定義されている必要がある
 // let Console = effect { fn log(String): Unit } // 仮定義
 // let ConsoleLogger = type {} // 仮定義
-// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
-// let consoleHandlerInstance = ConsoleLogger {} // 仮
-// with console = consoleHandlerInstance {
+// impl Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
+// let consoleLoggerInstance = ConsoleLogger {} // 仮
+// with console = consoleLoggerInstance {
 //   main()
 // }
 ```
@@ -138,10 +138,10 @@ let main = fn ()(effect console: Console) -> Unit => {
 1. **ヴァリアント型（代数的データ型）**: 式の構造を表現 (`type { ... }` 構文を使用)。
 2. **パターンマッチング**: 式の種類に基づいた処理の分岐。
 3. **代数的効果**: 例外処理のための型安全なメカニズム (`Exception<E>`)。
-4. **ハンドラ型**: 効果インターフェースの実装 (`ExceptionHandler<E>`)。
+4. **効果実装型**: 効果インターフェースの実装 (`ExceptionHandler<E>`)。
 5. **Effect パラメータ**: 関数が効果実装に依存することを宣言 (`effect exc: Exception<String>`)。
 6. **効果操作呼び出し**: エイリアスを使った呼び出し (`exc.raise(...)`)。
-7. **`with` 式**: ハンドラインスタンスの注入 (`with exc = ExceptionHandler<E> {} ...`)。
+7. **`with` 式**: 効果実装インスタンスの注入 (`with exc = ExceptionHandler<E> {} ...`)。
 8. **継続制御**: `noresume` による大域脱出。
 9. **エラー処理**: `Result` 型と `?` 演算子。
 
@@ -162,7 +162,7 @@ let StateContainer = type<S> {
   let mutable state: S
 }
 // StateContainer に対して State<S> 効果を実装
-let StateContainerHandler = handler State<S> for StateContainer<S> {
+impl State<S> for StateContainer<S> {
   // get は暗黙的に継続を呼び出す
   let get = fn (self) -> S => self.state
   // set は暗黙的に継続を呼び出す
@@ -182,9 +182,9 @@ let counterTick = fn (effect state: State<Int>) -> Int => {
 
 // runWithState ヘルパー関数 (新しい構文を使用)
 let runWithState = fn <S, T>(initialState: S, action: (effect st: State<S>) -> T) -> (T, S) => {
-  // ハンドラ実装を持つインスタンスを生成
+  // 実装インスタンスを生成
   let stateContainer = StateContainer<S> { state: initialState }
-  // with 式でハンドラを注入
+  // with 式で実装を注入
   let result = with st = stateContainer { // 型推論される (または : State<S> と明示)
     action() // Effect パラメータは暗黙的に解決されると仮定 (構文要検討)
   }
@@ -223,13 +223,13 @@ let main = fn ()(effect console: Console) -> Unit => {
   console.log(s"最終状態: ${finalState}") // 3
 }
 
-// main 関数を実行するためのトップレベルハンドラ (仮)
-// ConsoleHandler も新しい構文で定義されている必要がある
+// main 関数を実行するためのトップレベル実装 (仮)
+// Console 効果も新しい構文で定義されている必要がある
 // let Console = effect { fn log(String): Unit } // 仮定義
 // let ConsoleLogger = type {} // 仮定義
-// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
-// let consoleHandlerInstance = ConsoleLogger {} // 仮
-// with console = consoleHandlerInstance {
+// impl Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
+// let consoleLoggerInstance = ConsoleLogger {} // 仮
+// with console = consoleLoggerInstance {
 //   main()
 // }
 ```
@@ -237,11 +237,11 @@ let main = fn ()(effect console: Console) -> Unit => {
 この例では、以下の言語機能を示しています：
 
 1. **状態効果**: `State<S>` インターフェース。
-2. **ハンドラ型**: 状態をフィールドとして持つ `StateContainer<S>`。
+2. **効果実装型**: 状態をフィールドとして持つ `StateContainer<S>`。
 3. **Effect パラメータ**: `effect state: State<Int>`。
 4. **効果操作呼び出し**: `state.get()`, `state.modify(...)`。
 5. **`with` 式**: `StateContainer` インスタンスの注入。
-6. **ハンドラインスタンスの状態**: `with` ブロックを抜けた後にハンドラの状態を取得（フィールド可視性による）。
+6. **実装インスタンスの状態**: `with` ブロックを抜けた後に実装の状態を取得（フィールド可視性による）。
 
 ## 11.4 ファイル処理（ライフサイクル管理効果を使用）
 
@@ -257,12 +257,12 @@ let FileSystem = effect {
 }
 // 仮の型定義
 let FileHandle = type { id: Int } // レコード型
-let FileMode = type { Read, Write } // ヴァリアント型
+let FileMode = type { Read | Write } // ヴァリアント型
 let IOError = type { message: String } // レコード型
 
-// ファイルシステムハンドラ実装 (状態を持たない例)
+// ファイルシステム効果実装 (状態を持たない例)
 let SimpleFileHandler = type {} // ダミー型
-let SimpleFileHandlerImpl = handler FileSystem for SimpleFileHandler {
+impl FileSystem for SimpleFileHandler {
   let open = fn (self, path: String, mode: FileMode) -> Result<own FileHandle, IOError> => {
     println(s"Simulating open: ${path}, mode: ${mode}");
     // 実際のファイルオープン処理...
@@ -305,11 +305,11 @@ let processFile = fn (path: String)(effect fs: FileSystem) -> Result<String, IOE
 
 // 使用例
 let main = fn ()(effect console: Console) -> Unit => {
-  // ハンドラ実装を持つインスタンスを生成
-  let fsHandler = SimpleFileHandler {}
+  // 実装インスタンスを生成
+  let fsImpl = SimpleFileHandler {}
 
-  // with でハンドラを注入して実行
-  let result = with fs = fsHandler { // 型推論される (または : FileSystem と明示)
+  // with で実装を注入して実行
+  let result = with fs = fsImpl { // 型推論される (または : FileSystem と明示)
     processFile("my_data.txt") // Effect パラメータは暗黙的に解決されると仮定
   }
 
@@ -319,13 +319,13 @@ let main = fn ()(effect console: Console) -> Unit => {
   }
 }
 
-// main 関数を実行するためのトップレベルハンドラ (仮)
-// ConsoleHandler も新しい構文で定義されている必要がある
+// main 関数を実行するためのトップレベル実装 (仮)
+// Console 効果も新しい構文で定義されている必要がある
 // let Console = effect { fn log(String): Unit } // 仮定義
 // let ConsoleLogger = type {} // 仮定義
-// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
-// let consoleHandlerInstance = ConsoleLogger {} // 仮
-// with console = consoleHandlerInstance {
+// impl Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
+// let consoleLoggerInstance = ConsoleLogger {} // 仮
+// with console = consoleLoggerInstance {
 //   main()
 // }
 ```
@@ -333,9 +333,9 @@ let main = fn ()(effect console: Console) -> Unit => {
 この例では、以下の言語機能を示しています：
 
 1. **効果インターフェース**: ファイル操作を定義 (`FileSystem`)。
-2. **ハンドラ型**: ファイル操作を実装 (`SimpleFileHandler`)。
+2. **効果実装型**: ファイル操作を実装 (`SimpleFileHandler`)。
 3. **Effect パラメータ**: ファイルシステム実装への依存性 (`effect fs: FileSystem`)。
-4. **`with` 式**: ハンドラの注入。
+4. **`with` 式**: 実装の注入。
 5. **リソース管理の課題**: 現状では明示的な `close` が必要。RAII との連携が望まれる点を示唆。
 
 ## 11.5 依存性注入としての Effect パラメータ
@@ -345,7 +345,7 @@ let main = fn ()(effect console: Console) -> Unit => {
 ```protorun
 // ユーザーデータ型
 let User = type { id: String, name: String, email: String } // レコード型
-let DbError = type { NotFound(String), ConnectionError(String) } // ヴァリアント型
+let DbError = type { NotFound(String) | ConnectionError(String) } // ヴァリアント型
 
 // データベースアクセス効果インターフェース
 let Database = effect {
@@ -381,7 +381,7 @@ let PostgresConfig = type {
   // connectionPool: ConnectionPool // 内部状態としてプールを持つなど
 }
 // PostgresConfig に対して Database 効果を実装
-let PostgresHandler = handler Database for PostgresConfig {
+impl Database for PostgresConfig {
   let query = fn (self, sql: String) -> Result<List<Map<String, String>>, DbError> => {
     // self.connectionString を使って Postgres に接続し、クエリ実行
     // ... 実際の DB アクセスロジック ...
@@ -398,7 +398,7 @@ let MockDbData = type {
   let mutable users: Map<String, User> // テストデータを保持
 }
 // MockDbData に対して Database 効果を実装
-let MockDbHandler = handler Database for MockDbData {
+impl Database for MockDbData {
   let query = fn (self, sql: String) -> Result<List<Map<String, String>>, DbError> => {
     // sql を簡易的にパースして self.users からデータを返す (テスト用)
     // ... モック実装 ...
@@ -457,22 +457,22 @@ let main = fn ()(effect console: Console) -> Unit => {
   }
 }
 
-// main 関数を実行するためのトップレベルハンドラ (仮)
-// ConsoleHandler も新しい構文で定義されている必要がある
+// main 関数を実行するためのトップレベル実装 (仮)
+// Console 効果も新しい構文で定義されている必要がある
 // let Console = effect { fn log(String): Unit } // 仮定義
 // let ConsoleLogger = type {} // 仮定義
-// let ConsoleHandlerImpl = handler Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
-// let consoleHandlerInstance = ConsoleLogger {} // 仮
-// with console = consoleHandlerInstance {
+// impl Console for ConsoleLogger { let log = fn (self, msg) -> Unit => println(msg) } // 仮定義
+// let consoleLoggerInstance = ConsoleLogger {} // 仮
+// with console = consoleLoggerInstance {
 //   main()
 // }
 ```
 
 この例では、以下の言語機能を示しています：
 
-1. **依存性注入**: `getUserById` や `updateUser` は抽象的な `Database` 効果に依存し、具体的な実装（`PostgresHandler` や `MockDbHandler`）は `with` で注入される。
-2. **テスト容易性**: 同じビジネスロジック（`getUserById` など）を、本番用ハンドラとテスト用モックハンドラで差し替えて実行できる。
-3. **ハンドラ型の状態**: `MockDbData` がテストデータを内部状態として保持する例。
+1. **依存性注入**: `getUserById` や `updateUser` は抽象的な `Database` 効果に依存し、具体的な実装（`PostgresConfig` や `MockDbData` に対する `impl`）は `with` で注入される。
+2. **テスト容易性**: 同じビジネスロジック（`getUserById` など）を、本番用実装とテスト用モック実装で差し替えて実行できる。
+3. **効果実装型の状態**: `MockDbData` がテストデータを内部状態として保持する例。
 4. **疎結合**: ビジネスロジックが特定のデータベース実装に依存しない。
 
 Effect パラメータと `with` 式は、このような依存性の注入と抽象化を実現するための強力なツールとなります。

@@ -192,11 +192,11 @@ let IO = effect {
 }
 
 // 仮のIOエラー型 (ヴァリアント型)
-let IOError = type { FileNotFound(String), PermissionDenied, Other(String) }
+let IOError = type { FileNotFound(String) | PermissionDenied | Other(String) }
 
 // IOハンドラの実装例 (特定のプラットフォーム向け)
 let IOHandler = type { /* プラットフォーム依存の状態など */ }
-let IOHandlerImpl = handler IO for IOHandler {
+impl IO for IOHandler {
   let readFile = fn (self, path: String): Result<String, IOError> => {
     // プラットフォーム固有の実装
     /* ... */
@@ -279,7 +279,7 @@ let Duration = type { /* ... */ }
 module Duration { export let ofSeconds = fn (Int): Duration => { /* ... */ } }
 let Task = type<T> { /* ... */ } // 非同期タスクを表す型
 let TimeoutError = type {} // レコード型 (空)
-let NetworkError = type { Timeout, ConnectionFailed, Other(String) } // ヴァリアント型
+let NetworkError = type { Timeout | ConnectionFailed | Other(String) } // ヴァリアント型
 
 // 非同期効果
 let Async = effect {
@@ -294,7 +294,7 @@ let Async = effect {
 
 // Asyncハンドラの実装例
 let AsyncHandler = type { /* スレッドプールなどの状態 */ }
-let AsyncHandlerImpl = handler Async for AsyncHandler {
+impl Async for AsyncHandler {
   let spawn = fn <T> (self, task: () -> T, resume: (Task<T>) -> Unit): Unit => {
     let taskHandle = createTask(task) // createTask は内部関数と仮定
     resume(taskHandle)

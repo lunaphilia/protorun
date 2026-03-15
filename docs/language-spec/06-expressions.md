@@ -73,14 +73,14 @@ Protorunは、条件分岐や繰り返し、効果ハンドリングなどのた
 // if式 (すべての分岐でブロック式が必須)
 if condition1 {
   expression1 // ブロック式
-} elif condition2 {
+} else if condition2 {
   expression2
 } else {
   expression3
 }
 
 // 単一の値を返す場合もブロック式を使用
-let result = if x > 0 { 1 } elif x < 0 { -1 } else { 0 }
+let result = if x > 0 { 1 } else if x < 0 { -1 } else { 0 }
 
 // match式
 match value {
@@ -94,8 +94,6 @@ match value {
 
 // コレクションリテラル内包表記
 [x * 2 for x <- numbers if x % 2 == 0]
-{k.toUpperCase() -> v * 2 for (k, v) <- map if v > 0}
-#{x * x for x <- range(1, 10)}
 
 // bind式（モナド連鎖）
 bind {
@@ -132,13 +130,13 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 特に重要な特徴：
 
 - **if式**:
-  - **構文**: `if condition1 { then_branch1 } [elif condition2 { then_branch2 }]* [else { else_branch }]?`
-  - 条件に基づいて評価する式を選択します。`if` キーワードで始まり、条件式、そして中括弧 `{}` で囲まれたブロック式（`then` 節）が続きます。
-  - オプションで、0個以上の `elif` 節（`elif` キーワード、条件式、ブロック式のペア）と、最後の `else` 節（`else` キーワード、ブロック式）を持つことができます。
-  - **ブロック式必須**: `if`, `elif`, `else` の各分岐の本体は、**常に中括弧 `{}` で囲まれたブロック式**でなければなりません。単一の式を返す場合でも `{ expression }` のように記述します。これにより構文の一貫性を保ちます。
+  - **構文**: `if condition1 { then_branch1 } [else if condition2 { then_branch2 }]* [else { else_branch }]?`
+  - 条件に基づいて評価する式を選択します。`if` キーワードで始まり、条件式、そして中括弧 `{}` で囲まれたブロック式(`then` 節)が続きます。
+  - オプションで、0個以上の `else if` 節(`else if` キーワード、条件式、ブロック式のペア)と、最後の `else` 節(`else` キーワード、ブロック式)を持つことができます。
+  - **ブロック式必須**: `if`, `else if`, `else` の各分岐の本体は、**常に中括弧 `{}` で囲まれたブロック式**でなければなりません。単一の式を返す場合でも `{ expression }` のように記述します。これにより構文の一貫性を保ちます。
   - **利点**:
     - 単純な条件分岐や、論理演算子 (`&&`, `||`, `!`) を使った複合条件を直感的かつ簡潔に表現できます。
-    - `if ... elif ... else` チェーンにより、段階的な条件評価を自然に記述できます。
+    - `if ... else if ... else` チェーンにより、段階的な条件評価を自然に記述できます。
     - 多くのプログラマーにとって馴染み深く、学習コストが低い構文です。
   - **設計思想**: Protorunでは、より複雑なパターンマッチングに適した `match` 式も提供しますが、単純な条件分岐には `if` 式の方が読みやすく適切であると考え、両方の構文を採用しています。これにより、状況に応じて最適な表現を選択できます。`if` 式の構文をブロック式に統一することで、単一式の場合の `then` キーワードなどを不要にし、構文の複雑さを低減しています。
 
@@ -154,7 +152,7 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
   - **設計思想**: `match` 式は、特にヴァリアント型（代数的データ型）を扱う場合や、網羅性が重要な場合に威力を発揮します。`if` 式とは相補的な役割を果たし、言語全体の表現力を高めます。
   - `=>` の右辺 (`branch`) には、単一の式、または `{}` で囲まれたブロック式のいずれかを記述できます。複数行の文を実行したい場合はブロック式を使用する必要があります。（詳細は [6.4 パターンマッチング](#64-パターンマッチング) を参照）
 
-- **コレクションリテラル内包表記**: コレクション操作を簡潔に表現するための構文です。Pythonの内包表記からインスピレーションを得ており、コレクションの種類（リスト、マップ、セット）に応じた構文を提供します。
+- **コレクションリテラル内包表記**: コレクション操作を簡潔に表現するための構文です。Pythonの内包表記からインスピレーションを得ています。
 
 - **bind式**: モナド的な計算の連鎖を簡潔に表現するための構文です。（詳細は [6.3.2 bind式](#632-bind式) を参照）
 
@@ -168,6 +166,18 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 // リスト内包表記
 [expression for pattern <- iterable if condition]
 
+// 例:偶数の2倍
+[x * 2 for x <- numbers if x % 2 == 0]
+
+// 複数のイテレータ
+[(x, y) for x <- xs for y <- ys if x + y > 5]
+
+// パターンマッチング
+[(name, age) for Person { name, age } <- people if age >= 18] // Person はレコード型なのでレコードパターンを使用
+```
+// リスト内包表記
+[expression for pattern <- iterable if condition]
+
 // 例：偶数の2倍
 [x * 2 for x <- numbers if x % 2 == 0]
 
@@ -176,24 +186,6 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 
 // パターンマッチング
 [(name, age) for Person { name, age } <- people if age >= 18] // Person はレコード型なのでレコードパターンを使用
-
-// マップ内包表記
-{keyExpr -> valueExpr for pattern <- iterable if condition}
-
-// 例：キーと値の変換
-{k.toUpperCase() -> v * 2 for (k, v) <- originalMap if v > 0}
-
-// キーと値の入れ替え
-{v -> k for (k, v) <- originalMap}
-
-// セット内包表記
-#{expression for pattern <- iterable if condition}
-
-// 例：平方数のセット
-#{x * x for x <- range(1, 10)}
-
-// 文字列の最初の文字のセット
-#{word[0] for word <- words}
 ```
 
 内包表記は、以下のような高階関数の組み合わせに変換されます：
@@ -363,9 +355,9 @@ let process = fn (input: String) -> String => {
 ```protorun
 // 型定義とハンドラ実装 (8章より再掲)
 type ConsoleLogger {}
-handler Logger for ConsoleLogger { /* ... */ }
+impl Logger for ConsoleLogger { /* ... */ }
 type Counter { let mutable count: Int }
-handler State<Int> for Counter { /* ... */ }
+impl State<Int> for Counter { /* ... */ }
 
 // インスタンス生成
 let logger = ConsoleLogger {}
@@ -395,7 +387,7 @@ processResult(with st = counterState: State<Int> {
     ```protorun
     // リソース管理と結果の取得 (ハンドラがリソースを管理する想定)
     type FileSystemConfig { let basePath: String }
-    handler FileSystem for FileSystemConfig { /* ... open, read, close ... */ }
+    impl FileSystem for FileSystemConfig { /* ... open, read, close ... */ }
     let fsConfig = FileSystemConfig { basePath: "/data" }
 
     let fileContents = with fs = fsConfig { // 型推論される
@@ -420,7 +412,7 @@ processResult(with st = counterState: State<Int> {
       }
     } else {
       type FileLoggerConfig { let path: String }
-      handler Logger for FileLoggerConfig { /* ... */ }
+      impl Logger for FileLoggerConfig { /* ... */ }
       let fileLoggerConfig = FileLoggerConfig { path: "/log/false.log" }
       with log = fileLoggerConfig: Logger { // Logger として使うことを明示
         log.log("条件が偽の場合の処理")
@@ -637,7 +629,7 @@ Protorunでは、型、トレイト、効果、ハンドラ、型エイリアス
 type<GenericParams>? { field1: Type1, field2: Type2, ... }
 
 // ヴァリアント型定義
-type<GenericParams>? { Variant1(...), Variant2{...}, Variant3, ... }
+type<GenericParams>? { Variant1(...) | Variant2{...} | Variant3 | ... }
 ```
 
 - `type` キーワードで始まります。
@@ -652,7 +644,7 @@ type<GenericParams>? { Variant1(...), Variant2{...}, Variant3, ... }
 let Point = type { x: Float, y: Float }
 
 // ヴァリアント型
-let Option = type<T> { Some(T), None }
+let Option = type<T> { Some(T) | None }
 ```
 
 この式は、`let` で束縛されることで、新しい型をスコープに導入します。
@@ -727,30 +719,5 @@ effect<GenericParams>? {
 
 ```protorun
 let State = effect<S> { let get: fn() -> S; let put: fn(value: S) -> Unit }
-```
-詳細な意味論は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
-
-### 6.9.5 ハンドラ定義式 (handler)
-
-ハンドラ定義式は、特定の型に対して効果インターフェースの操作を実装する方法を定義します。
-
-**構文:**
-
-```protorun
-handler<GenericParams>? EffectName<EffectArgs> for TargetType<TargetArgs> {
-  let operation1 = fn (self, arg1: Type1, ...) -> ReturnType1 => { /* 実装 */ }
-  let operation2 = fn (self, arg2: Type2, ...) -> ReturnType2 => { /* 実装 */ }
-  // ... (EffectName で定義されたすべての操作を実装)
-}
-```
-- `handler` キーワードで始まります。
-- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
-- 実装する効果 (`EffectName`) と対象の型 (`TargetType`) を指定します (`for` キーワードを使用)。
-- 中括弧 `{}` 内に、`let` を用いた関数定義 (`let name = fn (...) -> ... => ...`) の形式で操作の実装を記述します。
-
-この式は、`let` で束縛されることで、特定の効果実装（ハンドラ）をスコープに導入します。
-
-```protorun
-let CounterStateHandler = handler State<Int> for CounterState { /* ... */ }
 ```
 詳細な意味論は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
