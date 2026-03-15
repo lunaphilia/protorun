@@ -36,7 +36,6 @@ Expression ::= LiteralExpr
              | MemberAccessExpr
              | BinaryExpr
              | UnaryExpr
-             | EffectOperationCallExpr
              | WithExpr
              | RangeExpr
              | AssignmentExpr
@@ -47,7 +46,6 @@ Expression ::= LiteralExpr
              | TypeDefinitionExpr
              | TraitDefinitionExpr
              | EffectDefinitionExpr
-             | HandlerDefinitionExpr
              | AliasDefinitionExpr
 
 TypeDefinitionExpr ::= "type" GenericParams? "{" (FieldDefinitionList | VariantDefinitionList)? "}"
@@ -55,7 +53,7 @@ TypeDefinitionExpr ::= "type" GenericParams? "{" (FieldDefinitionList | VariantD
 FieldDefinitionList ::= FieldDefinition ("," FieldDefinition)*
 FieldDefinition ::= Identifier ":" Type
 
-VariantDefinitionList ::= VariantDefinition ("," VariantDefinition)*
+VariantDefinitionList ::= VariantDefinition ("|" VariantDefinition)*
 VariantDefinition ::= Identifier ("(" TypeList? ")")?
                     | Identifier "{" (FieldDefinition ("," FieldDefinition)*)? "}"
 
@@ -64,9 +62,6 @@ TraitItem ::= LetDecl
 
 EffectDefinitionExpr ::= "effect" GenericParams? "{" EffectItem* "}"
 EffectItem ::= LetDecl
-
-HandlerDefinitionExpr ::= "handler" GenericParams? TypeRef "for" TypeRef WhereClause? "{" HandlerItem* "}"
-HandlerItem ::= LetDecl
 
 AliasDefinitionExpr ::= "alias" GenericParams? Type
 
@@ -107,6 +102,8 @@ TupleType ::= "(" TypeList? ")"
 
 TypeList ::= Type ("," Type)*
 
+ExpressionList ::= Expression ("," Expression)*
+
 ArrayType ::= "[" Type "]"
 
 ReturnType ::= Type | "Unit"
@@ -116,13 +113,11 @@ Statement ::= ReturnStatement
 ReturnStatement ::= "return" Expression?
 
 LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral
-              | ListLiteral | MapLiteral | SetLiteral
+              | ListLiteral
 
 ListLiteral ::= "[" (Expression ("," Expression)*)? "]"
-MapLiteral ::= "{" (Expression "->" Expression ("," Expression "->" Expression)*)? "}"
-SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
 
-TupleExpr ::= "(" Expression "," TypeList ")"
+TupleExpr ::= "(" Expression "," ExpressionList ")"
             | "(" ")"
 
 GroupedExpr ::= "(" Expression ")"
@@ -137,10 +132,8 @@ IfExpr ::= "if" Expression BlockExpr ("else" (IfExpr | BlockExpr))?
 MatchExpr ::= "match" Expression "{" (MatchArm ("," MatchArm)*)? "}"
 MatchArm ::= Pattern ("if" Expression)? "=>" Expression
 
-CollectionComprehensionExpr ::= ListComprehension | MapComprehension | SetComprehension
+CollectionComprehensionExpr ::= ListComprehension
 ListComprehension ::= "[" Expression "for" Pattern "<-" Expression ("if" Expression)? "]"
-MapComprehension ::= "{" Expression "->" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
-SetComprehension ::= "#{" Expression "for" Pattern "<-" Expression ("if" Expression)? "}"
 
 BindExpr ::= "bind" "{" (Pattern "<-" Expression)* Expression "}"
 
@@ -152,8 +145,6 @@ CallExpr ::= Expression "(" ArgList? ")"
 ArgList ::= Expression ("," Expression)*
 
 MemberAccessExpr ::= Expression "." Identifier
-
-EffectOperationCallExpr ::= Expression "." Identifier "(" ArgList? ")"
 
 BinaryExpr ::= Expression Operator Expression
 
@@ -205,7 +196,7 @@ WildcardPattern ::= "_"
 
 QualifiedIdentifier ::= (Identifier ".")* Identifier
 
-Operator ::= "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" | "!" | "|>" | "|>*" | ">>>" | ">>>*"
+Operator ::= "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&" | "||" | "!"
 
 WhereClause ::= "where" WherePredicate ("," WherePredicate)*
 WherePredicate ::= TypeRef ":" TypeConstraint
@@ -250,7 +241,7 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 
 式は評価されて値を生成します。Protorunでは、型定義なども式の一種として扱われます。
 
-- **リテラル (`LiteralExpr`)**: 数値、文字列、真偽値、ユニット `()` など。コレクションリテラル（`ListLiteral`, `MapLiteral`, `SetLiteral`）も含まれますが、標準ライブラリの型（例: `List<T>`）で代替される可能性があります。
+- **リテラル (`LiteralExpr`)**: 数値、文字列、真偽値、ユニット `()` など。コレクションリテラルは `ListLiteral` を含みます。
 - **識別子 (`IdentifierExpr`)**: 変数や関数名など。
 - **ブロック (`BlockExpr`)**: `{ BlockItem* }` 形式。
 - **条件 (`IfExpr`)**: `if cond { ... } else { ... }` 形式。
@@ -267,9 +258,8 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
     - **`TypeDefinitionExpr`**: `type <GenericParams>? { ... }`
     - **`TraitDefinitionExpr`**: `trait <GenericParams>? (: SuperTrait)? { ... }`
     - **`EffectDefinitionExpr`**: `effect <GenericParams>? { ... }`
-    - **`HandlerDefinitionExpr`**: `handler <GenericParams>? Effect for Type { ... }`
     - **`AliasDefinitionExpr`**: `alias <GenericParams>? Type`
-- **その他**: `WithExpr`（効果ハンドリング）、`RangeExpr` などが含まれますが、仕様変更の可能性があります。`CollectionComprehensionExpr`, `BindExpr`, `PartialApplicationExpr` も同様に見直される可能性があります。
+- **その他**: `WithExpr`（効果ハンドリング）、`RangeExpr` などが含まれますが、仕様変更の可能性があります。`CollectionComprehensionExpr` は現在 `ListComprehension` で構成され、`BindExpr`, `PartialApplicationExpr` も同様に見直される可能性があります。
 
 ### 12.3.6 パターン (Pattern)
 
@@ -296,6 +286,6 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 
 以下の特殊な構文要素の詳細については、対応する言語仕様の章を参照してください：
 
-- **代数的効果とハンドラ (`effect`, `handler`, `WithExpr`)**: [8. 代数的効果](08-algebraic-effects.md)
+- **代数的効果とハンドラ (`effect`, `impl`, `WithExpr`)**: [8. 代数的効果](08-algebraic-effects.md)
 - **所有権と借用 (`own`, `&`, `&mut`, `ref`)**: [7. 所有権](07-ownership.md)
 - **モジュールと可視性 (`export`)**: [9. モジュール](09-modules.md)

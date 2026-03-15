@@ -36,7 +36,7 @@ let add = fn (a: Int, b: Int) -> Int => a + b
 
 // 型定義 (型定義式を束縛)
 let Point = type { x: Float, y: Float } // レコード型
-let Option = type<T> { Some(T), None } // ヴァリアント型
+let Option = type<T> { Some(T) | None } // ヴァリアント型
 
 // 型エイリアス定義 (型エイリアス定義式を束縛)
 let UserId = alias Int
@@ -226,10 +226,10 @@ let Pair = type<A, B> {
 **宣言 (束縛):**
 
 ```protorun
-let TypeName = type<GenericParams>? { Variant1(...), Variant2{...}, Variant3, ... }
+let TypeName = type<GenericParams>? { Variant1(...) | Variant2{...} | Variant3 | ... }
 ```
 
-- 中括弧 `{}` 内には、1つ以上のヴァリアント定義をカンマ区切りで記述します。
+- 中括弧 `{}` 内には、1つ以上のヴァリアント定義をパイプ (`|`) 区切りで記述します。
 - 各ヴァリアントは、名前（通常は大文字で始まる識別子）、およびオプションで関連データ（タプル形式またはレコード形式）を持ちます。
 
 **具体例:**
@@ -237,20 +237,20 @@ let TypeName = type<GenericParams>? { Variant1(...), Variant2{...}, Variant3, ..
 ```protorun
 // Option型: 値が存在するか(Some)しないか(None)
 let Option = type<T> {
-  Some(T), // T型の値を持つヴァリアント
-  None     // データを持たないヴァリアント
+  Some(T) | // T型の値を持つヴァリアント
+  None      // データを持たないヴァリアント
 }
 
 // Result型: 成功(Ok)か失敗(Err)か
 let Result = type<T, E> {
-  Ok(T),   // 成功時の値 T を持つヴァリアント
+  Ok(T) |  // 成功時の値 T を持つヴァリアント
   Err(E)   // 失敗時のエラー E を持つヴァリアント
 }
 
 // Shape型: 様々な図形
 let Shape = type {
-  Circle(radius: Float), // タプル形式 (名前付き引数も可能だが、ここでは位置引数)
-  Rectangle { width: Float, height: Float }, // レコード形式
+  Circle(radius: Float) | // タプル形式 (名前付き引数も可能だが、ここでは位置引数)
+  Rectangle { width: Float, height: Float } | // レコード形式
   Point // データなし
 }
 ```
@@ -287,11 +287,11 @@ let Callback = alias fn(Int) -> String
 
 型エイリアスは、特にジェネリック型や関数型など、型シグネチャが長くなりがちな場合にコードを整理し、理解しやすくするのに有効です。
 
-## 4.5 効果とハンドラ定義 (effect / handler)
+## 4.5 効果の定義と実装 (effect / impl)
 
-**効果定義式** (`effect`) と**ハンドラ定義式** (`handler`) は、代数的効果システムの中核となる宣言であり、`let` を用いて定義されます。
+**効果定義式** (`effect`) と**効果実装宣言** (`impl`) は、代数的効果システムの中核となる構文です。効果はトレイトと同様に `impl` 宣言を用いて実装されます。
 
-これらの定義式の詳細な構文については [6. 式](06-expressions.md) および [8. 代数的効果](08-algebraic-effects.md) の章を参照してください。
+効果定義式の詳細な構文については [6. 式](06-expressions.md) および [8. 代数的効果](08-algebraic-effects.md) の章を参照してください。
 
 ### 4.5.1 効果インターフェース定義 (effect)
 
@@ -316,26 +316,30 @@ let Console = effect {
 }
 ```
 
-### 4.5.2 ハンドラ定義 (handler)
+### 4.5.2 効果実装 (impl)
 
-ハンドラ定義は、特定の型に対して、特定の効果インターフェースの操作を実装する方法を定義します。`let` と `handler` キーワードを用いたハンドラ定義式で定義します。
+効果実装は、特定の型に対して、特定の効果インターフェースの操作を実装する方法を定義します。トレイト実装と同じ `impl` キーワードを使用します。
 
-**宣言 (束縛):**
+**構文:**
 
-```protorun
-let HandlerName = handler<GenericParams>? EffectName<EffectArgs> for TargetType<TargetArgs> { /* 操作実装 */ }
+```ebnf
+ImplDecl ::= ("export")? "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" ImplItem* "}"
 ```
+
+効果実装の場合、第一の `TypeRef` は効果名、`for` 以降の `TypeRef` は実装対象の型を指定します。
 
 **具体例:**
 
 ```protorun
-let CounterStateHandler = handler State<Int> for CounterState {
+impl State<Int> for CounterState {
   let get = fn (self) -> Int => self.count
   let put = fn (self, value: Int) -> Unit => {
     resume_with(Unit, CounterState { count: value })
   }
 }
 ```
+
+効果実装は `impl` **宣言**であり、`let` による束縛は不要です。これはトレイト実装と同じです。
 
 ## 4.6 トレイト定義 (trait) と実装 (impl)
 
