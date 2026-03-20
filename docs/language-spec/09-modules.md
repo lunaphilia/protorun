@@ -19,11 +19,11 @@
 ```protorun
 module Math {
   // 公開関数（外部からアクセス可能）
-  export let add = fn (a: Int, b: Int): Int => a + b;
-  export let subtract = fn (a: Int, b: Int): Int => a - b;
+  export let add = fn(a: Int, b: Int): Int = a + b;
+  export let subtract = fn(a: Int, b: Int): Int = a - b;
 
   // 非公開関数（モジュール内でのみアクセス可能）
-  let helper = fn (): Int => 42;
+  let helper = fn(): Int = 42;
 
   // 公開型
   export let Point = type {
@@ -88,14 +88,14 @@ module Graphics {
 
   // 2Dグラフィックスのサブモジュール
   export module TwoD {
-    export let drawRect = fn (x: Int, y: Int, width: Int, height: Int, color: Color): Unit => {
+    export let drawRect = fn(x: Int, y: Int, width: Int, height: Int, color: Color): Unit = {
       // 実装
     };
   }
 
   // 3Dグラフィックスのサブモジュール
   export module ThreeD {
-    export let drawCube = fn (x: Int, y: Int, z: Int, size: Int, color: Color): Unit => {
+    export let drawCube = fn(x: Int, y: Int, z: Int, size: Int, color: Color): Unit = {
       // 実装
     };
   }
@@ -123,20 +123,20 @@ Protorun言語では、モジュール構造とファイルシステム構造を
 // ファイル: graphics/two_d.pr
 module Graphics.TwoD {
   // 2Dグラフィックスの実装
-  export let drawLine = fn (...) => { ... };
+  export let drawLine = fn(...) = { ... };
 }
 
 // ファイル: graphics/three_d.pr
 module Graphics.ThreeD {
   // 3Dグラフィックスの実装
-  export let drawSphere = fn (...) => { ... };
+  export let drawSphere = fn(...) = { ... };
 }
 
 // ファイル: main.pr
 import Graphics.TwoD; // graphics/two_d.pr をインポート
 import Graphics.ThreeD.drawSphere; // graphics/three_d.pr の drawSphere をインポート
 
-let main = fn (): Unit => {
+let main = fn(): Unit = {
   TwoD.drawLine(...);
   drawSphere(...);
 };
@@ -148,7 +148,30 @@ let main = fn (): Unit => {
 2. **自動インポート**: ファイルシステム構造に基づいて、モジュールが自動的に認識されます（コンパイラがソースファイルを探索します）。
 3. **分割定義**: 大きなモジュールを複数のファイルに分割できます（同じ `module` 宣言を複数のファイルに記述するなど、具体的な方法は言語仕様で定義されます）。
 
-## 9.6 モジュールの設計上の考慮事項
+## 9.6 エントリポイント
+
+Protorun言語では、**トップレベル式**がプログラムのエントリポイントとなります。ファイルのトップレベルに記述された宣言と式が、上から順に実行されます。
+
+```protorun
+// main.pr — トップレベル式がエントリポイント
+
+// 宣言（実行されない）
+let greet = fn(name: String): String = f"Hello, {name}!"
+
+// トップレベル式（実行される）
+with console = ConsoleLogger {} {
+  console.println(greet("World"))
+}
+```
+
+**エントリポイントの特徴:**
+
+1. **特別な `main` 関数は不要**: Protorun言語では、`main` 関数を定義する必要がありません。代わりに、トップレベルに記述された式が自動的に実行されます。
+2. **効果の明示的ハンドリング**: トップレベルで効果操作を使用する場合、`with` 構文で明示的にハンドラを提供する必要があります。
+3. **宣言と式の区別**: トップレベルの宣言（`let`, `impl`, `module`）は実行されず、スコープに名前を導入します。トップレベルの式（関数呼び出し、`with` ブロック等）が実行されます。
+4. **複数ファイルの場合**: 複数のファイルがある場合、エントリポイントファイルを指定してコンパイル/実行します。
+
+## 9.7 モジュールの設計上の考慮事項
 
 モジュールを設計する際には、以下の点を考慮することが重要です：
 
