@@ -1,0 +1,4 @@
+=== Return Arrow ===
+FunctionDefinitionExpr ::= FunctionHeader "=" Expression
+FunctionHeader ::= "fn" GenericParams? ParamList ("->" ReturnType)?
+TraitItem ::= "effect"? Identifier "=" FunctionHeader ("=>" Expression)?

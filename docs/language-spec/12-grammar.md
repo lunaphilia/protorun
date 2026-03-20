@@ -17,7 +17,7 @@ Protorun言語の文法は、言語の構文を形式的に定義するための
 ```ebnf
 Program ::= (Declaration | Expression)*
 
-Declaration ::= LetDecl | ImplDecl
+Declaration ::= LetDecl | ImplDecl | ModuleDecl | ImportDecl
 
 Statement ::= ReturnStatement
 ReturnStatement ::= "return" Expression?
@@ -33,7 +33,7 @@ Type ::= TypeRef
 TypeRef ::= Identifier GenericArgs?
 GenericArgs ::= "[" (Type ("," Type)*)? "]"
 
-FunctionType ::= ParamTypeList "=>" ReturnType
+FunctionType ::= ParamTypeList "->" ReturnType
 ParamTypeList ::= "(" (ParamType ("," ParamType)*)? ")"
 ParamType ::= Type
             | ImplicitParamType
@@ -50,6 +50,11 @@ Expression ::= LiteralExpr
              | IdentifierExpr
              | BlockExpr
              | IfExpr
+             | WhileExpr
+             | ForExpr
+             | LoopExpr
+             | BreakExpr
+             | ContinueExpr
              | MatchExpr
              | ListComprehension
              | CallExpr
@@ -57,13 +62,15 @@ Expression ::= LiteralExpr
              | BinaryOperatorExpr
              | UnaryOperatorExpr
              | AssignmentExpr
+             | RangeExpr
+             | StringInterpolation
              | GroupedExpr
              | TypeDefinitionExpr
              | AliasDefinitionExpr
              | FunctionDefinitionExpr
              | TraitDefinitionExpr
 
-LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral | ListLiteral | TupleLiteral | MapLiteral
+LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral | ListLiteral | TupleLiteral | MapLiteral | SetLiteral
 
 IntLiteral ::= DecimalLiteral | HexLiteral | BinaryLiteral | OctalLiteral
 
@@ -79,8 +86,6 @@ DIGIT ::= [0-9]
 HEX_DIGIT ::= [0-9a-fA-F]
 BINARY_DIGIT ::= [01]
 OCTAL_DIGIT ::= [0-7]
-
-FloatLiteral ::= FLOAT
 
 FloatLiteral ::= DecimalFloatLiteral | HexFloatLiteral
 
@@ -120,6 +125,7 @@ UnitLiteral ::= "(" ")"
 ListLiteral ::= "[" (Expression ("," Expression)*)? "]"
 TupleLiteral ::= "(" (Expression ("," Expression)*)? ")"
 MapLiteral ::= "{" (MapEntry ("," MapEntry)*)? "}"
+SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
 MapEntry ::= Expression ":" Expression
 
 IdentifierExpr ::= Identifier
@@ -127,7 +133,12 @@ IdentifierExpr ::= Identifier
 BlockExpr ::= "{" BlockItem* "}"
 BlockItem ::= LetDecl | Statement | Expression
 
-IfExpr ::= "if" Expression "then" Expression ("else" Expression)?
+IfExpr ::= "if" Expression "then" Expression ("elif" Expression "then" Expression)* ("else" Expression)?
+WhileExpr ::= "while" Expression "then" Expression
+ForExpr ::= "for" Pattern "in" Expression "then" Expression
+LoopExpr ::= "loop" Expression
+BreakExpr ::= "break" Expression?
+ContinueExpr ::= "continue"
 
 MatchExpr ::= "match" Expression "{" MatchArmList? "}"
 MatchArmList ::= MatchArm (NEWLINE MatchArm)* NEWLINE?
@@ -174,12 +185,15 @@ UnaryOperator ::= "!" | "-" | "~"
 AssignmentExpr ::= LValue "=" Expression
 LValue ::= IdentifierExpr | MemberAccessExpr
 
+RangeExpr ::= Expression ".." Expression
+            | Expression "..=" Expression
+
 GroupedExpr ::= "(" Expression ")"
 
 TypeDefinitionExpr ::= "type" GenericParams? "{" (FieldDefinitionList | VariantDefinitionList)? "}"
 
 FieldDefinitionList ::= FieldDefinition ("," FieldDefinition)*
-FieldDefinition ::= Identifier ":" Type
+FieldDefinition ::= "mut"? Identifier ":" Type
 
 VariantDefinitionList ::= VariantDefinition ("," VariantDefinition)*
 VariantDefinition ::= Identifier ("(" Identifier? ")")?
@@ -192,7 +206,7 @@ TypeConstraint ::= TypeRef ("+" TypeRef)*
 AliasDefinitionExpr ::= "alias" GenericParams? Type
 
 FunctionDefinitionExpr ::= FunctionHeader "=" Expression
-FunctionHeader ::= "fn" GenericParams? ParamList (":" ReturnType)?
+FunctionHeader ::= "fn" GenericParams? ParamList ("->" ReturnType)?
 
 ParamList ::= "(" (Param ("," Param)*)? ")"
 Param ::= SimpleParam | ImplicitParam | EffectParam
@@ -207,6 +221,17 @@ ImplDecl ::= "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" Imp
 WhereClause ::= "where" WherePredicate ("," WherePredicate)*
 WherePredicate ::= TypeRef ":" TypeConstraint
 ImplItem ::= "effect"? Identifier "=" FunctionDefinitionExpr
+
+ModuleDecl ::= "module" QualifiedIdentifier "{" (Declaration | Statement | Expression)* "}"
+ImportDecl ::= "import" QualifiedIdentifier ("." "{" Identifier ("," Identifier)* "}")?
+             | "import" QualifiedIdentifier ("as" Identifier)?
+
+StringInterpolation ::= "f" "\"" (StringContent | "{" Expression "}")* "\""
+
+Keyword ::= "let" | "mut" | "impl" | "return" | "if" | "elif" | "else"
+          | "match" | "for" | "in" | "while" | "loop" | "break" | "continue" | "then"
+          | "fn" | "trait" | "type" | "alias" | "module" | "import" | "as"
+          | "with" | "effect" | "where" | "True" | "False"
 ```
 
 ## 12.3 文法の説明
@@ -229,8 +254,8 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 
 ### 12.3.3 型システム (Type System)
 
-- **型参照 (`TypeRef`)**: 型名とジェネリック引数で構成されます。所有権修飾子（`own`, `&`, `&mut`）を含むことができます（所有権システムの詳細は [7. 所有権](07-ownership.md) を参照）。タプル型やリスト型は `Tuple<T, U>` や `List<T>` のようにジェネリック型として表現されます。
-- **関数型 (`FunctionType`)**: `(ParamListType?) => ReturnType` の形式で、パラメータ型、戻り値の型、およびオプションの効果指定 (`EffectSpecifier`) で構成されます。
+- **型参照 (`TypeRef`)**: 型名とジェネリック引数で構成されます。タプル型やリスト型は `Tuple[T, U]` や `List[T]` のようにジェネリック型として表現されます（ジェネリクスは `[T]` の角括弧記法を使用）。
+- **関数型 (`FunctionType`)**: `(ParamListType?) -> ReturnType` の形式で、パラメータ型と戻り値の型で構成されます。例: `(Int, String) -> Bool`。
 - **ジェネリクス (`GenericParams`, `GenericArgs`)**: 型、関数、トレイトなどに型パラメータを導入し、多相的なコードを可能にします。
 - **トレイト制約 (`TypeConstraint`, `WhereClause`)**: ジェネリックパラメータが満たすべきトレイトを指定します。
 
@@ -284,5 +309,5 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 以下の特殊な構文要素の詳細については、対応する言語仕様の章を参照してください：
 
 - **代数的効果とハンドラ (`effect`, `handler`, `WithExpr`)**: [8. 代数的効果](08-algebraic-effects.md)
-- **所有権と借用 (`own`, `&`, `&mut`, `ref`)**: [7. 所有権](07-ownership.md)
+- **所有権と借用**: 将来フェーズで導入予定。詳細は [7. 所有権](07-ownership.md) を参照（現在はMVPスコープ外）。
 - **モジュールと可視性 (`export`)**: [9. モジュール](09-modules.md)

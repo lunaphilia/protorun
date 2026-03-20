@@ -1,0 +1,14 @@
+=== New Rules ===
+Declaration ::= LetDecl | ImplDecl | ModuleDecl | ImportDecl
+             | WhileExpr
+             | ForExpr
+             | LoopExpr
+             | StringInterpolation
+LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral | ListLiteral | TupleLiteral | MapLiteral | SetLiteral
+SetLiteral ::= "#{" (Expression ("," Expression)*)? "}"
+WhileExpr ::= "while" Expression "then" Expression
+ForExpr ::= "for" Pattern "in" Expression "then" Expression
+LoopExpr ::= "loop" Expression
+ModuleDecl ::= "module" QualifiedIdentifier "{" (Declaration | Statement | Expression)* "}"
+ImportDecl ::= "import" QualifiedIdentifier ("." "{" Identifier ("," Identifier)* "}")?
+StringInterpolation ::= "f" "\"" (StringContent | "{" Expression "}")* "\""
