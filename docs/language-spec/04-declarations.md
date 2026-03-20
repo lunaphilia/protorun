@@ -160,7 +160,7 @@ let identity = fn[T](x: T) -> T = x
 
 ```protorun
 let factorial = fn(n: Int) -> Int = {
-  if n <= 1 {
+  if n <= 1 then {
     1
   } else {
     n * factorial(n - 1) // 再帰呼び出し

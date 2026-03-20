@@ -35,7 +35,7 @@ Protorun言語で使用されるキーワードは以下の通りです。これ
 | `loop`        | 無限ループを開始します。                                           | `LoopExpr` ([6. 式](06-expressions.md))                                                                |
 | `match`       | パターンマッチ式を開始します。                                     | `MatchExpr` ([6. 式](06-expressions.md))                                                               |
 | `module`      | モジュール定義を宣言します。                                       | `ModuleDecl` ([9. モジュール](09-modules.md))                                                          |
-| `mut`         | 可変性（ミュータビリティ）を示します（例: `let mut`, `&mut`）。    | `LetDecl`, `TypeRef` ([4. 宣言](04-declarations.md)), ([3. 型システム](03-type-system.md))            |
+| `mut`         | 可変性（ミュータビリティ）を示します（例: `let mut`, `mut field: Type`）。    | `LetDecl` ([4. 宣言](04-declarations.md))            |
 | `resume`      | 効果ハンドラ内で、操作の再開ポイントを示します。                   | `HandlerFunction` ([8. 代数的効果](08-algebraic-effects.md))                                           |
 | `return`      | 現在の関数から値を返します。                                       | `ReturnStatement` ([5. 文](05-statements.md))                                                          |
 | `then`        | `if`/`while`/`for`/`loop`式の本体区切りに使用されます。            | `IfExpr`, `WhileExpr`, `ForExpr`, `LoopExpr` ([6. 式](06-expressions.md))                              |
