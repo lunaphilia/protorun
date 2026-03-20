@@ -1,0 +1,17 @@
+Task 5 evidence: function example syntax cleanup
+Target file: docs/language-spec/06-algebraic-effects.md
+Date: 2026-03-20
+
+[check] `fn` keyword removal from new chapter
+- command intent: search `\bfn\b`
+- result: No matches found
+
+[check] Generic angle bracket usage (`<T>` style)
+- command intent: search `<[A-Za-z]`
+- result: No matches found
+
+[check] Generic bracket usage examples (`[T]` style)
+- confirmed examples:
+  - let State = [S] effect { ... }
+  - let StateHandler = [S](initial: S) handler State[S] for Unit { ... }
+  - let AbortToResult = [E, T] handler Abort[E] for Unit { ... }

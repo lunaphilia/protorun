@@ -1,0 +1,6 @@
+command: grep -nE "TraitItem ::= LetDecl|ImplItem ::= LetDecl|let show: \(self\) -> String;|let show = \(self: Int\) -> String" docs/language-spec/04-declarations-and-statements.md
+output:
+98:TraitItem ::= LetDecl
+108:  let show: (self) -> String;
+165:ImplItem ::= LetDecl
+172:  let show = (self: Int) -> String = self.toString();

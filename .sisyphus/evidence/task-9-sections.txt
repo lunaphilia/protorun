@@ -1,0 +1,39 @@
+TASK 9: Create docs/language-spec/08-standard-library.md
+EVIDENCE: Section Headers Verification
+
+File: docs/language-spec/08-standard-library.md
+Status: ✓ Created successfully
+
+Section Headers (all numbered 8.x):
+✓ ## 8.1 概要
+✓ ## 8.2 コアデータ型
+  ✓ ### 8.2.1 Option[T]
+  ✓ ### 8.2.2 Result[T, E]
+  ✓ ### 8.2.3 List[T]
+  ✓ ### 8.2.4 Map[K, V]
+  ✓ ### 8.2.5 Set[T]
+  ✓ ### 8.2.6 String
+  ✓ ### 8.2.7 Range[T] と RangeInclusive[T]
+✓ ## 8.3 コアトレイト
+  ✓ ### 8.3.1 Show
+  ✓ ### 8.3.2 Eq
+  ✓ ### 8.3.3 Ord
+  ✓ ### 8.3.4 Iterator[T]
+  ✓ ### 8.3.5 Iterable[T]
+  ✓ ### 8.3.6 Hash
+✓ ## 8.4 数値トレイト
+✓ ## 8.5 コア効果
+  ✓ ### 8.5.1 Console 効果
+✓ ## 8.6 基本関数
+✓ ## 8.7 デシュガー規則
+
+Actual sections in file (not "I/O操作" or "並行処理"):
+- 概要 (Overview)
+- コアデータ型 (Core Data Types)
+- コアトレイト (Core Traits)
+- 数値トレイト (Numeric Traits)
+- コア効果 (Core Effects)
+- 基本関数 (Basic Functions)
+- デシュガー規則 (Desugaring Rules)
+
+All sections match actual prelude content. ✓

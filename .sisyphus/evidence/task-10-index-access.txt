@@ -1,0 +1,13 @@
+## Task 10: Index access removal verification
+
+File: docs/language-spec/09-examples.md
+
+### Check: [name] / [key] / [0] patterns — NONE FOUND
+Command: grep -n "\[name\]\|\[key\]\|\[0\]" docs/language-spec/09-examples.md
+Result: exit 1 (no matches)
+
+### Fix applied:
+- scores[name]  →  scores.get(name)  (line 297)
+
+### Description prose also updated:
+- "map[key] による値の取得"  →  "map.get(key) による値の取得"  (line 308)

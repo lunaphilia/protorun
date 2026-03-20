@@ -1,0 +1,3 @@
+command: grep -nE "with|resume|継続" docs/language-spec/04-declarations-and-statements.md
+output:
+(no matches)

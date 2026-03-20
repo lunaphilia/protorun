@@ -15,34 +15,33 @@ Protorun言語で使用されるキーワードは以下の通りです。これ
 
 | キーワード    | 主な用途                                                           | 関連する文法ルール/章                                                                                  |
 | ------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `alias`       | 型エイリアス定義式で使用されます。                                 | `AliasDefinitionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                     |
-| `as`          | インポート時の別名指定に使用されます。                             | `ImportDecl` ([9. モジュール](09-modules.md))                                                          |
-| `bind`        | bind式で使用され、モナド的な操作の連鎖を表現します。               | `BindExpr` ([6. 式](06-expressions.md))                                                                |
-| `break`       | ループから脱出します（代数的効果として実装）。                     | `BreakExpr` ([6. 式](06-expressions.md)), ([8. 代数的効果](08-algebraic-effects.md))                   |
-| `continue`    | 現在の反復をスキップします（代数的効果として実装）。               | `ContinueExpr` ([6. 式](06-expressions.md)), ([8. 代数的効果](08-algebraic-effects.md))                |
-| `effect`      | 効果定義式で使用されます。                                         | `EffectDefinitionExpr` ([6. 式](06-expressions.md)), ([8. 代数的効果](08-algebraic-effects.md))         |
-| `elif`        | `if`式の追加条件分岐を示します。                                   | `IfExpr` ([6. 式](06-expressions.md))                                                                  |
-| `else`        | `if`式の偽の場合の分岐を示します。                                 | `IfExpr` ([6. 式](06-expressions.md))                                                                  |
-| `export`      | モジュールから宣言（関数、型など）をエクスポートします。           | `LetDecl`, `ImplDecl` ([9. モジュール](09-modules.md)), ([4. 宣言](04-declarations.md))                 |
-| `fn`          | 関数式で使用されます。                                             | `FunctionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                         |
-| `for`         | イテレータベースのループおよびコレクション内包表記で使用されます。 | `ForExpr`, `CollectionComprehensionExpr` ([6. 式](06-expressions.md))                                  |
-| `handler`     | ハンドラ定義式で使用されます。                                     | `HandlerDefinitionExpr` ([6. 式](06-expressions.md)), ([8. 代数的効果](08-algebraic-effects.md))    |
-| `if`          | 条件式を開始します。                                               | `IfExpr` ([6. 式](06-expressions.md))                                                                  |
-| `impl`        | トレイトの実装を宣言します。                                       | `ImplDecl` ([4. 宣言](04-declarations.md))                                                             |
-| `import`      | 他モジュールの要素をインポートします。                             | `ImportDecl` ([9. モジュール](09-modules.md))                                                          |
-| `in`          | `for`ループのイテレータ指定に使用されます。                        | `ForExpr` ([6. 式](06-expressions.md))                                                                 |
-| `let`         | 束縛を宣言します (`mut` キーワードと組み合わせて可変束縛も可能)。   | `LetDecl` ([4. 宣言](04-declarations.md))                                                              |
-| `loop`        | 無限ループを開始します。                                           | `LoopExpr` ([6. 式](06-expressions.md))                                                                |
-| `match`       | パターンマッチ式を開始します。                                     | `MatchExpr` ([6. 式](06-expressions.md))                                                               |
-| `module`      | モジュール定義を宣言します。                                       | `ModuleDecl` ([9. モジュール](09-modules.md))                                                          |
-| `mut`         | 可変性（ミュータビリティ）を示します（例: `let mut`, `mut field: Type`）。    | `LetDecl` ([4. 宣言](04-declarations.md))            |
-| `resume`      | 効果ハンドラ内で、操作の再開ポイントを示します。                   | `HandlerFunction` ([8. 代数的効果](08-algebraic-effects.md))                                           |
-| `return`      | 現在の関数から値を返します。                                       | `ReturnStatement` ([5. 文](05-statements.md))                                                          |
-| `then`        | `if`/`while`/`for`/`loop`式の本体区切りに使用されます。            | `IfExpr`, `WhileExpr`, `ForExpr`, `LoopExpr` ([6. 式](06-expressions.md))                              |
-| `trait`       | トレイト定義式で使用されます。                                     | `TraitDefinitionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                    |
-| `type`        | レコード型またはヴァリアント型（代数的データ型）定義式で使用されます。 | `TypeDefinitionExpr` ([6. 式](06-expressions.md)), ([4. 宣言](04-declarations.md))                    |
-| `while`       | 条件付きループを開始します。                                       | `WhileExpr` ([6. 式](06-expressions.md))                                                               |
-| `with`        | 暗黙的パラメータリストやwith式（効果ハンドラの適用）で使用します。 | `ImplicitParamList`, `WithExpr` ([8. 代数的効果](08-algebraic-effects.md), [6. 式](06-expressions.md)) |
+| `alias`       | 型エイリアス定義式で使用されます。                                 | `AliasDefinitionExpr` ([5. 式](05-expressions.md)), ([4. 宣言と文](04-declarations-and-statements.md))                     |
+| `as`          | インポート時の別名指定に使用されます。                             | `ImportDecl` ([7. モジュール](07-modules.md))                                                          |
+| `bind`        | bind式で使用され、モナド的な操作の連鎖を表現します（将来検討）。   | 現在のEBNFには`BindExpr`の定義なし。将来フェーズで導入予定。                                           |
+| `break`       | ループから脱出します（代数的効果として実装）。                     | `BreakExpr` ([5. 式](05-expressions.md)), ([6. 代数的効果](06-algebraic-effects.md))                   |
+| `continue`    | 現在の反復をスキップします（代数的効果として実装）。               | `ContinueExpr` ([5. 式](05-expressions.md)), ([6. 代数的効果](06-algebraic-effects.md))                |
+| `effect`      | 効果定義式で使用されます。                                         | `EffectDefinitionExpr` ([5. 式](05-expressions.md)), ([6. 代数的効果](06-algebraic-effects.md))         |
+| `elif`        | `if`式の追加条件分岐を示します。                                   | `IfExpr` ([5. 式](05-expressions.md))                                                                  |
+| `else`        | `if`式の偽の場合の分岐を示します。                                 | `IfExpr` ([5. 式](05-expressions.md))                                                                  |
+| `export`      | モジュールから宣言（関数、型など）をエクスポートします。           | `LetDecl`, `ImplDecl` ([7. モジュール](07-modules.md)), ([4. 宣言と文](04-declarations-and-statements.md))                 |
+| `for`         | イテレータベースのループおよびコレクション内包表記で使用されます。 | `ForExpr`, `CollectionComprehensionExpr` ([5. 式](05-expressions.md))                                  |
+| `handler`     | ハンドラ定義式で使用されます。                                     | `HandlerDefinitionExpr` ([4. 宣言と文](04-declarations-and-statements.md)), ([6. 代数的効果](06-algebraic-effects.md))    |
+| `if`          | 条件式を開始します。                                               | `IfExpr` ([5. 式](05-expressions.md))                                                                  |
+| `impl`        | トレイトの実装を宣言します。                                       | `ImplDecl` ([4. 宣言と文](04-declarations-and-statements.md))                                                             |
+| `import`      | 他モジュールの要素をインポートします。                             | `ImportDecl` ([7. モジュール](07-modules.md))                                                          |
+| `in`          | `for`ループのイテレータ指定に使用されます。                        | `ForExpr` ([5. 式](05-expressions.md))                                                                 |
+| `let`         | 束縛を宣言します (`mut` キーワードと組み合わせて可変束縛も可能)。   | `LetDecl` ([4. 宣言と文](04-declarations-and-statements.md))                                                              |
+| `loop`        | 無限ループを開始します。                                           | `LoopExpr` ([5. 式](05-expressions.md))                                                                |
+| `match`       | パターンマッチ式を開始します。                                     | `MatchExpr` ([5. 式](05-expressions.md))                                                               |
+| `module`      | モジュール定義を宣言します。                                       | `ModuleDecl` ([7. モジュール](07-modules.md))                                                          |
+| `mut`         | 可変性（ミュータビリティ）を示します（例: `let mut`, `mut field: Type`）。    | `LetDecl` ([4. 宣言と文](04-declarations-and-statements.md))            |
+| `resume`      | 効果ハンドラ内で、操作の再開ポイントを示します。                   | `HandlerFunction` ([6. 代数的効果](06-algebraic-effects.md))                                           |
+| `return`      | 現在の関数から値を返します。                                       | `ReturnStatement` ([4. 宣言と文](04-declarations-and-statements.md))                                                          |
+| `then`        | `if`/`while`/`for`/`loop`式の本体区切りに使用されます。            | `IfExpr`, `WhileExpr`, `ForExpr`, `LoopExpr` ([5. 式](05-expressions.md))                              |
+| `trait`       | トレイト定義式で使用されます。                                     | `TraitDefinitionExpr` ([5. 式](05-expressions.md)), ([4. 宣言と文](04-declarations-and-statements.md))                    |
+| `type`        | レコード型またはヴァリアント型（代数的データ型）定義式で使用されます。 | `TypeDefinitionExpr` ([5. 式](05-expressions.md)), ([4. 宣言と文](04-declarations-and-statements.md))                    |
+| `while`       | 条件付きループを開始します。                                       | `WhileExpr` ([5. 式](05-expressions.md))                                                               |
+| `with`        | 暗黙的パラメータリストやwith式（効果ハンドラの適用）で使用します。 | `ImplicitParamList`, `WithExpr` ([6. 代数的効果](06-algebraic-effects.md), [5. 式](05-expressions.md)) |
 
 *(注意: `own` キーワードは所有権システムの一部として将来フェーズで導入予定です。現在のMVP仕様には含まれません。)*
 
@@ -137,7 +136,7 @@ Protorun言語の演算子は、以下の原則に基づいて設計されてい
 
 1. **親しみやすさ**: 一般的なプログラミング言語で使用される演算子を採用し、学習障壁を低減します
 2. **表現力**: 関数型プログラミングに適した演算子を提供し、表現力を向上させます
-3. **一貫性**: 演算子の優先順位と結合性は直感的で一貫したルールに従います (詳細は [6. 式](06-expressions.md) の演算子優先順位のセクションを参照)。
+3. **一貫性**: 演算子の優先順位と結合性は直感的で一貫したルールに従います (詳細は [5. 式](05-expressions.md) の演算子優先順位のセクションを参照)。
 
 ## 2.4 リテラル
 
@@ -253,7 +252,7 @@ Protorun言語の演算子は、以下の原則に基づいて設計されてい
     let set = #{1, 2, 3};
     ```
 
-詳細は [6. 式](06-expressions.md) のコレクションリテラルのセクションを参照してください。
+詳細は [5. 式](05-expressions.md) のコレクションリテラルのセクションを参照してください。
 
 Protorun言語のリテラルは、以下の原則に基づいて設計されています：
 

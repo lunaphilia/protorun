@@ -1,0 +1,19 @@
+## Task 10: Return type syntax verification
+
+File: docs/language-spec/09-examples.md
+
+### Check: "): TypeName" colon-return-type pattern — NONE FOUND
+Command: grep -n "): [A-Z]" docs/language-spec/09-examples.md
+Result: exit 1 (no matches)
+
+### Note:
+The source file (11-examples.md) already used correct "-> TypeName" arrow syntax throughout.
+No colon-style return types were present, so no fixes needed.
+All function return types in 09-examples.md correctly use -> notation per EBNF:
+  FunctionHeader ::= GenericParams? ParamList ("->" ReturnType)?
+
+### Additional checks passed:
+- " true" / " false" lowercase booleans: NONE FOUND (all use True/False)
+- s"..." string interpolation: NONE FOUND (all use f"...")
+- Grammar reference: correctly updated to [10. 文法](10-grammar.md)
+- Section numbers: all updated from 11.x to 9.x

@@ -1,0 +1,19 @@
+Task 5 evidence: consolidated 06 algebraic effects chapter
+Target file: docs/language-spec/06-algebraic-effects.md
+Date: 2026-03-20
+
+[check] Section heading count (`^## `)
+- result: 11 matches
+
+[check] WithExpr and handler provisioning text present
+- line 70: WithExpr ::= "with" WithBinding ("," WithBinding)* BlockExpr
+- line 75: let result = with state = StateHandler[Int](0), console = ConsoleHandler {
+- line 79: let result2 = with state = StateHandler[Int](10): State[Int] {
+
+[check] break/continue effect semantics present
+- line 127: BreakExpr ::= "break" Expression?
+- line 128: ContinueExpr ::= "continue"
+- line 131: `while` / `for` / `loop` は暗黙的に `BreakEffect` と `ContinueEffect` のハンドラを提供
+
+[check] lsp diagnostics
+- lsp_diagnostics for .md returned: No LSP server configured for extension .md
