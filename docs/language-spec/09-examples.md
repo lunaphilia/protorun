@@ -136,7 +136,7 @@ let insert = [T](tree: Tree[T], value: T, compare: (T, T) -> Int) -> Tree[T] = {
       let cmp = compare(value, data)
       if cmp < 0 then {
         Tree.Node(data, insert(left, value, compare), right)
-      } elif cmp > 0 then {
+      } else if cmp > 0 then {
         Tree.Node(data, left, insert(right, value, compare))
       } else {
         tree
@@ -153,7 +153,7 @@ let contains = [T](tree: Tree[T], value: T, compare: (T, T) -> Int) -> Bool = {
       let cmp = compare(value, data)
       if cmp < 0 then {
         contains(left, value, compare)
-      } elif cmp > 0 then {
+      } else if cmp > 0 then {
         contains(right, value, compare)
       } else {
         True

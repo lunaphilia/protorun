@@ -21,7 +21,6 @@ Protorun言語で使用されるキーワードは以下の通りです。これ
 | `break`       | ループから脱出します（代数的効果として実装）。                     | `BreakExpr` ([5. 式](05-expressions.md)), ([6. 代数的効果](06-algebraic-effects.md))                   |
 | `continue`    | 現在の反復をスキップします（代数的効果として実装）。               | `ContinueExpr` ([5. 式](05-expressions.md)), ([6. 代数的効果](06-algebraic-effects.md))                |
 | `effect`      | 効果定義式で使用されます。                                         | `EffectDefinitionExpr` ([5. 式](05-expressions.md)), ([6. 代数的効果](06-algebraic-effects.md))         |
-| `elif`        | `if`式の追加条件分岐を示します。                                   | `IfExpr` ([5. 式](05-expressions.md))                                                                  |
 | `else`        | `if`式の偽の場合の分岐を示します。                                 | `IfExpr` ([5. 式](05-expressions.md))                                                                  |
 | `export`      | モジュールから宣言（関数、型など）をエクスポートします。           | `LetDecl`, `ImplDecl` ([7. モジュール](07-modules.md)), ([4. 宣言と文](04-declarations-and-statements.md))                 |
 | `for`         | イテレータベースのループおよびコレクション内包表記で使用されます。 | `ForExpr`, `CollectionComprehensionExpr` ([5. 式](05-expressions.md))                                  |

@@ -137,7 +137,7 @@ IdentifierExpr ::= Identifier
 BlockExpr ::= "{" BlockItem* "}"
 BlockItem ::= LetDecl | Statement | Expression
 
-IfExpr ::= "if" Expression "then" Expression ("elif" Expression "then" Expression)* ("else" Expression)?
+IfExpr ::= "if" Expression "then" Expression ("else" (IfExpr | Expression))?
 WhileExpr ::= "while" Expression "then" Expression
 ForExpr ::= "for" Pattern "in" Expression "then" Expression
 LoopExpr ::= "loop" Expression
@@ -244,7 +244,7 @@ ImportDecl ::= "import" QualifiedIdentifier ("." "{" Identifier ("," Identifier)
 
 StringInterpolation ::= "f" "\"" (StringContent | "{" Expression "}")* "\""
 
-Keyword ::= "let" | "mut" | "impl" | "return" | "if" | "elif" | "else"
+Keyword ::= "let" | "mut" | "impl" | "return" | "if" | "else"
           | "match" | "for" | "in" | "while" | "loop" | "break" | "continue" | "then"
           | "trait" | "type" | "alias" | "module" | "import" | "as"
           | "with" | "effect" | "where" | "True" | "False"

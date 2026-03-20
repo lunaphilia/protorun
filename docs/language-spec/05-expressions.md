@@ -44,12 +44,11 @@ let logged = {
 
 ## 5.3 条件式 (`IfExpr`)
 
-`if` は式です。構文は `if cond then expr` で、`elif` と `else` を任意で連結できます。
+`if` は式です。構文は `if cond then expr` で、`else` 節に別の `if` 式をネストすることで条件を連鎖できます。
 
 ```ebnf
 IfExpr ::= "if" Expression "then" Expression
-           ("elif" Expression "then" Expression)*
-           ("else" Expression)?
+           ("else" (IfExpr | Expression))?
 ```
 
 分岐本体には単一式もブロック式も置けます。複数行を使う場合はブロック式を使います。
@@ -57,7 +56,7 @@ IfExpr ::= "if" Expression "then" Expression
 ```protorun
 let sign = if x > 0 then {
   "positive"
-} elif x < 0 then {
+} else if x < 0 then {
   "negative"
 } else {
   "zero"
