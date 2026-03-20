@@ -1,3 +1,0 @@
-command: ls docs/language-spec/04-declarations-and-statements.md
-output:
-docs/language-spec/04-declarations-and-statements.md

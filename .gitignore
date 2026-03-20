@@ -38,3 +38,6 @@ Thumbs.db
 *.prc
 
 worklog
+
+# AI agent work artifacts
+.sisyphus/

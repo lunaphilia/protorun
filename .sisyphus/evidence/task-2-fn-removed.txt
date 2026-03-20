@@ -1,2 +1,0 @@
-215:FunctionDefinitionExpr ::= FunctionHeader "=" Expression
-216:FunctionHeader ::= GenericParams? ParamList ("->" ReturnType)?

@@ -1,2 +1,0 @@
-224:TraitDefinitionExpr ::= "trait" GenericParams? (":" TypeRef)? "{" TraitItem* "}"
-225:TraitItem ::= LetDecl
