@@ -1,0 +1,9 @@
+docs/language-spec/10-grammar.md:328:- **所有権と借用**: 将来フェーズで導入予定。詳細は [7. 所有権](07-ownership.md) を参照（現在はMVPスコープ外）。
+docs/language-spec/03-type-system.md:70:*(注意: 参照型は所有権システムの一部として将来フェーズで導入予定です。)*
+docs/language-spec/02-lexical-structure.md:46:*(注意: `own` キーワードは所有権システムの一部として将来フェーズで導入予定です。現在のMVP仕様には含まれません。)*
+docs/language-spec/01-introduction.md:11:2. **メモリ管理の複雑さ**: 手動メモリ管理は難しく、ガベージコレクションは予測不可能性をもたらします。Protorunは、現在のMVPではGCベースのメモリ管理を採用しており、将来のフェーズで所有権システムを導入し、GCなしのメモリ安全性を実現する予定です。
+docs/language-spec/01-introduction.md:24:  - 現在のMVPではGCベースのメモリ管理を採用しており、将来のフェーズで所有権システムを導入予定です
+docs/language-spec/01-introduction.md:40:  - 将来のフェーズで所有権システムを導入し、ガベージコレクションに依存しないメモリ管理を実現予定です
+docs/language-spec/01-introduction.md:69:### 将来フェーズ: 所有権モデル
+docs/language-spec/01-introduction.md:71:所有権システム（借用、ライフタイム、RAII）は将来のフェーズで導入予定です。現在のMVPでは、GCベースのメモリ管理を採用しており、以下の機能を実現します：
+docs/language-spec/01-introduction.md:85:5. **所有権システム**: Rustに類似した所有権・借用・ライフタイムシステムを導入し、GCなしのメモリ安全性を実現します。代数的効果との相互作用（継続と借用の安全な組み合わせ）を慎重に設計します。

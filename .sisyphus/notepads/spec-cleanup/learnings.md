@@ -33,3 +33,22 @@
 - `): [A-Z]` → 0件
 - ` true| false` → 0件
 - `s"` → 0件
+
+## Task 13: Old chapter file reference updates (2026-03-20)
+
+### Files modified:
+1. `docs/language-spec/10-grammar.md`
+   - Section headers updated: `## 12.x` / `### 12.x.y` → `## 10.x` / `### 10.x.y` (all 11 headings)
+   - Line 269: `[9. モジュール](09-modules.md)` → `[7. モジュール](07-modules.md)`
+   - Line 327: `[8. 代数的効果](08-algebraic-effects.md)` → `[6. 代数的効果](06-algebraic-effects.md)`
+   - Line 328: Removed file link `[7. 所有権](07-ownership.md)`, kept note as "将来フェーズで導入予定（現在はMVPスコープ外）"
+   - Line 329: `[9. モジュール](09-modules.md)` → `[7. モジュール](07-modules.md)`
+
+2. `docs/language-spec/06-algebraic-effects.md`
+   - Line 7: `[4. 宣言](04-declarations.md)` → `[4. 宣言と文](04-declarations-and-statements.md)`
+   - Line 7: `[12. 文法](12-grammar.md)` → `[10. 文法](10-grammar.md)`
+
+### Notes:
+- AGENTS.md was already updated to new file names before this task ran.
+- 09-examples.md already correctly referenced `[10. 文法](10-grammar.md)`.
+- Section number patterns `12.x` in 10-grammar.md were internal numbering from old chapter 12 system.

@@ -10,22 +10,18 @@ Protorun is a new programming language combining functional programming, a stron
 
 ```
 docs/
-  language-spec.md          # Table of contents + changelog
+  language-spec.md          # Table of contents
   language-spec/
     01-introduction.md      # Design philosophy, priorities
     02-lexical-structure.md # Keywords, operators, literals
     03-type-system.md       # Types (i8-i128, u8-u128, f32/f64, generics [T])
-    04-declarations.md      # let/let mut, type, trait, impl, effect, handler
-    05-statements.md        # return, while/for/loop, break/continue (as effects)
-    06-expressions.md       # if/match/with, string interpolation, UFCS, closures
-    07-ownership.md         # DEFERRED to future phase (GC-based MVP)
-    08-algebraic-effects.md # Core feature: effect/handler/with
-    09-modules.md           # module/import/export, entry point (top-level exprs)
-    10-standard-library.md  # Minimal prelude: Option, Result, List, Map, Iterator, Console
-    11-examples.md          # Sample programs
-    12-grammar.md           # Canonical EBNF grammar (SOURCE OF TRUTH)
-  design/                   # Historical design decision plans
-taskdef/                    # Pending implementation tasks
+    04-declarations-and-statements.md  # let/let mut, type, trait, impl, effect, handler, return, while/for/loop
+    05-expressions.md       # if/match, string interpolation, UFCS, patterns, literals
+    06-algebraic-effects.md # Core feature: effect/handler/with, break/continue as effects
+    07-modules.md           # module/import/export, entry point (top-level exprs)
+    08-standard-library.md  # Minimal prelude: Option, Result, List, Map, Iterator, Console
+    09-examples.md          # Sample programs
+    10-grammar.md           # Canonical EBNF grammar (SOURCE OF TRUTH)
 .clinerules                 # Project rules (see below)
 .sisyphus/                  # Work session artifacts (plans, evidence, notepads)
 mise.toml                   # Tool versions (rust = latest)
@@ -63,9 +59,9 @@ cargo fmt -- --check
 
 ## Language Spec Conventions (CRITICAL for all agents)
 
-### 12-grammar.md is the Source of Truth
+### 10-grammar.md is the Source of Truth
 
-When prose in other chapters contradicts the EBNF in `12-grammar.md`, **the EBNF is correct**. Update the prose.
+When prose in other chapters contradicts the EBNF in `10-grammar.md`, **the EBNF is correct**. Update the prose.
 
 ### Syntax Rules (enforced across ALL spec files)
 
@@ -73,8 +69,8 @@ When prose in other chapters contradicts the EBNF in `12-grammar.md`, **the EBNF
 |---------|---------|-------|
 | Generics | `Option[T]`, `List[Int]` | `Option<T>`, `List<Int>` |
 | Boolean literals | `True`, `False` | `true`, `false` |
-| Function body | `fn(x: Int) -> Int = x + 1` | `fn(x: Int) -> Int => x + 1` |
-| Return type | `fn(x: Int) -> Int` | `fn(x: Int): Int` |
+| Function body | `(x: Int) -> Int = x + 1` | `(x: Int) -> Int => x + 1` |
+| Return type | `(x: Int) -> Int` | `(x: Int): Int` |
 | If expression | `if cond then { ... }` | `if cond { ... }` |
 | Map literal | `{"key" : value}` | `{"key" -> value}` |
 | String interpolation | `f"Hello {name}"` | `s"Hello ${name}"` |
@@ -84,7 +80,7 @@ When prose in other chapters contradicts the EBNF in `12-grammar.md`, **the EBNF
 
 ### Features NOT in MVP (do NOT add)
 
-- Ownership system (`own`, `&`, `&mut`, lifetimes) — chapter 7 is deferred
+- Ownership system (`own`, `&`, `&mut`, lifetimes) — deferred to future phase
 - `?` error propagation operator
 - List patterns / spread (`[head, ...tail]`, `...`)
 - User-defined operator overloading
@@ -146,9 +142,9 @@ When prose in other chapters contradicts the EBNF in `12-grammar.md`, **the EBNF
 
 ## Spec Editing Workflow
 
-1. Change EBNF in `12-grammar.md` first
+1. Change EBNF in `10-grammar.md` first
 2. Update prose in relevant chapters to match
-3. Update examples in `11-examples.md`
+3. Update examples in `09-examples.md`
 4. Verify no contradictions: `grep` for old syntax across all `docs/language-spec/*.md`
 5. Update changelog in `docs/language-spec.md`
 

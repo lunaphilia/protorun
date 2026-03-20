@@ -1,0 +1,10 @@
+✓ language-spec/01-introduction.md
+✓ language-spec/02-lexical-structure.md
+✓ language-spec/03-type-system.md
+✓ language-spec/04-declarations-and-statements.md
+✓ language-spec/05-expressions.md
+✓ language-spec/06-algebraic-effects.md
+✓ language-spec/07-modules.md
+✓ language-spec/08-standard-library.md
+✓ language-spec/09-examples.md
+✓ language-spec/10-grammar.md

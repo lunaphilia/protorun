@@ -1,0 +1,20 @@
+VERIFICATION: AGENTS.md Repository Structure Updated
+
+✓ Repository Structure section (lines 11-24):
+  - Removed docs/design/ entry
+  - Removed taskdef/ entry
+  - Updated file numbering: 04-declarations-and-statements.md, 05-expressions.md, 06-algebraic-effects.md, 07-modules.md, 08-standard-library.md, 09-examples.md, 10-grammar.md
+  - Removed 07-ownership.md reference
+
+✓ File descriptions updated to match new structure:
+  - 04: Combined declarations and statements
+  - 05: Expressions (if/match, string interpolation, UFCS, patterns, literals)
+  - 06: Algebraic effects (effect/handler/with, break/continue as effects)
+  - 07: Modules (module/import/export, entry point)
+  - 08: Standard library
+  - 09: Examples
+  - 10: Grammar (SOURCE OF TRUTH)
+
+✓ Removed lines:
+  - design/ directory reference
+  - taskdef/ directory reference

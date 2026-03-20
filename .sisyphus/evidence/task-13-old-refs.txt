@@ -1,0 +1,18 @@
+docs/language-spec/10-grammar.md:269:**`export` 修飾子**: `let` (不変・可変問わず) および `impl` 宣言の前に `export` キーワードを付与することで、その宣言をモジュール外に公開できます。（詳細は [9. モジュール](09-modules.md) を参照）
+docs/language-spec/10-grammar.md:327:- **代数的効果とハンドラ (`effect`, `handler`, `WithExpr`)**: [8. 代数的効果](08-algebraic-effects.md)
+docs/language-spec/10-grammar.md:328:- **所有権と借用**: 将来フェーズで導入予定。詳細は [7. 所有権](07-ownership.md) を参照（現在はMVPスコープ外）。
+docs/language-spec/10-grammar.md:329:- **モジュールと可視性 (`export`)**: [9. モジュール](09-modules.md)
+docs/language-spec/06-algebraic-effects.md:7:この章は主に**使い方とセマンティクス**を扱います。基本的な宣言形は [4. 宣言](04-declarations.md) と [12. 文法](12-grammar.md) を参照してください。
+AGENTS.md:18:    04-declarations.md      # let/let mut, type, trait, impl, effect, handler
+AGENTS.md:19:    05-statements.md        # return, while/for/loop, break/continue (as effects)
+AGENTS.md:20:    06-expressions.md       # if/match/with, string interpolation, UFCS, closures
+AGENTS.md:21:    07-ownership.md         # DEFERRED to future phase (GC-based MVP)
+AGENTS.md:22:    08-algebraic-effects.md # Core feature: effect/handler/with
+AGENTS.md:23:    09-modules.md           # module/import/export, entry point (top-level exprs)
+AGENTS.md:24:    10-standard-library.md  # Minimal prelude: Option, Result, List, Map, Iterator, Console
+AGENTS.md:25:    11-examples.md          # Sample programs
+AGENTS.md:26:    12-grammar.md           # Canonical EBNF grammar (SOURCE OF TRUTH)
+AGENTS.md:66:### 12-grammar.md is the Source of Truth
+AGENTS.md:68:When prose in other chapters contradicts the EBNF in `12-grammar.md`, **the EBNF is correct**. Update the prose.
+AGENTS.md:149:1. Change EBNF in `12-grammar.md` first
+AGENTS.md:151:3. Update examples in `11-examples.md`

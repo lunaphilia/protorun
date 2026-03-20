@@ -1,6 +1,6 @@
-# 12. 文法（EBNF）
+# 10. 文法（EBNF）
 
-## 12.1 文法の目的と概要
+## 10.1 文法の目的と概要
 
 Protorun言語の文法は、言語の構文を形式的に定義するためのものです。この文法定義は以下の目的を持っています：
 
@@ -12,7 +12,7 @@ Protorun言語の文法は、言語の構文を形式的に定義するための
 
 以下の文法はEBNF（拡張バッカス・ナウア記法）形式で記述されており、Protorun言語の構文要素を定義しています。
 
-## 12.2 EBNF文法
+## 10.2 EBNF文法
 
 ```ebnf
 Program ::= (Declaration | Expression)*
@@ -250,13 +250,13 @@ Keyword ::= "let" | "mut" | "impl" | "return" | "if" | "elif" | "else"
           | "with" | "effect" | "where" | "True" | "False"
 ```
 
-## 12.3 文法の説明
+## 10.3 文法の説明
 
-### 12.3.1 プログラム構造
+### 10.3.1 プログラム構造
 
 Protorun言語のプログラムは、トップレベルに配置できる宣言（Declaration）と式（Expression）のシーケンスで構成されます。
 
-### 12.3.2 宣言 (Declaration)
+### 10.3.2 宣言 (Declaration)
 
 Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と、`impl` キーワードを用いたトレイト実装宣言があります。
 
@@ -266,16 +266,16 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
     - 右辺の式 (`Expression`) には、通常の計算式だけでなく、関数式や型定義式なども含まれます。
 - **`ImplDecl` (トレイト実装)**: `impl` キーワードで始まり、特定の型に対するトレイトの実装を定義します。
 
-**`export` 修飾子**: `let` (不変・可変問わず) および `impl` 宣言の前に `export` キーワードを付与することで、その宣言をモジュール外に公開できます。（詳細は [9. モジュール](09-modules.md) を参照）
+**`export` 修飾子**: `let` (不変・可変問わず) および `impl` 宣言の前に `export` キーワードを付与することで、その宣言をモジュール外に公開できます。（詳細は [7. モジュール](07-modules.md) を参照）
 
-### 12.3.3 型システム (Type System)
+### 10.3.3 型システム (Type System)
 
 - **型参照 (`TypeRef`)**: 型名とジェネリック引数で構成されます。タプル型やリスト型は `Tuple[T, U]` や `List[T]` のようにジェネリック型として表現されます（ジェネリクスは `[T]` の角括弧記法を使用）。
 - **関数型 (`FunctionType`)**: `(ParamListType?) -> ReturnType` の形式で、パラメータ型と戻り値の型で構成されます。例: `(Int, String) -> Bool`。
 - **ジェネリクス (`GenericParams`, `GenericArgs`)**: 型、関数、トレイトなどに型パラメータを導入し、多相的なコードを可能にします。
 - **トレイト制約 (`TypeConstraint`, `WhereClause`)**: ジェネリックパラメータが満たすべきトレイトを指定します。
 
-### 12.3.4 文 (Statement)
+### 10.3.4 文 (Statement)
 
 文は主に制御フローを変更するために使用されます。
 
@@ -283,7 +283,7 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 
 ブロック式 (`BlockExpr`) 内では、宣言 (`Declaration`)、文 (`Statement`)、式 (`Expression`) を記述できます。最後の式がブロックの値となります。副作用のためだけに式を実行する場合も `BlockItem` として扱われます。
 
-### 12.3.5 式 (Expression)
+### 10.3.5 式 (Expression)
 
 式は評価されて値を生成します。Protorunでは、型定義なども式の一種として扱われます。
 
@@ -306,7 +306,7 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
     - **`AliasDefinitionExpr`**: `alias [GenericParams]? Type`
 - **その他**: `WithExpr`（効果ハンドリング）などが含まれます。`CollectionComprehensionExpr`、`BindExpr`、`PartialApplicationExpr` は現時点のEBNF（12.2）には定義されておらず、将来検討項目です。
 
-### 12.3.6 パターン (Pattern)
+### 10.3.6 パターン (Pattern)
 
 パターンは主に `match` 式で使用され、値の構造と照合します。`let` 束縛で使用できるパターンは `IrrefutablePattern` として別途定義されており、より限定されています。
 
@@ -320,10 +320,10 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 
 `let` 宣言では反駁不可能パターンのみが使用でき、反駁可能なパターン（リテラルやコンストラクタなど）は `match` 式を使用する必要があります。
 
-## 12.4 特殊な構文要素
+## 10.4 特殊な構文要素
 
 以下の特殊な構文要素の詳細については、対応する言語仕様の章を参照してください：
 
-- **代数的効果とハンドラ (`effect`, `handler`, `WithExpr`)**: [8. 代数的効果](08-algebraic-effects.md)
-- **所有権と借用**: 将来フェーズで導入予定。詳細は [7. 所有権](07-ownership.md) を参照（現在はMVPスコープ外）。
-- **モジュールと可視性 (`export`)**: [9. モジュール](09-modules.md)
+- **代数的効果とハンドラ (`effect`, `handler`, `WithExpr`)**: [6. 代数的効果](06-algebraic-effects.md)
+- **所有権と借用**: 将来フェーズで導入予定（現在はMVPスコープ外）。
+- **モジュールと可視性 (`export`)**: [7. モジュール](07-modules.md)
