@@ -1,0 +1,6 @@
+ls: docs/design/: No such file or directory
+✓ docs/design/ deleted
+ls: taskdef/: No such file or directory
+✓ taskdef/ deleted
+ls: docs/language-spec/07-ownership.md: No such file or directory
+✓ 07-ownership.md deleted
