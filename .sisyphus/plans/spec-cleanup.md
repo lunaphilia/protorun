@@ -1182,11 +1182,11 @@ Max Concurrent: 8 (Wave 2)
 
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   Read the plan end-to-end. For each "Must Have": verify implementation exists (grep for patterns, read files). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   Run comprehensive grep for ALL forbidden syntax patterns across docs/:
   - `<T>` generics (should be `[T]`)
   - `: Type` return types (should be `-> Type`) — excluding field declarations `name: Type`
@@ -1199,7 +1199,7 @@ Max Concurrent: 8 (Wave 2)
   - References to old filenames (04-declarations.md, 05-statements, etc.)
   Output: `Patterns [N clean/N issues] | Files [N/N checked] | VERDICT`
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [x] F3. **Real Manual QA** — `unspecified-high`
   Read EVERY chapter (01 through 10) sequentially. For each chapter:
   - Verify file exists with correct name
   - Verify section headings match TOC in language-spec.md
@@ -1209,7 +1209,7 @@ Max Concurrent: 8 (Wave 2)
   Save per-chapter report to `.sisyphus/evidence/final-qa/`.
   Output: `Chapters [N/N pass] | Cross-refs [N/N valid] | Duplicates [CLEAN/N issues] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read "What to do", read actual diff (git log/diff). Verify 1:1 — everything in spec was built (no missing), nothing beyond spec was built (no creep). Check "Must NOT do" compliance. Detect unaccounted changes.
   Output: `Tasks [N/N compliant] | Unaccounted [CLEAN/N files] | VERDICT`
 
