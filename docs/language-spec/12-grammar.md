@@ -213,7 +213,7 @@ TypeConstraint ::= TypeRef ("+" TypeRef)*
 AliasDefinitionExpr ::= "alias" GenericParams? Type
 
 FunctionDefinitionExpr ::= FunctionHeader "=" Expression
-FunctionHeader ::= "fn" GenericParams? ParamList ("->" ReturnType)?
+FunctionHeader ::= GenericParams? ParamList ("->" ReturnType)?
 
 ParamList ::= "(" (Param ("," Param)*)? ")"
 Param ::= SimpleParam | ImplicitParam | EffectParam
@@ -222,7 +222,7 @@ ImplicitParam ::= "with" SimpleParam
 EffectParam ::= "effect" SimpleParam
 
 TraitDefinitionExpr ::= "trait" GenericParams? (":" TypeRef)? "{" TraitItem* "}"
-TraitItem ::= "effect"? Identifier "=" FunctionHeader ("=>" Expression)?
+TraitItem ::= LetDecl
 
 EffectDefinitionExpr ::= "effect" GenericParams? "{" EffectItem* "}"
 EffectItem ::= LetDecl
@@ -236,7 +236,7 @@ RecordFieldInit ::= Identifier ":" Expression
 ImplDecl ::= "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" ImplItem* "}"
 WhereClause ::= "where" WherePredicate ("," WherePredicate)*
 WherePredicate ::= TypeRef ":" TypeConstraint
-ImplItem ::= "effect"? Identifier "=" FunctionDefinitionExpr
+ImplItem ::= LetDecl
 
 ModuleDecl ::= "module" QualifiedIdentifier "{" (Declaration | Statement | Expression)* "}"
 ImportDecl ::= "import" QualifiedIdentifier ("." "{" Identifier ("," Identifier)* "}")?
@@ -246,7 +246,7 @@ StringInterpolation ::= "f" "\"" (StringContent | "{" Expression "}")* "\""
 
 Keyword ::= "let" | "mut" | "impl" | "return" | "if" | "elif" | "else"
           | "match" | "for" | "in" | "while" | "loop" | "break" | "continue" | "then"
-          | "fn" | "trait" | "type" | "alias" | "module" | "import" | "as"
+          | "trait" | "type" | "alias" | "module" | "import" | "as"
           | "with" | "effect" | "where" | "True" | "False"
 ```
 
@@ -290,9 +290,9 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 - **リテラル (`LiteralExpr`)**: 数値、文字列、真偽値、ユニット `()` など。コレクションリテラル（`ListLiteral`, `TupleLiteral`）も含まれますが、標準ライブラリの型（例: `List[Item]`）で代替される可能性があります。
 - **識別子 (`IdentifierExpr`)**: 変数や関数名など。
 - **ブロック (`BlockExpr`)**: `{ BlockItem* }` 形式。
-- **条件 (`IfExpr`)**: `if cond { ... } else { ... }` 形式。
+- **条件 (`IfExpr`)**: `if cond then { ... } else { ... }` 形式。
 - **パターンマッチ (`MatchExpr`)**: `match value { Pattern => Expr` を改行区切りで並べる形式。
-- **関数 (`FunctionDefinitionExpr`)**: `fn[GenericParams]?(Params)?: ReturnType = Expr` 形式の無名関数。
+- **関数 (`FunctionDefinitionExpr`)**: `[GenericParams]?(Params) (-> ReturnType)? = Expr` 形式の無名関数。
 - **呼び出し (`CallExpr`)**: `func(Args)` 形式。
 - **メンバーアクセス (`MemberAccessExpr`)**: `expr.identifier` 形式。
 - **レコード構築 (`RecordExpr`)**: `TypeName { field: value, ... }` 形式。
@@ -304,7 +304,7 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
     - **`TraitDefinitionExpr`**: `trait [GenericParams]? (: SuperTrait)? { ... }` - 効果（effect）もtraitとして定義されます
     - **`HandlerDefinitionExpr`**: `handler [GenericParams]? Effect for Type { ... }`
     - **`AliasDefinitionExpr`**: `alias [GenericParams]? Type`
-- **その他**: `WithExpr`（効果ハンドリング）などが含まれますが、仕様変更の可能性があります。`CollectionComprehensionExpr`, `BindExpr`, `PartialApplicationExpr` も同様に見直される可能性があります。
+- **その他**: `WithExpr`（効果ハンドリング）などが含まれます。`CollectionComprehensionExpr`、`BindExpr`、`PartialApplicationExpr` は現時点のEBNF（12.2）には定義されておらず、将来検討項目です。
 
 ### 12.3.6 パターン (Pattern)
 
