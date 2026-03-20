@@ -1,0 +1,8 @@
+docs/language-spec/06-expressions.md:313:- `("->" ReturnType)?`: 戻り値の型注釈（オプション）。アロー `->` に続けて戻り値の型 (`ReturnType`) を記述します。
+docs/language-spec/04-declarations.md:47:1.  **統一された構文**: すべての束縛宣言が `let ("mut")? IrrefutablePattern (":" Type)? ("=" Expression)?` の形式に従い、言語の学習コストと複雑さを低減します。型定義なども式の一種として扱われます。シグネチャ宣言（例: Trait 内のメソッドシグネチャ）もこの形式の右辺省略形として表現されます。
+docs/language-spec/04-declarations.md:76:- `("mut")?`: **任意**の `mut` キーワード。存在する場合、可変束縛となります。
+docs/language-spec/04-declarations.md:84:- `("=" Expression)?`: **任意**の初期化式。存在する場合、束縛する対象を評価または解釈する式。これには、通常の計算式、関数式、そして型定義式、トレイト定義式なども含まれます。右辺が省略された場合（例: `let name: Type;`）、これはシグネチャ宣言（Trait/Effect 内など）や未初期化変数の宣言（スコープによる）として解釈される可能性があります（意味解析で文脈に応じて判断）。
+docs/language-spec/04-declarations.md:352:let TraitName = trait[GenericParams]? (: SuperTrait[SuperArgs])? { /* メソッドシグネチャ / デフォルト実装 (LetDecl) */ }
+docs/language-spec/12-grammar.md:231:             | "import" QualifiedIdentifier ("as" Identifier)?
+docs/language-spec/12-grammar.md:283:- **関数 (`FunctionDefinitionExpr`)**: `fn[GenericParams]?(Params)?: ReturnType = Expr` 形式の無名関数。
+docs/language-spec/12-grammar.md:292:    - **`TraitDefinitionExpr`**: `trait [GenericParams]? (: SuperTrait)? { ... }` - 効果（effect）もtraitとして定義されます

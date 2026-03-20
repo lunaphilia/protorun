@@ -220,7 +220,7 @@ fn processData(): Result<String, Error> & Database & FileSystem = {
   let file = FileSystem.acquire()
   
   // データベースからデータを取得
-  let data = Database.query("SELECT * FROM data")?
+  let data = Database.query("SELECT * FROM data")
   
   // ファイルに書き込み
   FileSystem.write(data.toString())

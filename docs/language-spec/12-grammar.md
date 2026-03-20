@@ -57,6 +57,7 @@ Expression ::= LiteralExpr
              | ContinueExpr
              | MatchExpr
              | ListComprehension
+             | WithExpr
              | CallExpr
              | MemberAccessExpr
              | BinaryOperatorExpr
@@ -168,6 +169,9 @@ NEWLINE ::= "\n"+
 
 ListComprehension ::= "[" Expression "for" Pattern "<-" Expression ("if" Expression)? "]"
 
+WithExpr ::= "with" WithBinding ("," WithBinding)* BlockExpr
+WithBinding ::= Identifier "=" Expression (":" TypeRef)?
+
 CallExpr ::= Expression "(" ArgList? ")"
 ArgList ::= Expression ("," Expression)*
 
@@ -271,7 +275,7 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
 
 式は評価されて値を生成します。Protorunでは、型定義なども式の一種として扱われます。
 
-- **リテラル (`LiteralExpr`)**: 数値、文字列、真偽値、ユニット `()` など。コレクションリテラル（`ListLiteral`, `TupleLiteral`）も含まれますが、標準ライブラリの型（例: `List<T>`）で代替される可能性があります。
+- **リテラル (`LiteralExpr`)**: 数値、文字列、真偽値、ユニット `()` など。コレクションリテラル（`ListLiteral`, `TupleLiteral`）も含まれますが、標準ライブラリの型（例: `List[Item]`）で代替される可能性があります。
 - **識別子 (`IdentifierExpr`)**: 変数や関数名など。
 - **ブロック (`BlockExpr`)**: `{ BlockItem* }` 形式。
 - **条件 (`IfExpr`)**: `if cond { ... } else { ... }` 形式。
