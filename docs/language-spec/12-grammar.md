@@ -69,7 +69,10 @@ Expression ::= LiteralExpr
              | TypeDefinitionExpr
              | AliasDefinitionExpr
              | FunctionDefinitionExpr
-             | TraitDefinitionExpr
+              | TraitDefinitionExpr
+              | EffectDefinitionExpr
+              | HandlerDefinitionExpr
+              | RecordExpr
 
 LiteralExpr ::= IntLiteral | FloatLiteral | StringLiteral | BoolLiteral | UnitLiteral | ListLiteral | TupleLiteral | MapLiteral | SetLiteral
 
@@ -220,6 +223,15 @@ EffectParam ::= "effect" SimpleParam
 
 TraitDefinitionExpr ::= "trait" GenericParams? (":" TypeRef)? "{" TraitItem* "}"
 TraitItem ::= "effect"? Identifier "=" FunctionHeader ("=>" Expression)?
+
+EffectDefinitionExpr ::= "effect" GenericParams? "{" EffectItem* "}"
+EffectItem ::= LetDecl
+
+HandlerDefinitionExpr ::= "handler" GenericParams? TypeRef "for" TypeRef WhereClause? "{" HandlerItem* "}"
+HandlerItem ::= LetDecl
+
+RecordExpr ::= TypeRef "{" (RecordFieldInit ("," RecordFieldInit)*)? "}"
+RecordFieldInit ::= Identifier ":" Expression
 
 ImplDecl ::= "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" ImplItem* "}"
 WhereClause ::= "where" WherePredicate ("," WherePredicate)*
