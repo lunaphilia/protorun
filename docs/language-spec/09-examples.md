@@ -49,14 +49,14 @@ let Option = type[T] {
 // オプション値を操作する関数
 let map = [T, U](option: Option[T], f: (T) -> U) -> Option[U] = {
   match option {
-    Option.Some(value) => Option.Some(f(value)),
+    Option.Some(value) => Option.Some(f(value))
     Option.None => Option.None
   }
 }
 
 let getOrElse = [T](option: Option[T], default: T) -> T = {
   match option {
-    Option.Some(value) => value,
+    Option.Some(value) => value
     Option.None => default
   }
 }
@@ -66,7 +66,7 @@ let main = () -> Unit = {
   let maybeNumber = Option.Some(42)
   let noNumber = Option.None
 
-  let doubled = map(maybeNumber, (x) = x * 2)
+  let doubled = map(maybeNumber, (x: Int) = x * 2)
   let result1 = getOrElse(doubled, 0)
 
   let result2 = getOrElse(noNumber, 0)
@@ -95,19 +95,19 @@ let numbers = [1, 2, 3, 4, 5]
 let len = numbers.length()
 
 // リストの要素を変換（map）
-let doubled = numbers.map((x) = x * 2)
+let doubled = numbers.map((x: Int) = x * 2)
 
 // リストのフィルタリング
-let evens = numbers.filter((x) = x % 2 == 0)
+let evens = numbers.filter((x: Int) = x % 2 == 0)
 
 // リストの畳み込み（foldLeft）
-let sum = numbers.foldLeft(0, (acc, x) = acc + x)
+let sum = numbers.foldLeft(0, (acc: Int, x: Int) = acc + x)
 
 // 複数の操作をメソッドチェーンで組み合わせ
 let result = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-  .filter((x) = x % 2 == 0)
-  .map((x) = x * x)
-  .foldLeft(0, (acc, x) = acc + x)
+  .filter((x: Int) = x % 2 == 0)
+  .map((x: Int) = x * x)
+  .foldLeft(0, (acc: Int, x: Int) = acc + x)
 ```
 
 この例では、以下の言語機能を示しています：
@@ -115,7 +115,7 @@ let result = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 1. **リストリテラル**: `[1, 2, 3, 4, 5]` のようなリストの構築
 2. **メソッドチェーン**: `list.filter(...).map(...).foldLeft(...)` による操作の連鎖
 3. **高階関数**: `map`, `filter`, `foldLeft` への関数引数
-4. **無名関数**: `(x) = ...` 形式の無名関数
+4. **無名関数**: `(x: T) = ...` 形式の無名関数
 
 ## 9.5 バイナリツリー
 
@@ -131,7 +131,7 @@ let Tree = type[T] {
 // ツリーに要素を挿入
 let insert = [T](tree: Tree[T], value: T, compare: (T, T) -> Int) -> Tree[T] = {
   match tree {
-    Tree.Leaf => Tree.Node(value, Tree.Leaf, Tree.Leaf),
+    Tree.Leaf => Tree.Node(value, Tree.Leaf, Tree.Leaf)
     Tree.Node(data, left, right) => {
       let cmp = compare(value, data)
       if cmp < 0 then {
@@ -148,7 +148,7 @@ let insert = [T](tree: Tree[T], value: T, compare: (T, T) -> Int) -> Tree[T] = {
 // ツリーの要素を検索
 let contains = [T](tree: Tree[T], value: T, compare: (T, T) -> Int) -> Bool = {
   match tree {
-    Tree.Leaf => False,
+    Tree.Leaf => False
     Tree.Node(data, left, right) => {
       let cmp = compare(value, data)
       if cmp < 0 then {
@@ -165,7 +165,7 @@ let contains = [T](tree: Tree[T], value: T, compare: (T, T) -> Int) -> Bool = {
 // ツリーを走査してリストに変換（中順走査）
 let toList = [T](tree: Tree[T]) -> List[T] = {
   match tree {
-    Tree.Leaf => [],
+    Tree.Leaf => []
     Tree.Node(data, left, right) => {
       let leftList = toList(left)
       let rightList = toList(right)
@@ -212,14 +212,14 @@ let Result = type[T, E] {
 // Resultを操作する関数
 let mapResult = [T, U, E](result: Result[T, E], f: (T) -> U) -> Result[U, E] = {
   match result {
-    Result.Ok(value) => Result.Ok(f(value)),
+    Result.Ok(value) => Result.Ok(f(value))
     Result.Err(error) => Result.Err(error)
   }
 }
 
 let flatMap = [T, U, E](result: Result[T, E], f: (T) -> Result[U, E]) -> Result[U, E] = {
   match result {
-    Result.Ok(value) => f(value),
+    Result.Ok(value) => f(value)
     Result.Err(error) => Result.Err(error)
   }
 }
@@ -245,9 +245,9 @@ let safeSqrt = (x: Int) -> Result[Int, String] = {
 let compute = (a: Int, b: Int, c: Int) -> Result[Int, String] = {
   flatMap(
     divide(a, b),
-    (quotient) = flatMap(
+    (quotient: Int) = flatMap(
       safeSqrt(quotient),
-      (sqrt) = Result.Ok(sqrt + c)
+      (sqrt: Int) = Result.Ok(sqrt + c)
     )
   )
 }
@@ -259,7 +259,7 @@ let main = () -> Unit = {
   let result3 = compute(-100, 10, 5)
 
   match result1 {
-    Result.Ok(value) => value,
+    Result.Ok(value) => value
     Result.Err(msg) => 0
   }
 }
@@ -326,7 +326,9 @@ let User = type {
 
 // ユーザー情報を表示する関数
 let displayUser = (user: User) -> String = {
-  let name = match user { User(id, name, email) => name }
+  let name = match user {
+    User { id: id, name: n, email: e } => n
+  }
   name
 }
 

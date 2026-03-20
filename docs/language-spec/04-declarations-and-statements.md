@@ -100,17 +100,17 @@ TraitItem ::= LetDecl
 
 `TraitItem` は `LetDecl` で統一されます。
 
-- シグネチャ: `let method: (params) -> ReturnType;`
+- シグネチャ: `let method: (params) -> ReturnType`
 - デフォルト実装: `let method = (params) -> ReturnType = body`
 
 ```protorun
 let Show = trait {
-  let show: (self) -> String;
+  let show: (self) -> String
 }
 
 let Ord = trait: Show {
-  let compare: (self, other: Self) -> Int;
-  let showDebug = (self) -> String = f"Debug: {self.show()}";
+  let compare: (self, other: Self) -> Int
+  let showDebug = (self) -> String = f"Debug: {self.show()}"
 }
 ```
 
@@ -127,12 +127,12 @@ EffectItem ::= LetDecl
 
 ```protorun
 let State = [S] effect {
-  let get: () -> S;
-  let put: (value: S) -> Unit;
+  let get: () -> S
+  let put: (value: S) -> Unit
 }
 
 let Console = effect {
-  let log: (message: String) -> Unit;
+  let log: (message: String) -> Unit
 }
 ```
 
@@ -147,10 +147,10 @@ HandlerItem ::= LetDecl
 
 ```protorun
 let CounterHandler = handler State[Int] for Counter {
-  let get = (self: Counter) -> Int = self.count;
+  let get = (self: Counter) -> Int = self.count
   let put = (self: Counter, value: Int) -> Unit = {
     self.count = value
-  };
+  }
 }
 ```
 
@@ -158,10 +158,10 @@ let CounterHandler = handler State[Int] for Counter {
 
 ## 4.9 トレイト実装 (ImplDecl)
 
-`impl` はトレイトを型へ適用する宣言です。
+`impl` はトレイトを型へ適用する宣言です。`for` 句は省略可能で、`impl TypeRef { ... }` の形も取れます。
 
 ```ebnf
-ImplDecl ::= "impl" GenericParams? TypeRef "for" TypeRef WhereClause? "{" ImplItem* "}"
+ImplDecl ::= "impl" GenericParams? TypeRef ("for" TypeRef)? WhereClause? "{" ImplItem* "}"
 ImplItem ::= LetDecl
 ```
 
@@ -169,14 +169,14 @@ ImplItem ::= LetDecl
 
 ```protorun
 impl Show for Int {
-  let show = (self: Int) -> String = self.toString();
+  let show = (self: Int) -> String = self.toString()
 }
 
 impl[T] Show for Option[T] where T: Show {
   let show = (self: Option[T]) -> String = match self {
-    Option.Some(v) => f"Some({v.show()})",
+    Option.Some(v) => f"Some({v.show()})"
     Option.None => "None"
-  };
+  }
 }
 ```
 

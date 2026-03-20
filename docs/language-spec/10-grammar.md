@@ -304,7 +304,7 @@ Protorunの宣言は、主に `let` キーワードを用いた束縛宣言と�
     - **`TraitDefinitionExpr`**: `trait [GenericParams]? (: SuperTrait)? { ... }` - 効果（effect）もtraitとして定義されます
     - **`HandlerDefinitionExpr`**: `handler [GenericParams]? Effect for Type { ... }`
     - **`AliasDefinitionExpr`**: `alias [GenericParams]? Type`
-- **その他**: `WithExpr`（効果ハンドリング）などが含まれます。`CollectionComprehensionExpr`、`BindExpr`、`PartialApplicationExpr` は現時点のEBNF（12.2）には定義されておらず、将来検討項目です。
+- **その他**: `WithExpr`（効果ハンドリング）などが含まれます。`CollectionComprehensionExpr`、`BindExpr`、`PartialApplicationExpr` は現時点のEBNF（10.2）には定義されておらず、将来検討項目です。
 
 ### 10.3.6 パターン (Pattern)
 

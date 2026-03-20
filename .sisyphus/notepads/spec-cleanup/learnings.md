@@ -52,3 +52,24 @@
 - AGENTS.md was already updated to new file names before this task ran.
 - 09-examples.md already correctly referenced `[10. 文法](10-grammar.md)`.
 - Section number patterns `12.x` in 10-grammar.md were internal numbering from old chapter 12 system.
+
+## Task 14: F3 Manual QA 指摘のEBNF整合修正 (2026-03-20)
+
+### 修正方針
+- EBNF定義本体は変更せず、散文・例・章内参照のみを EBNF に一致させる。
+- `TraitItem` / `EffectItem` / `HandlerItem` / `ImplItem` が `LetDecl` に従うため、コード例の終端セミコロンを除去する。
+- `MatchArmList ::= MatchArm (NEWLINE MatchArm)*` に合わせ、`match` アームはカンマ区切りではなく改行区切りへ統一する。
+
+### 今回の具体修正
+1. `docs/language-spec.md` の Chapter 10 サブセクション番号を `12.x` から `10.x` へ修正。
+2. `docs/language-spec/10-grammar.md` の本文参照 `EBNF（12.2）` を `EBNF（10.2）` へ修正。
+3. `docs/language-spec/02-lexical-structure.md` で octal/raw string 非対応注記を対応済み表現へ更新し、`protorun` コード例のセミコロンを除去。
+4. `docs/language-spec/04-declarations-and-statements.md` で `ImplDecl` の `("for" TypeRef)?` を反映し、`match` アームのカンマおよび `let` 終端セミコロンを除去。
+5. `docs/language-spec/03-type-system.md` の壊れたアンカーリンクを章リンク + テキスト参照に変更。
+6. `docs/language-spec/06-algebraic-effects.md` / `docs/language-spec/07-modules.md` の `let` / `import` 例から終端セミコロンを除去。
+7. `docs/language-spec/09-examples.md` で型なしラムダに型注釈を付与し、`match` アームのカンマ除去、record位置パターンを recordフィールドパターンへ修正。
+
+### 検証メモ
+- `docs/language-spec.md` の `12.1|12.2|12.3|12.4` は 0 件。
+- `docs/language-spec/10-grammar.md` の `12.2` は 0 件。
+- Markdown 向け LSP が未設定のため `lsp_diagnostics` は `.md` で実行不可（No LSP server configured for extension: .md）。

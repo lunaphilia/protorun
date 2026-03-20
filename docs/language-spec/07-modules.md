@@ -19,20 +19,20 @@
 ```protorun
 module Math {
   // 公開関数（外部からアクセス可能）
-  export let add = (a: Int, b: Int) -> Int = a + b;
-  export let subtract = (a: Int, b: Int) -> Int = a - b;
+  export let add = (a: Int, b: Int) -> Int = a + b
+  export let subtract = (a: Int, b: Int) -> Int = a - b
 
   // 非公開関数（モジュール内でのみアクセス可能）
-  let helper = () -> Int = 42;
+  let helper = () -> Int = 42
 
   // 公開型
   export let Point = type {
     x: Float,
     y: Float
-  };
+  }
 
   // 公開定数 (let束縛として)
-  export let PI: Float = 3.14159;
+  export let PI: Float = 3.14159
 }
 ```
 
@@ -51,19 +51,19 @@ module Math {
 // import Math // この形式は非推奨または廃止の可能性あり
 
 // 特定の要素のインポート
-import Math.add;
-import Math.Point;
+import Math.add
+import Math.Point
 
 // 複数の要素のインポート
-import Math.{add, subtract, Point};
+import Math.{add, subtract, Point}
 
 // モジュールのすべての公開要素のインポート（注意：ワイルドカードインポートは推奨されない場合がある）
 // import Math.*; // 文法的には可能だが、名前空間の汚染を避けるため、通常は明示的なインポートが推奨される
 
 // 別名を付けてインポート
-import Math as M;
-import Math.add as addition;
-import Math.{Point as Vec2};
+import Math as M
+import Math.add as addition
+import Math.{Point as Vec2}
 ```
 
 インポートには以下の特徴があります：
@@ -84,29 +84,29 @@ module Graphics {
     r: Int,
     g: Int,
     b: Int
-  };
+  }
 
   // 2Dグラフィックスのサブモジュール
   export module TwoD {
     export let drawRect = (x: Int, y: Int, width: Int, height: Int, color: Color) -> Unit = {
       // 実装
-    };
+    }
   }
 
   // 3Dグラフィックスのサブモジュール
   export module ThreeD {
     export let drawCube = (x: Int, y: Int, z: Int, size: Int, color: Color) -> Unit = {
       // 実装
-    };
+    }
   }
 }
 
 // サブモジュールの使用
-import Graphics.TwoD;
-import Graphics.ThreeD.drawCube; // 特定の要素をインポート
+import Graphics.TwoD
+import Graphics.ThreeD.drawCube // 特定の要素をインポート
 
 // または
-import Graphics.{TwoD, ThreeD};
+import Graphics.{TwoD, ThreeD}
 ```
 
 階層構造には以下の特徴があります：
@@ -123,23 +123,23 @@ Protorun言語では、モジュール構造とファイルシステム構造を
 // ファイル: graphics/two_d.pr
 module Graphics.TwoD {
   // 2Dグラフィックスの実装
-  export let drawLine = (...) -> Unit = { ... };
+  export let drawLine = (...) -> Unit = { ... }
 }
 
 // ファイル: graphics/three_d.pr
 module Graphics.ThreeD {
   // 3Dグラフィックスの実装
-  export let drawSphere = (...) -> Unit = { ... };
+  export let drawSphere = (...) -> Unit = { ... }
 }
 
 // ファイル: main.pr
-import Graphics.TwoD; // graphics/two_d.pr をインポート
-import Graphics.ThreeD.drawSphere; // graphics/three_d.pr の drawSphere をインポート
+import Graphics.TwoD // graphics/two_d.pr をインポート
+import Graphics.ThreeD.drawSphere // graphics/three_d.pr の drawSphere をインポート
 
 let main = () -> Unit = {
-  TwoD.drawLine(...);
-  drawSphere(...);
-};
+  TwoD.drawLine(...)
+  drawSphere(...)
+}
 ```
 
 ファイルシステムとの関連付けには以下の特徴があります：

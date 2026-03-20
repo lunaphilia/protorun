@@ -926,7 +926,7 @@ Max Concurrent: 8 (Wave 2)
   - Message: (same as T6 — grouped commit)
   - Files: `docs/language-spec/09-examples.md`
 
-- [ ] 11. Rename/delete files to final numbering scheme
+- [x] 11. Rename/delete files to final numbering scheme
 
   **What to do**:
   - **削除** (Wave 2で新ファイルが作成済みのため、旧ファイルは不要):
@@ -983,7 +983,7 @@ Max Concurrent: 8 (Wave 2)
   - Message: `docs: renumber chapters to 01-10, update TOC, cross-references, and AGENTS.md`
   - Files: deleted files + renamed 10-grammar.md
 
-- [ ] 12. Rewrite language-spec.md — new TOC, remove changelog
+- [x] 12. Rewrite language-spec.md — new TOC, remove changelog
 
   **What to do**:
   - **更新履歴セクション削除**: `## 更新履歴` 以降を全削除（L73-107）
@@ -1050,7 +1050,7 @@ Max Concurrent: 8 (Wave 2)
   - Message: (same as T11 — grouped commit)
   - Files: `docs/language-spec.md`
 
-- [ ] 13. Update all cross-references across all chapter files
+- [x] 13. Update all cross-references across all chapter files
 
   **What to do**:
   - **全10章ファイルを走査**し、他章への参照（ファイル名リンク、章番号言及）を新番号に更新
@@ -1110,7 +1110,7 @@ Max Concurrent: 8 (Wave 2)
   - Message: (same as T11 — grouped commit)
   - Files: all chapter files with cross-reference updates
 
-- [ ] 14. Update AGENTS.md — reflect new file structure
+- [x] 14. Update AGENTS.md — reflect new file structure
 
   **What to do**:
   - **Repository Structure セクション更新**:

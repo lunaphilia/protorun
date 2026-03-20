@@ -12,17 +12,17 @@
 
 ```protorun
 let Console = effect {
-  let log: (message: String) -> Unit;
-  let readLine: () -> String;
+  let log: (message: String) -> Unit
+  let readLine: () -> String
 }
 
 let State = [S] effect {
-  let get: () -> S;
-  let put: (S) -> Unit;
+  let get: () -> S
+  let put: (S) -> Unit
 }
 ```
 
-- `effect` 本体の各項目は `let operation: (params) -> ReturnType;` の形式を取ります。
+- `effect` 本体の各項目は `let operation: (params) -> ReturnType` の形式を取ります。
 - 効果定義は値に束縛され、関数側は `effect` パラメータを通じてそのインターフェースに依存します。
 - ジェネリクスは常に `[T]` 形式です。
 
@@ -32,13 +32,13 @@ let State = [S] effect {
 
 ```protorun
 let StateHandler = [S](initial: S) handler State[S] for Unit {
-  let get = () -> S = initial;
-  let put = (s: S) -> Unit = ();
+  let get = () -> S = initial
+  let put = (s: S) -> Unit = ()
 }
 
 let ConsoleHandler = handler Console for Unit {
-  let log = (message: String) -> Unit = println(message);
-  let readLine = () -> String = input();
+  let log = (message: String) -> Unit = println(message)
+  let readLine = () -> String = input()
 }
 ```
 
@@ -111,11 +111,11 @@ let result2 = with state = StateHandler[Int](10): State[Int] {
 
 ```protorun
 let Abort = [E] effect {
-  let raise: (E) -> Nothing;
+  let raise: (E) -> Nothing
 }
 
 let AbortToResult = [E, T] handler Abort[E] for Unit {
-  let raise = (e: E) -> Result[T, E] = Result.Err(e);
+  let raise = (e: E) -> Result[T, E] = Result.Err(e)
 }
 ```
 
@@ -153,8 +153,8 @@ let firstOdd = loop {
 
 ```protorun
 let ManagedFile = effect {
-  let open: (String) -> Result[File, IOError];
-  let close: (File) -> Result[Unit, IOError];
+  let open: (String) -> Result[File, IOError]
+  let close: (File) -> Result[Unit, IOError]
 }
 
 let UseFile = (path: String, effect fs: ManagedFile) -> Result[String, IOError] = {
@@ -175,7 +175,7 @@ let UseFile = (path: String, effect fs: ManagedFile) -> Result[String, IOError] 
 
 ```protorun
 let Clock = effect {
-  let nowMillis: () -> Int;
+  let nowMillis: () -> Int
 }
 
 let measure = (effect clock: Clock, work: () -> Unit) -> Int = {
