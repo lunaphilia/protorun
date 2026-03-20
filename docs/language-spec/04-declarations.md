@@ -32,11 +32,11 @@ let mut counter = 0
 let mut name: String = "John"
 
 // 関数定義 (関数式を束縛)
-let add = fn (a: Int, b: Int) -> Int => a + b
+let add = fn(a: Int, b: Int) -> Int = a + b
 
 // 型定義 (型定義式を束縛)
 let Point = type { x: Float, y: Float } // レコード型
-let Option = type<T> { Some(T), None } // ヴァリアント型
+let Option = type[T] { Some(T), None } // ヴァリアント型
 
 // 型エイリアス定義 (型エイリアス定義式を束縛)
 let UserId = alias Int
@@ -112,23 +112,23 @@ let person_value = Person { name: "Alice", age: 30 }
 let { name: person_name, age } = person_value
 
 // 関数定義 (関数式を束縛)
-let square = fn x -> x * x // 戻り値型推論
-let identity = fn <T> (x: T) -> T => x
+let square = fn(x) = x * x // 戻り値型推論
+let identity = fn[T](x: T) -> T = x
 
 // 型定義 (型定義式を束縛)
 let Person = type { name: String, age: Int } // レコード型
-let Result = type<T, E> { Ok(T), Err(E) } // ヴァリアント型
+let Result = type[T, E] { Ok(T), Err(E) } // ヴァリアント型
 
 // トレイト定義 (トレイト定義式を束縛)
-let Show = trait { let show: fn(self) -> String } // シグネチャ
-let Ord = trait<T: Eq> { let compare: fn(self, other: T) -> Int } // シグネチャ
+let Show = trait { let show: (self) -> String } // シグネチャ
+let Ord = trait[T: Eq] { let compare: (self, other: T) -> Int } // シグネチャ
 
 // 型エイリアス定義 (型エイリアス定義式を束縛)
 let UserId = alias Int
-let StringMap = alias<T> Map<String, T>
+let StringMap = alias[T] Map[String, T]
 
 // スコープ
-fn example_scope() {
+let example_scope = fn() = {
   let outer = "Outer scope"
   {
     let inner = "Inner scope"
@@ -149,9 +149,9 @@ fn example_scope() {
 関数は `let` 束縛と関数式 ([6.3.3 関数式](06-expressions.md#633-関数式)) を組み合わせて定義します。これにより、関数も他の値と同様に扱われ、言語の一貫性が保たれます。詳細な構文は [6. 式](06-expressions.md) を参照してください。
 
 ```protorun
-let add = fn (a: Int, b: Int) -> Int => a + b
-let square = fn x -> x * x // 戻り値型推論
-let identity = fn <T> (x: T) -> T => x
+let add = fn(a: Int, b: Int) -> Int = a + b
+let square = fn(x) = x * x // 戻り値型推論
+let identity = fn[T](x: T) -> T = x
 ```
 
 **暗黙的な再帰:**
@@ -159,7 +159,7 @@ let identity = fn <T> (x: T) -> T => x
 `let` で束縛された関数式は、自身の名前を再帰的に参照できます。特別なキーワード (`rec` など) は不要です。
 
 ```protorun
-let factorial = fn (n: Int) -> Int => {
+let factorial = fn(n: Int) -> Int = {
   if n <= 1 {
     1
   } else {
@@ -201,7 +201,7 @@ Protorun言語では、`let` 宣言と `type` キーワードで始まる**型�
 **宣言 (束縛):**
 
 ```protorun
-let TypeName = type<GenericParams>? { field1: Type1, field2: Type2, ... }
+let TypeName = type[GenericParams]? { field1: Type1, field2: Type2, ... }
 ```
 
 **具体例:**
@@ -212,7 +212,7 @@ let Person = type {
   age: Int
 }
 
-let Pair = type<A, B> {
+let Pair = type[A, B] {
   first: A,
   second: B
 }
@@ -227,7 +227,7 @@ let Pair = type<A, B> {
 **宣言 (束縛):**
 
 ```protorun
-let TypeName = type<GenericParams>? { Variant1(...), Variant2{...}, Variant3, ... }
+let TypeName = type[GenericParams]? { Variant1(...), Variant2{...}, Variant3, ... }
 ```
 
 - 中括弧 `{}` 内には、1つ以上のヴァリアント定義をカンマ区切りで記述します。
@@ -237,13 +237,13 @@ let TypeName = type<GenericParams>? { Variant1(...), Variant2{...}, Variant3, ..
 
 ```protorun
 // Option型: 値が存在するか(Some)しないか(None)
-let Option = type<T> {
+let Option = type[T] {
   Some(T), // T型の値を持つヴァリアント
   None     // データを持たないヴァリアント
 }
 
 // Result型: 成功(Ok)か失敗(Err)か
-let Result = type<T, E> {
+let Result = type[T, E] {
   Ok(T),   // 成功時の値 T を持つヴァリアント
   Err(E)   // 失敗時のエラー E を持つヴァリアント
 }
@@ -274,14 +274,14 @@ let Shape = type {
 **宣言 (束縛):**
 
 ```protorun
-let AliasName = alias<GenericParams>? ExistingType<GenericParams>
+let AliasName = alias[GenericParams]? ExistingType[GenericParams]
 ```
 
 **具体例:**
 
 ```protorun
 let UserId = alias Int
-let StringMap = alias<T> Map<String, T>
+let StringMap = alias[T] Map[String, T]
 let PointTuple = alias (Float, Float)
 let Callback = alias (Int) -> String
 ```
@@ -301,13 +301,13 @@ let Callback = alias (Int) -> String
 **宣言 (束縛):**
 
 ```protorun
-let EffectName = effect<GenericParams>? { /* 操作シグネチャ (LetDecl) */ }
+let EffectName = effect[GenericParams]? { /* 操作シグネチャ (LetDecl) */ }
 ```
 
 **具体例:**
 
 ```protorun
-let State = effect<S> {
+let State = effect[S] {
   let get: () -> S
   let put: (value: S) -> Unit
 }
@@ -324,15 +324,15 @@ let Console = effect {
 **宣言 (束縛):**
 
 ```protorun
-let HandlerName = handler<GenericParams>? EffectName<EffectArgs> for TargetType<TargetArgs> { /* 操作実装 */ }
+let HandlerName = handler[GenericParams]? EffectName[EffectArgs] for TargetType[TargetArgs] { /* 操作実装 */ }
 ```
 
 **具体例:**
 
 ```protorun
-let CounterStateHandler = handler State<Int> for CounterState {
-  let get = fn (self) -> Int => self.count
-  let put = fn (self, value: Int) -> Unit => {
+let CounterStateHandler = handler State[Int] for CounterState {
+  let get = fn(self) -> Int = self.count
+  let put = fn(self, value: Int) -> Unit = {
     resume_with(Unit, CounterState { count: value })
   }
 }
@@ -349,7 +349,7 @@ let CounterStateHandler = handler State<Int> for CounterState {
 **宣言 (束縛):**
 
 ```protorun
-let TraitName = trait<GenericParams>? (: SuperTrait<SuperArgs>)? { /* メソッドシグネチャ / デフォルト実装 (LetDecl) */ }
+let TraitName = trait[GenericParams]? (: SuperTrait[SuperArgs])? { /* メソッドシグネチャ / デフォルト実装 (LetDecl) */ }
 ```
 
 **具体例:**
@@ -365,10 +365,10 @@ let Eq = trait {
 
 let Ord = trait: Eq {
   let compare: (self, other: Self) -> Int // シグネチャ
-  let equals = fn(self, other: Self) -> Bool => self.compare(other) == 0 // デフォルト実装は fn を残す
+  let equals = fn(self, other: Self) -> Bool = self.compare(other) == 0 // デフォルト実装
 }
 
-let Add = trait<Rhs = Self, Output = Self> {
+let Add = trait[Rhs = Self, Output = Self] {
     let add: (self, rhs: Rhs) -> Output // シグネチャ
 }
 ```
@@ -380,35 +380,35 @@ let Add = trait<Rhs = Self, Output = Self> {
 **構文:**
 
 ```ebnf
-ImplDeclaration ::= 'impl' <GenericParams>? TraitName<TraitArgs> for TypeName<TypeArgs> <WhereClause>? '{'
-                      ImplItem*
-                   '}'
+ImplDecl ::= 'impl' GenericParams? TraitName GenericArgs? 'for' TypeName GenericArgs? WhereClause? '{'
+                ImplItem*
+             '}'
 ImplItem ::= LetDecl // 主に関数定義
 ```
 
 - `impl`: 実装を開始するキーワード。
-- `<GenericParams>?`: 実装自体がジェネリックな場合の型パラメータ。
-- `TraitName<TraitArgs>`: 実装するトレイト。
-- `TypeName<TypeArgs>`: 実装対象の型。
-- `<WhereClause>?`: 型パラメータに対する追加の制約（例: `where T: Show`）。
-- `ImplItem*`: トレイトメソッドの実装。`let method_name = fn (...) -> ... => ...;` の形式。
+- `GenericParams?`: 実装自体がジェネリックな場合の型パラメータ。
+- `TraitName GenericArgs?`: 実装するトレイト。
+- `TypeName GenericArgs?`: 実装対象の型。
+- `WhereClause?`: 型パラメータに対する追加の制約（例: `where T: Show`）。
+- `ImplItem*`: トレイトメソッドの実装。`let method_name = fn(...) -> ... = ...` の形式。
 
 **具体例:**
 
 ```protorun
 impl Show for Int {
-  let show = fn (self) -> String => self.toString()
+  let show = fn(self) -> String = self.toString()
 }
 
-impl<T> Show for Option<T> where T: Show {
-  let show = fn (self) -> String => match self {
-    Option.Some(v) => s"Some(${v.show()})",
+impl[T] Show for Option[T] where T: Show {
+  let show = fn(self) -> String = match self {
+    Option.Some(v) => f"Some({v.show()})",
     Option.None => "None"
   }
 }
 
 impl Add for Int {
-    let add = fn (self, rhs: Int) -> Int => self + rhs
+    let add = fn(self, rhs: Int) -> Int = self + rhs
 }
 ```
 

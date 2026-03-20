@@ -31,7 +31,7 @@ Statement ::= ReturnStatement // 現在の仕様では Return のみ
 
 ```protorun
 // 例1: if式でのブロック使用
-if x > 0 {
+if x > 0 then {
   println("xは正です") // 文1
   x * 2             // 最後の式 (ブロックの値)
 } else {
@@ -71,16 +71,16 @@ Protorunは、条件分岐や繰り返し、効果ハンドリングなどのた
 
 ```protorun
 // if式 (すべての分岐でブロック式が必須)
-if condition1 {
+if condition1 then {
   expression1 // ブロック式
-} elif condition2 {
+} elif condition2 then {
   expression2
 } else {
   expression3
 }
 
 // 単一の値を返す場合もブロック式を使用
-let result = if x > 0 { 1 } elif x < 0 { -1 } else { 0 }
+let result = if x > 0 then { 1 } elif x < 0 then { -1 } else { 0 }
 
 // match式
 match value {
@@ -132,15 +132,15 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 特に重要な特徴：
 
 - **if式**:
-  - **構文**: `if condition1 { then_branch1 } [elif condition2 { then_branch2 }]* [else { else_branch }]?`
-  - 条件に基づいて評価する式を選択します。`if` キーワードで始まり、条件式、そして中括弧 `{}` で囲まれたブロック式（`then` 節）が続きます。
-  - オプションで、0個以上の `elif` 節（`elif` キーワード、条件式、ブロック式のペア）と、最後の `else` 節（`else` キーワード、ブロック式）を持つことができます。
+  - **構文**: `if condition1 then { then_branch1 } [elif condition2 then { then_branch2 }]* [else { else_branch }]?`
+  - 条件に基づいて評価する式を選択します。`if` キーワードで始まり、条件式、`then` キーワード、そして中括弧 `{}` で囲まれたブロック式が続きます。
+  - オプションで、0個以上の `elif` 節（`elif` キーワード、条件式、`then` キーワード、ブロック式のペア）と、最後の `else` 節（`else` キーワード、ブロック式）を持つことができます。
   - **ブロック式必須**: `if`, `elif`, `else` の各分岐の本体は、**常に中括弧 `{}` で囲まれたブロック式**でなければなりません。単一の式を返す場合でも `{ expression }` のように記述します。これにより構文の一貫性を保ちます。
   - **利点**:
     - 単純な条件分岐や、論理演算子 (`&&`, `||`, `!`) を使った複合条件を直感的かつ簡潔に表現できます。
-    - `if ... elif ... else` チェーンにより、段階的な条件評価を自然に記述できます。
+    - `if ... then ... elif ... then ... else ...` チェーンにより、段階的な条件評価を自然に記述できます。
     - 多くのプログラマーにとって馴染み深く、学習コストが低い構文です。
-  - **設計思想**: Protorunでは、より複雑なパターンマッチングに適した `match` 式も提供しますが、単純な条件分岐には `if` 式の方が読みやすく適切であると考え、両方の構文を採用しています。これにより、状況に応じて最適な表現を選択できます。`if` 式の構文をブロック式に統一することで、単一式の場合の `then` キーワードなどを不要にし、構文の複雑さを低減しています。
+  - **設計思想**: Protorunでは、より複雑なパターンマッチングに適した `match` 式も提供しますが、単純な条件分岐には `if` 式の方が読みやすく適切であると考え、両方の構文を採用しています。これにより、状況に応じて最適な表現を選択できます。`if ... then ...` 構文により、条件と本体の分岐を明確に分離しています。
 
 - **match式**:
   - **構文**: `match scrutinee { [pattern [if guard]? => branch],* }`
@@ -193,7 +193,7 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 #{x * x for x <- range(1, 10)}
 
 // 文字列の最初の文字のセット
-#{word[0] for word <- words}
+#{word.get(0) for word <- words}
 ```
 
 内包表記は、以下のような高階関数の組み合わせに変換されます：
@@ -203,15 +203,15 @@ Protorun言語の制御構造は、以下の原則に基づいて設計されて
 [x * 2 for x <- numbers if x % 2 == 0]
 
 // 変換後
-numbers.filter(x => x % 2 == 0).map(x => x * 2)
+numbers.filter(fn(x) = x % 2 == 0).map(fn(x) = x * 2)
 
 // 複数のイテレータを持つ内包表記
 [(x, y) for x <- xs for y <- ys if x + y > 5]
 
 // 変換後
-xs.flatMap(x => 
-  ys.filter(y => x + y > 5)
-    .map(y => (x, y))
+xs.flatMap(fn(x) =
+  ys.filter(fn(y) = x + y > 5)
+    .map(fn(y) = (x, y))
 )
 ```
 
@@ -261,9 +261,9 @@ bind {
 }
 
 // 変換後
-findUser(userId).flatMap(user => 
-  getUserEmail(user).flatMap(email => 
-    validateEmail(email).map(validEmail => 
+findUser(userId).flatMap(fn(user) =
+  getUserEmail(user).flatMap(fn(email) =
+    validateEmail(email).map(fn(validEmail) =
       validEmail
     )
   )
@@ -274,29 +274,29 @@ bind式の利点は、ネストしたflatMap/map呼び出しを平坦で読み�
 
 bind式は、以下のような型を持つ値に対して使用できます：
 
-1. **Option<T>**: 値が存在するかどうかを表す型
-2. **Result<T, E>**: 成功または失敗を表す型
-3. **Future<T>**: 非同期計算の結果を表す型
-4. **Either<L, R>**: 2つの可能な型のうちの1つを表す型
+1. **Option[T]**: 値が存在するかどうかを表す型
+2. **Result[T, E]**: 成功または失敗を表す型
+3. **Future[T]**: 非同期計算の結果を表す型
+4. **Either[L, R]**: 2つの可能な型のうちの1つを表す型
 5. **カスタムモナド型**: `flatMap`と`map`メソッドを持つ任意の型
 
 bind式を使用するには、対象の型が以下のメソッドを提供している必要があります：
 
-```
-trait Monad<T> {
-  fn flatMap<U>(f: (T) -> Monad<U>): Monad<U>
-  fn map<U>(f: (T) -> U): Monad<U>
+```protorun
+let Monad = trait[T] {
+  let flatMap: [U](f: (T) -> Monad[U]) -> Monad[U]
+  let map: [U](f: (T) -> U) -> Monad[U]
 }
 ```
 
 ### 6.3.3 関数式 (Function Expressions)
 
-関数式（以前のラムダ式）は、無名関数をその場で定義するための構文です。`fn` キーワードで始まり、パラメータリスト（複数種類あり、すべてオプション）、オプションの戻り値型、そして `=>` の後に続く関数本体（式）で構成されます。
+関数式（以前のラムダ式）は、無名関数をその場で定義するための構文です。`fn` キーワードで始まり、パラメータリスト（複数種類あり、すべてオプション）、オプションの戻り値型、そして `=` の後に続く関数本体（式）で構成されます。
 
 **構文:**
 
 ```ebnf
-FunctionExpr ::= FunctionHeader "=>" Expression
+FunctionExpr ::= FunctionHeader "=" Expression
 FunctionHeader ::= "fn" GenericParams? ParamList? EffectParamList? ImplicitParamList? ("->" ReturnType)?
 ParamList ::= "(" (Param ("," Param)*)? ")"
 EffectParamList ::= "(" (EffectParam ("," EffectParam)*)? ")"
@@ -311,48 +311,48 @@ ReturnType ::= Type | "Unit" // (Type の定義は他を参照)
 - `EffectParamList?`: Effect パラメータリスト（オプション）。`()` で囲み、カンマ区切りで `effect identifier: TypeRef` を記述します。関数が依存する効果インターフェースを指定します。
 - `ImplicitParamList?`: Implicit パラメータリスト（オプション）。`(with ...)` で囲み、カンマ区切りで `identifier (: Type)?` を記述します。コンテキストから暗黙的に渡される値を指定します（Scala の implicit parameter list に類似）。
 - `("->" ReturnType)?`: 戻り値の型注釈（オプション）。アロー `->` に続けて戻り値の型 (`ReturnType`) を記述します。
-- `=>`: パラメータリスト/型注釈と関数本体を区切るキーワード。
-- `Expression`: 関数本体。`=>` の後に直接続きます。単一の式である必要があります。複数の文を実行したい場合はブロック式 `{...}` を使用します。
+- `=`: パラメータリスト/型注釈と関数本体を区切るキーワード。
+- `Expression`: 関数本体。`=` の後に直接続きます。単一の式である必要があります。複数の文を実行したい場合はブロック式 `{...}` を使用します。
 
 **具体例:**
 
 ```protorun
 // 通常のパラメータのみ
-let add = fn (a: Int, b: Int) -> Int => a + b
-let square = fn x -> x * x // 戻り値型推論
+let add = fn(a: Int, b: Int) -> Int = a + b
+let square = fn(x) = x * x // 戻り値型推論
 
 // Effect パラメータを持つ関数式
-let logOperation = fn (data: Data) (effect logger: Logger) -> Unit => { // 戻り値 Unit を明示 (または推論)
-  logger.log(s"Processing $data")
+let logOperation = fn(data: Data) (effect logger: Logger) -> Unit = { // 戻り値 Unit を明示 (または推論)
+  logger.log(f"Processing {data}")
   process(data)
 }
 
 // Implicit パラメータを持つ関数式
-let greet = fn (name: String) (with context: Context) -> String => {
-  s"${context.greeting}, $name!"
+let greet = fn(name: String) (with context: Context) -> String = {
+  f"{context.greeting}, {name}!"
 }
 
 // 複数のパラメータリストを持つ関数式
-let complexCalc = fn (x: Int) (effect state: State<Int>) (with config: Config) -> Int => {
+let complexCalc = fn(x: Int) (effect state: State[Int]) (with config: Config) -> Int = {
   let current = state.get()
   state.set(current + x * config.multiplier)
   state.get()
 }
 
 // パラメータなしの関数式
-let getMeaning = fn -> Int => 42 // 戻り値型を明示 (または推論)
+let getMeaning = fn -> Int = 42 // 戻り値型を明示 (または推論)
 
 // ブロック式を本体に持つ関数式
-let process = fn (input: String) -> String => {
+let process = fn(input: String) -> String = {
   let trimmed = input.trim()
-  println(s"Processing: $trimmed")
+  println(f"Processing: {trimmed}")
   trimmed.toUpperCase() // ブロックの最後の式が返り値
 }
 ```
 
 **特徴:**
 
-- **統一された関数定義**: `let` 束縛と組み合わせることで、名前付き関数も無名関数も同じ `fn (...) -> RetType => body` 形式で表現されます ([4.2.2 `let` による関数定義](04-declarations.md#let-による関数定義) を参照)。
+- **統一された関数定義**: `let` 束縛と組み合わせることで、名前付き関数も無名関数も同じ `fn(...) -> RetType = body` 形式で表現されます ([4.2.2 `let` による関数定義](04-declarations.md#let-による関数定義) を参照)。
 - **パラメータリストの柔軟性**: 通常、Effect、Implicit の3種類のパラメータリストを任意の順序（ただし、各種類は1回まで）で記述できます（※注: 現在のパーサー実装では `ParamList? EffectParamList? ImplicitParamList?` の順序のみサポート）。これにより、カリー化や依存性の注入を表現豊かに行えます。
 - **式ベース**: 関数式の本体は常に単一の式です。
 
@@ -365,7 +365,7 @@ let process = fn (input: String) -> String => {
 type ConsoleLogger {}
 handler Logger for ConsoleLogger { /* ... */ }
 type Counter { let mutable count: Int }
-handler State<Int> for Counter { /* ... */ }
+handler State[Int] for Counter { /* ... */ }
 
 // インスタンス生成
 let logger = ConsoleLogger {}
@@ -376,12 +376,12 @@ let result = with log = logger, state = counterState {
   log.log("計算を開始します")
   let x = complexCalculation(state.get()) // 仮の関数
   state.set(x)
-  log.log(s"計算結果: $x")
+  log.log(f"計算結果: {x}")
   x * 2 // この値がwith式の返り値となる
 }
 
 // with式の返り値を関数の引数として使用 (型注釈あり)
-processResult(with st = counterState: State<Int> {
+processResult(with st = counterState: State[Int] {
   let current = st.get()
   st.set(current + 1)
   current * 2 // この値がwith式の返り値となる
@@ -399,9 +399,9 @@ processResult(with st = counterState: State<Int> {
     let fsConfig = FileSystemConfig { basePath: "/data" }
 
     let fileContents = with fs = fsConfig { // 型推論される
-      let handle = fs.open("data.txt", FileMode.Read)?
-      let content = fs.read(&handle)?
-      fs.close(handle)?
+      let handle = fs.open("data.txt", FileMode.Read)
+      let content = fs.read(handle)
+      fs.close(handle)
       processData(content) // 処理結果を返す
       // fsConfig インスタンスのライフサイクルは with スコープとは独立
       // リソース解放はハンドラ実装や Drop トレイト等で管理 (詳細は8.7節)
@@ -413,7 +413,7 @@ processResult(with st = counterState: State<Int> {
 
     ```protorun
     // 条件分岐での使用
-    let result = if condition {
+    let result = if condition then {
       with log = logger { // ConsoleLogger インスタンス
         log.log("条件が真の場合の処理")
         computeForTrue()
@@ -421,7 +421,7 @@ processResult(with st = counterState: State<Int> {
     } else {
       type FileLoggerConfig { let path: String }
       handler Logger for FileLoggerConfig { /* ... */ }
-      let fileLoggerConfig = FileLoggerConfig { path: "/log/false.log" }
+      let fileLoggerConfig = FileLoggerConfig { path: "/log/else-branch.log" }
       with log = fileLoggerConfig: Logger { // Logger として使うことを明示
         log.log("条件が偽の場合の処理")
         computeForFalse()
@@ -461,15 +461,15 @@ match x {
 
 // 構造のパターンマッチング
 match opt {
-  Option.Some(value) => s"値: $value",
+  Option.Some(value) => f"値: {value}",
   Option.None => "値なし"
 }
 
 // タプルのパターンマッチング
 match pair {
-  (0, y) => s"最初の要素はゼロ、2番目は$y",
-  (x, 0) => s"最初の要素は$x、2番目はゼロ",
-  (x, y) => s"($x, $y)"
+  (0, y) => f"最初の要素はゼロ、2番目は{y}",
+  (x, 0) => f"最初の要素は{x}、2番目はゼロ",
+  (x, y) => f"({x}, {y})"
 }
 
 // 複数文を実行する場合 (右辺はブロック式)
@@ -501,7 +501,7 @@ Protorun言語のパターンマッチングは、以下の原則に基づいて
 関数内で Effect パラメータのエイリアスを使って効果操作を呼び出す構文 `alias.operation(...)` も式の一種です。
 
 ```protorun
-let example = fn (effect log: Console) -> Int => {
+let example = fn(effect log: Console) -> Int = {
   log.log("開始") // 効果操作呼び出し式 (Unit を返す)
   let result = calculate()
   log.log("終了") // 効果操作呼び出し式
@@ -552,7 +552,7 @@ Protorunは、複数の値を一つのまとまりとして扱うためのタプ
 ```protorun
 let unit_val = ()             // Unit 型
 let pair = (10, "hello")      // (Int, String) 型
-let triple = (true, 2.5, 'x') // (Bool, Float, Char) 型
+let triple = (True, 2.5, 'x') // (Bool, Float, Char) 型
 ```
 
 **グループ化:**
@@ -597,7 +597,7 @@ PartialApplicationExpr ::= Expression "(" ((Expression | "_") ("," (Expression |
 
 ```protorun
 // 2引数関数
-let add = fn (a: Int, b: Int) -> Int => a + b
+let add = fn(a: Int, b: Int) -> Int = a + b
 
 // 部分適用: 最初の引数に 1 を適用
 let add_one = add(1, _) // add_one は Int -> Int 型の関数
@@ -610,7 +610,7 @@ let add_ten = add(_, 10) // add_ten は Int -> Int 型の関数
 let result2 = add_ten(3) // result2 は 13
 
 // 複数のプレースホルダー
-let multiply = fn (a: Int, b: Int, c: Int) -> Int => a * b * c
+let multiply = fn(a: Int, b: Int, c: Int) -> Int = a * b * c
 let multiply_by_two = multiply(_, 2, _) // multiply_by_two は (Int, Int) -> Int 型の関数
 let result3 = multiply_by_two(3, 4) // result3 は 24 (3 * 2 * 4)
 ```
@@ -647,7 +647,7 @@ VariantDefinition ::= Identifier ("(" TypeList? ")")?
 ```
 
 - `type` キーワードで始まります。
-- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- オプションでジェネリックパラメータ `[GenericParams]?` を持ちます。
 - 中括弧 `{}` 内に、フィールド定義のリスト（レコード型の場合）またはヴァリアント定義のリスト（ヴァリアント型の場合）を記述します。
 - パーサーは `{` の直後の最初の要素の形式によって、レコード型定義かヴァリアント型定義かを判断します ([4. 宣言](04-declarations.md#432-ヴァリアント型定義-type) の「レコード型定義との区別」を参照)。
 
@@ -658,7 +658,7 @@ VariantDefinition ::= Identifier ("(" TypeList? ")")?
 let Point = type { x: Float, y: Float }
 
 // ヴァリアント型
-let Option = type<T> { Some(T), None }
+let Option = type[T] { Some(T), None }
 ```
 
 この式は、`let` で束縛されることで、新しい型をスコープに導入します。
@@ -675,14 +675,14 @@ let Option = type<T> { Some(T), None }
 AliasDefinitionExpr ::= "alias" GenericParams? Type
 ```
 - `alias` キーワードで始まります。
-- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- オプションでジェネリックパラメータ `[GenericParams]?` を持ちます。
 - 既存の型 (`Type`) を指定します。
 
 この式は、`let` で束縛されることで、新しい型エイリアスをスコープに導入します。
 
 ```protorun
 let UserId = alias Int
-let StringMap = alias<T> Map<String, T>
+let StringMap = alias[T] Map[String, T]
 let Callback = alias (Int) -> String
 ```
 詳細な意味論は [4. 宣言](04-declarations.md#44-型エイリアス定義-alias) を参照してください。
@@ -698,9 +698,9 @@ TraitDefinitionExpr ::= "trait" GenericParams? (":" TypeRef)? "{" TraitItem* "}"
 TraitItem ::= LetDecl // メソッドシグネチャ or デフォルト実装
 ```
 - `trait` キーワードで始まります。
-- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- オプションでジェネリックパラメータ `[GenericParams]?` を持ちます。
 - オプションでスーパー（親）トレイト `(: TypeRef)` を指定できます（単一継承のみ）。
-- 中括弧 `{}` 内に、`LetDecl` を用いてメソッドシグネチャ (`let name: (self, ...) -> ...`) またはデフォルト実装 (`let name = fn (self, ...) -> ... => ...`) を記述します。
+- 中括弧 `{}` 内に、`LetDecl` を用いてメソッドシグネチャ (`let name: (self, ...) -> ...`) またはデフォルト実装 (`let name = fn(self, ...) -> ... = ...`) を記述します。
 
 この式は、`let` で束縛されることで、新しいトレイトをスコープに導入します。
 
@@ -708,7 +708,7 @@ TraitItem ::= LetDecl // メソッドシグネチャ or デフォルト実装
 let Show = trait { let show: (self) -> String }
 let Ord = trait: Eq {
   let compare: (self, other: Self) -> Int
-  let equals = fn(self, other: Self) -> Bool => self.compare(other) == 0
+  let equals = fn(self, other: Self) -> Bool = self.compare(other) == 0
 }
 ```
 詳細な意味論は [4. 宣言](04-declarations.md#46-トレイト定義-trait-と実装-impl) を参照してください。
@@ -724,13 +724,13 @@ EffectDefinitionExpr ::= "effect" GenericParams? "{" EffectItem* "}"
 EffectItem ::= LetDecl // 操作シグネチャ
 ```
 - `effect` キーワードで始まります。
-- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- オプションでジェネリックパラメータ `[GenericParams]?` を持ちます。
 - 中括弧 `{}` 内に、`LetDecl` を用いて操作シグネチャ (`let name: (arg1: Type1, ...) -> ReturnType1`) を記述します。
 
 この式は、`let` で束縛されることで、新しい効果インターフェースをスコープに導入します。
 
 ```protorun
-let State = effect<S> { let get: () -> S; let put: (value: S) -> Unit }
+let State = effect[S] { let get: () -> S; let put: (value: S) -> Unit }
 ```
 詳細な意味論は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
 
@@ -745,16 +745,109 @@ HandlerDefinitionExpr ::= "handler" GenericParams? TypeRef "for" TypeRef WhereCl
 HandlerItem ::= LetDecl // 操作実装
 ```
 - `handler` キーワードで始まります。
-- オプションでジェネリックパラメータ `<GenericParams>?` を持ちます。
+- オプションでジェネリックパラメータ `[GenericParams]?` を持ちます。
 - 実装する効果 (`TypeRef`) と対象の型 (`TypeRef`) を指定します (`for` キーワードを使用)。
-- 中括弧 `{}` 内に、`let` を用いた関数定義 (`let name = fn (self, ...) -> ... => ...`) の形式で操作の実装を記述します。
+- 中括弧 `{}` 内に、`let` を用いた関数定義 (`let name = fn(self, ...) -> ... = ...`) の形式で操作の実装を記述します。
 
 この式は、`let` で束縛されることで、特定の効果実装（ハンドラ）をスコープに導入します。
 
 ```protorun
-let CounterStateHandler = handler State<Int> for CounterState {
-  let get = fn (self) -> Int => self.count
-  let put = fn (self, value: Int) -> Unit => { /* ... */ }
+let CounterStateHandler = handler State[Int] for CounterState {
+  let get = fn(self) -> Int = self.count
+  let put = fn(self, value: Int) -> Unit = { /* ... */ }
 }
 ```
 詳細な意味論は [8. 代数的効果](08-algebraic-effects.md) を参照してください。
+
+## 6.10 文字列補間式
+
+文字列補間式は、`f` プレフィックスを付けた文字列リテラルで、`{expr}` を使って式を埋め込みます。
+
+**構文:**
+
+```ebnf
+StringInterpolation ::= "f" "\"" (StringContent | "{" Expression "}")* "\""
+```
+
+**例:**
+
+```protorun
+let name = "World"
+let greeting = f"Hello, {name}!"  // "Hello, World!"
+
+let x = 42
+let msg = f"The answer is {x * 2}"  // "The answer is 84"
+
+// 複雑な式も埋め込み可能
+let result = f"Result: {if x > 0 then { "positive" } else { "non-positive" }}"
+```
+
+**デシュガー:**
+
+`f"Hello, {name}!"` は以下に等価:
+
+```protorun
+String.concat(["Hello, ", name.show(), "!"])
+```
+
+埋め込まれた式は `Show` トレイトの `show()` メソッドで文字列に変換されます。
+
+`{` をリテラルとして含めるには `{{` とエスケープします。
+
+## 6.11 範囲式
+
+範囲式は、連続した値の範囲を表現します。
+
+**構文:**
+
+```ebnf
+RangeExpr ::= Expression ".." Expression
+            | Expression "..=" Expression
+```
+
+**例:**
+
+```protorun
+let r1 = 1..10    // Range[Int]: 1, 2, ..., 9 (10を含まない)
+let r2 = 1..=10   // RangeInclusive[Int]: 1, 2, ..., 10 (10を含む)
+
+// for ループで使用
+for i in 1..5 then {
+  println(f"i = {i}")  // 1, 2, 3, 4
+}
+```
+
+**型:**
+
+- `a..b` は `Range[T]` 型を返す（`T` は `a` と `b` の型）
+- `a..=b` は `RangeInclusive[T]` 型を返す
+- `Range[T]` と `RangeInclusive[T]` は `Iterable[T]` を実装する
+
+## 6.12 メソッド呼び出しとUFCS
+
+Protorunでは、`x.f(y)` 形式のメソッド呼び出しは以下の順序で解決されます：
+
+1. **固有メソッド**: `x` の型に直接定義されたメソッド
+2. **トレイトメソッド**: スコープ内でインポートされたトレイトのメソッド
+
+**UFCS（Universal Function Call Syntax）:**
+
+`x.f(y)` は `f(x, y)` と等価です（フリー関数として定義されている場合）。
+
+**曖昧性の解消:**
+
+複数のトレイトが同名のメソッドを提供する場合、明示的に指定します：
+
+```protorun
+Type.method(x, y)   // 型の固有メソッドを明示
+Trait.method(x, y)  // 特定のトレイトのメソッドを明示
+```
+
+**インデックスアクセス:**
+
+`[]` はジェネリクス専用です。コレクションへのインデックスアクセスはトレイトメソッドを使用します：
+
+```protorun
+list.get(0)        // インデックス 0 の要素を取得 (Option[T] を返す)
+list.set(0, val)   // インデックス 0 に val を設定
+```
